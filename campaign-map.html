@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Limiar OS - Mapa de Campanha</title>
+  <style>
+    :root{--bg:#080a07;--panel:#0e120d;--line:rgba(214,170,78,.2);--gold:#d6aa4e;--teal:#3fe0d0;--red:#c0635b;--text:#f0ead8;--muted:#6f7a64;--side:360px}
+    *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:radial-gradient(800px 520px at 18% 10%,rgba(63,224,208,.10),transparent 60%),#050704;color:var(--text);font-family:"Share Tech Mono","Consolas",monospace}
+    body:before{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 4px);opacity:.28;z-index:3}
+    button,input,select,textarea{font:inherit}button{cursor:pointer}input,select,textarea{width:100%;min-width:0;background:#080a07;border:1px solid rgba(214,170,78,.25);color:var(--text);outline:0;padding:8px}textarea{min-height:62px;resize:vertical}
+    #app{position:relative;z-index:4;width:100vw;height:100dvh;display:grid;grid-template-columns:54px minmax(0,1fr) var(--side);grid-template-rows:44px minmax(0,1fr);padding:10px}
+    body.side-off{--side:0px}.topbar{grid-column:1/4;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-bottom:0;background:rgba(14,18,13,.96);padding:0 10px}
+    .brand{display:flex;align-items:center;gap:10px;min-width:0;text-transform:uppercase;font-size:12px;letter-spacing:1px;color:var(--teal)}.brand strong{color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brand span:last-child{min-width:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .actions,.row{display:flex;align-items:center;gap:8px}.toolbar{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:8px;align-items:center;border:1px solid var(--line);border-right:0;background:rgba(14,18,13,.96);padding:9px 7px}
+    .tool,.btn,.tab{border:1px solid rgba(63,224,208,.3);background:rgba(63,224,208,.055);color:var(--text)}.tool{width:36px;height:36px;display:grid;place-items:center}.tool.active,.tool:hover,.btn:hover,.tab.active,.tab:hover{border-color:var(--gold);color:var(--gold);background:rgba(214,170,78,.1)}.btn{min-height:32px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;text-transform:none;cursor:pointer}.primary{border-color:var(--gold);color:var(--gold);background:rgba(214,170,78,.1)}.danger{color:var(--red);border-color:rgba(192,99,91,.36)}
+    .stage{position:relative;grid-column:2;grid-row:2;min-width:0;min-height:0;border:1px solid var(--line);background:#020403;overflow:hidden}#canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}.hud{position:absolute;left:12px;bottom:12px;display:flex;gap:10px;align-items:center;max-width:calc(100% - 24px);background:rgba(5,7,4,.86);border:1px solid rgba(63,224,208,.22);padding:8px 10px;color:var(--muted);font-size:11px;pointer-events:none}
+    .side{grid-column:3;grid-row:2;min-width:0;overflow:hidden;border:1px solid var(--line);border-left:0;background:rgba(14,18,13,.96);display:grid;grid-template-rows:auto minmax(0,1fr)}body.side-off .side{display:none}.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:10px;border-bottom:1px solid var(--line)}.tab{min-height:32px;font-size:10px;text-transform:uppercase}.panel{display:none;overflow:auto;padding:12px}.panel.active{display:block}.section{margin-bottom:14px}.section h2{margin:0 0 9px;color:var(--teal);font-size:11px;letter-spacing:1px;text-transform:uppercase}.stack{display:grid;gap:9px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}label{display:grid;gap:5px;color:var(--muted);font-size:10px;text-transform:uppercase}.hint,.status{color:var(--muted);font-size:11px;line-height:1.45}.ok{color:#6bd67d}.err{color:var(--red)}.hidden{display:none!important}.lm-file-input{position:fixed;left:-1000px;top:auto;width:1px;height:1px;opacity:.01}
+    .list{display:grid;gap:7px}.list-btn{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;min-height:38px;text-align:left;border:1px solid rgba(63,224,208,.17);background:rgba(63,224,208,.04);color:var(--text);padding:8px}.list-btn.active,.list-btn:hover{border-color:var(--gold);background:rgba(214,170,78,.08)}.list-btn span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tag{font-size:9px;color:var(--muted)}.swatch{width:16px;height:16px;border:2px solid rgba(240,234,216,.7);border-radius:50%}.token-row{grid-template-columns:18px minmax(0,1fr) auto auto}.divider{width:32px;height:1px;background:var(--line);margin:4px 0}
+    @media(max-width:900px){#app{grid-template-columns:48px minmax(0,1fr);grid-template-rows:44px minmax(0,1fr) minmax(240px,36dvh)}.topbar{grid-column:1/3}.toolbar{grid-row:2/4}.stage{grid-column:2;grid-row:2}.side{grid-column:2;grid-row:3;border-left:1px solid var(--line);border-top:0}.actions{display:none}body.side-off #app{grid-template-rows:44px minmax(0,1fr)}}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand"><span>// campaign-map.exe</span><strong id="sceneName">cena</strong><span id="campaignName">campanha</span></div>
+      <div class="actions"><button class="btn" id="reloadBtn">recarregar</button><button class="btn" id="fitBtn">encaixar</button><button class="btn" id="backBtn">voltar</button></div>
+    </header>
+    <nav class="toolbar">
+      <button class="tool active" data-tool="select" title="Selecionar/mover">M</button>
+      <button class="tool" data-tool="pan" title="Mover camera">P</button>
+      <button class="tool" data-tool="measure" title="Medir">R</button>
+      <button class="tool master-only" data-tool="fog" title="Area oculta">O</button>
+      <button class="tool master-only" data-tool="terrain" title="Terreno dificil (2m por 1m percorrido)">T</button>
+      <div class="divider"></div>
+      <button class="tool" id="sideBtn" title="Painel">☰</button>
+      <button class="tool" id="zoomInBtn" title="Zoom +">+</button>
+      <button class="tool" id="zoomOutBtn" title="Zoom -">-</button>
+      <button class="tool" id="centerBtn" title="Encaixar">□</button>
+    </nav>
+    <main class="stage"><canvas id="canvas" tabindex="0"></canvas><div class="hud" id="hud">Zoom 100%</div></main>
+    <aside class="side">
+      <div class="tabs">
+        <button class="tab active" data-panel="scenes">cenas</button>
+        <button class="tab" data-panel="tokens">tokens</button>
+        <button class="tab" data-panel="fog">sombra</button>
+        <button class="tab" data-panel="view">visao</button>
+      </div>
+      <section class="panel active" id="panel-scenes">
+        <div class="section"><h2>Cenario ativo</h2><div class="stack"><select id="sceneSelect"></select><div class="row master-only"><button class="btn primary" id="activateSceneBtn">ativar</button><button class="btn" id="newSceneBtn">nova</button></div></div></div>
+        <div class="section master-only"><h2>Editar cenario</h2><div class="stack"><label>Nome<input id="sceneInput"></label><label>Imagem<input id="bgInput" placeholder="/uploads/..."></label><div class="row"><label class="btn" id="uploadBtn" for="uploadFile">upload</label><button class="btn" id="useImageSizeBtn">usar tamanho</button><input class="lm-file-input" id="uploadFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div><div class="grid2"><label>Ajuste<select id="fitSelect"><option value="contain">encaixar</option><option value="cover">preencher</option><option value="native">nativo</option><option value="stretch">esticar</option></select></label><label>Grid<input id="gridInput" type="number" min="16" max="240"></label></div><div class="grid2"><label>Largura<input id="widthInput" type="number"></label><label>Altura<input id="heightInput" type="number"></label></div><button class="btn primary" id="saveSceneBtn">salvar cenario</button></div></div>
+        <p class="hint">Use imagens por upload ou URL interna. Cada campanha tem sua propria lista de cenas.</p>
+      </section>
+      <section class="panel" id="panel-tokens">
+        <div class="section master-only"><h2>Criar / editar token</h2><div class="stack"><div class="row"><label style="flex:1">Nome<input id="tokenName" value="Token"></label><label style="width:74px">Cor<input id="tokenColor" type="color" value="#d6aa4e"></label></div><label>Imagem<input id="tokenImage" placeholder="/uploads/..."></label><div class="row"><label class="btn" id="tokenUploadBtn" for="tokenUploadFile">upload</label><button class="btn" id="syncPlayersBtn">tokens das fichas</button><input class="lm-file-input" id="tokenUploadFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div><div class="grid2"><label>Tamanho<input id="tokenSize" type="number" min=".35" max="4" step=".1" value="1"></label><label>Visao px<input id="tokenVision" type="number" min="0" max="2000" value="260"></label></div><div class="grid2"><label>Move (celulas, manual)<input id="tokenMove" type="number" min="1" max="20" value="6"></label><label>&nbsp;<span class="hint">Token de personagem usa o MOVE efetivo da ficha</span></label></div><div class="grid2"><label>HP<input id="tokenHp" type="number"></label><label>HP max<input id="tokenHpMax" type="number"></label></div><label class="row" style="display:flex"><input id="tokenVisible" type="checkbox" checked style="width:16px"><span>visivel</span></label><div class="row"><button class="btn primary" id="addTokenBtn">adicionar</button><button class="btn" id="saveTokenBtn">salvar</button><button class="btn" id="centerTokenBtn">centralizar</button></div></div></div>
+        <div class="section"><h2>Tokens na cena</h2><div class="list" id="tokenList"></div></div>
+      </section>
+      <section class="panel" id="panel-fog">
+        <div class="section master-only"><h2>Area oculta manual</h2><div class="stack"><button class="btn primary" id="fogToolBtn">desenhar retangulo</button><button class="btn danger" id="clearRevealsBtn">resetar revelado</button><p class="hint">A sombra vai sendo revelada conforme tokens com visao se movem. Areas manuais continuam escuras ate o mestre remover.</p></div></div>
+        <div class="section"><h2>Areas ocultas</h2><div class="list" id="fogList"></div></div>
+        <div class="section master-only"><h2>Terreno dificil</h2><div class="stack"><p class="hint">Ferramenta "T" na barra lateral: clique ou arraste para marcar celulas de terreno dificil (2m de movimento gastos por 1m percorrido, RAW). Cada celula tocada no arraste alterna uma vez.</p><button class="btn danger" id="clearTerrainBtn">limpar terreno dificil</button></div></div>
+      </section>
+      <section class="panel" id="panel-view">
+        <div class="section"><h2>Visualizacao</h2><div class="stack"><label class="row" style="display:flex"><input id="gridToggle" type="checkbox" checked style="width:16px"><span>mostrar grid</span></label><label class="row" style="display:flex"><input id="snapToggle" type="checkbox" style="width:16px"><span>snap no grid</span></label><label class="row" style="display:flex"><input id="runToggle" type="checkbox" style="width:16px"><span>Run (dobra alcance de movimento do token selecionado)</span></label><button class="btn" id="fitPanelBtn">encaixar mapa</button><button class="btn" id="sideCloseBtn">recolher painel</button></div></div>
+        <div class="section"><h2>Status</h2><div class="status" id="statusText"></div></div>
+      </section>
+    </aside>
+  </div>
+  <script type="module" src="/dist/campaign-map.js"></script>
+</body>
+</html>

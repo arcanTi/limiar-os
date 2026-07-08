@@ -1,0 +1,57 @@
+[
+  {
+    "key": "nocoverage",
+    "label": "NO COVERAGE",
+    "pt": "SEM PLANO",
+    "color": "#c0635b",
+    "glow": "rgba(192,99,91,.24)",
+    "bg": "linear-gradient(135deg,#1a0f0d,#070808 58%,#241210)",
+    "response": "NO RESPONSE",
+    "eta": "",
+    "clearance": ""
+  },
+  {
+    "key": "silver",
+    "label": "SILVER",
+    "pt": "PRATA",
+    "color": "#aeb4b8",
+    "glow": "rgba(174,180,184,.18)",
+    "bg": "linear-gradient(135deg,#101315,#070808 58%,#1b2022)",
+    "response": "URBAN RESPONSE",
+    "eta": "ETA 12 MIN",
+    "clearance": "TT-S"
+  },
+  {
+    "key": "gold",
+    "label": "GOLD",
+    "pt": "OURO",
+    "color": "#d6aa4e",
+    "glow": "rgba(214,170,78,.28)",
+    "bg": "linear-gradient(135deg,#221b0c,#090a08 60%,#37280c)",
+    "response": "PRIORITY RESPONSE",
+    "eta": "ETA 7 MIN",
+    "clearance": "TT-G"
+  },
+  {
+    "key": "platinum",
+    "label": "PLATINUM",
+    "pt": "PLATINUM",
+    "color": "#eef8ff",
+    "glow": "rgba(170,225,255,.42)",
+    "bg": "linear-gradient(135deg,#233744,#071014 48%,#3b5868)",
+    "response": "EXECUTIVE RESPONSE",
+    "eta": "ETA 3 MIN",
+    "clearance": "TT-P"
+  },
+  {
+    "key": "executivo",
+    "label": "EXECUTIVE",
+    "pt": "EXECUTIVO",
+    "color": "#c9a4ff",
+    "glow": "rgba(201,164,255,.45)",
+    "bg": "linear-gradient(135deg,#241a37,#0a0710 48%,#3a2555)",
+    "response": "FULL-BODY RESTORE",
+    "eta": "ETA 90 SEC",
+    "clearance": "TT-X"
+  }
+]

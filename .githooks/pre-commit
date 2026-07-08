@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+python3 -m pytest backend/tests -q
+
+cd frontend
+npm test
+npm run typecheck

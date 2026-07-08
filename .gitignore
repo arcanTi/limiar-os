@@ -1,0 +1,28 @@
+# SQLite database + WAL/SHM sidecars — runtime state, never versioned
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# User uploads (portraits etc.) — runtime data
+uploads/
+
+# Python bytecode cache
+__pycache__/
+*.py[cod]
+
+# Scratch / temp
+tmp/
+
+# OS noise
+.DS_Store
+
+# caveman-code tooling — assistant skills, not Limiar OS source
+.agents/
+skills-lock.json
+
+# Node deps (frontend build tooling)
+node_modules/
+frontend/node_modules/
+frontend/coverage/
+
+.claude

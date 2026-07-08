@@ -1,0 +1,2238 @@
+{
+  "generatedAt": "2026-07-02T13:41:15.018Z",
+  "source": "data/seed/limiar-seed.json",
+  "canonicalRules": "data/canonical/cpr-canonical-rules.json",
+  "report": "data/audit/limiar-catalog-audit.json",
+  "engineReferences": {
+    "stats": [
+      "INT",
+      "REF",
+      "DEX",
+      "TECH",
+      "COOL",
+      "WILL",
+      "LUCK",
+      "MOVE",
+      "BODY",
+      "EMP"
+    ],
+    "skills": [
+      "Accounting",
+      "Acting",
+      "Air Vehicle Tech",
+      "Animal Handling",
+      "Archery",
+      "Athletics",
+      "Autofire",
+      "Basic Tech",
+      "Brawling",
+      "Bribery",
+      "Bureaucracy",
+      "Business",
+      "Composition",
+      "Conceal/Reveal Object",
+      "Concentration",
+      "Contortionist",
+      "Conversation",
+      "Criminology",
+      "Cryptography",
+      "Cybertech",
+      "Dance",
+      "Deduction",
+      "Demolitions",
+      "Drive Land Vehicle",
+      "Education",
+      "Electronics/Security Tech",
+      "Endurance",
+      "Evasion",
+      "First Aid",
+      "Forgery",
+      "Gamble",
+      "Handgun",
+      "Heavy Weapons",
+      "Human Perception",
+      "Interrogation",
+      "Land Vehicle Tech",
+      "Language (Streetslang)",
+      "Library Search",
+      "Lip Reading",
+      "Local Expert (Your Home)",
+      "Martial Arts",
+      "Melee Weapon",
+      "Paint/Draw/Sculpt",
+      "Paramedic",
+      "Perception",
+      "Personal Grooming",
+      "Persuasion",
+      "Photography/Film",
+      "Pick Lock",
+      "Pick Pocket",
+      "Pilot Air Vehicle",
+      "Pilot Sea Vehicle",
+      "Play Instrument",
+      "Resist Torture/Drugs",
+      "Riding",
+      "Science",
+      "Sea Vehicle Tech",
+      "Shoulder Arms",
+      "Stealth",
+      "Streetwise",
+      "Tactics",
+      "Tracking",
+      "Trading",
+      "Wardrobe & Style",
+      "Weaponstech",
+      "Wilderness Survival"
+    ],
+    "bonusTypes": [
+      "armorAblation",
+      "critDamage",
+      "critRoll",
+      "damageVsCover",
+      "deafenImmunity",
+      "empImmunity",
+      "flashImmunity",
+      "healingRate",
+      "ignoreArmor",
+      "nonLethalOption",
+      "rangedBonus",
+      "spinalInjuryImmunity",
+      "weaponMode"
+    ],
+    "sourceTypes": [
+      "official-core",
+      "official-dlc",
+      "official-supplement",
+      "homebrew-limiar",
+      "unvalidated"
+    ],
+    "skillAliases": {
+      "Local Expert (Home)": "Local Expert (Your Home)",
+      "Melee Weapons": "Melee Weapon",
+      "Weapon Tech": "Weaponstech",
+      "Weapons Tech": "Weaponstech",
+      "Photograph/Film": "Photography/Film",
+      "Street Slang": "Streetslang",
+      "Language (Street Slang)": "Language (Streetslang)"
+    },
+    "invalidSkillLikeFields": [
+      "Athletics (natacao)",
+      "Disguise",
+      "Evidence Collection",
+      "MOVE_ao_patinar",
+      "Perception (as cegas/no escuro)",
+      "Perception (deteccao por radar/sonar)",
+      "Pericia Selecionada (definir na instalacao)"
+    ],
+    "canonicalItemCodes": [
+      "AIR-SUPP",
+      "AMMO-ARROW",
+      "AMMO-GRENADE",
+      "AMMO-H-PISTOL",
+      "AMMO-M-PISTOL",
+      "AMMO-RIFLE",
+      "AMMO-ROCKET",
+      "AMMO-SHELL",
+      "AMMO-SLUG",
+      "AMMO-VH-PISTOL",
+      "AMP-HEARING",
+      "ANTI-DAZ",
+      "ART-SHOULDER",
+      "ASSAULT-RIFLE",
+      "AUD-REC",
+      "AUDIOVOX",
+      "BD-REC",
+      "BIG-KNUCKS",
+      "BOW-CROSSBOW",
+      "BRAWLING-BODY-HIGH",
+      "BRAWLING-BODY-LOW",
+      "BRAWLING-BODY-MID",
+      "BRAWLING-BODY-SUPERHUMAN",
+      "BUG-DET",
+      "CHAINRIPP",
+      "CHEM-ANAL",
+      "CHIP-SOCKET",
+      "CHYRON",
+      "COLOR-SH",
+      "COMBAT-TAIL",
+      "CONC-SLEEVE",
+      "CONTRACEPTIVE",
+      "CYBERARM",
+      "CYBERAUDIO",
+      "CYBERDECK-ARM",
+      "CYBEREYE",
+      "CYBERLEG",
+      "DARTGUN-EYE",
+      "DRUM-MAG",
+      "ENH-ANTI",
+      "ENH-BARB-LIN",
+      "ENH-DBL-EDGE",
+      "ENH-ELECTRO",
+      "ENH-HYD-RAM",
+      "ENH-MONO-EDG",
+      "ENH-PNEU-ACT",
+      "ENH-THERMAL",
+      "ENH-TUNG-REIN",
+      "EXTENDED-MAG",
+      "GILLS",
+      "GORILLA-ARMS",
+      "GRAPPLE-HAND",
+      "GRENADE-LAUNCHER",
+      "GRIP-FOOT",
+      "HARD-SHIELD",
+      "HEAVY-MELEE",
+      "HEAVY-PISTOL",
+      "HEAVY-SMG",
+      "HIDDEN-HOLSTER",
+      "HOM-TRAC",
+      "IMAGE-ENH",
+      "INT-AGENT",
+      "INTERFACE-PLUGS",
+      "JUMP-BOOSTER",
+      "KERENZIKOV",
+      "LEVEL-DAMP",
+      "LIGHT-MELEE",
+      "LINEAR-BETA",
+      "LINEAR-SIGMA",
+      "LOWLIGHT-UV",
+      "MANTIS-BLADE",
+      "MEDIUM-MELEE",
+      "MEDIUM-PISTOL",
+      "MEDSCAN",
+      "MEM-CHIP",
+      "MICRO-OPT",
+      "MICRO-VID",
+      "MONOWIRE",
+      "MULTIOPTIC",
+      "MUSCLE-LACE",
+      "NASAL-FILTER",
+      "NEURAL-LINK",
+      "OLF-BOOST",
+      "PAIN-EDITOR",
+      "PLASTIC-COVER",
+      "POP-MELEE",
+      "POP-RANGED",
+      "POP-SHIELD",
+      "POPUP-GL",
+      "QUICK-MOUNT",
+      "RAD-DET-OPT",
+      "RAD-SON-INT",
+      "RADAR-DET",
+      "RADIO-COMM",
+      "RADIO-SCAN-MUSIC",
+      "REALSKINN-COVER",
+      "REFLEX-CO",
+      "RIPPERS",
+      "ROCKET-LAUNCHER",
+      "SANDEVISTAN",
+      "SCOPE",
+      "SCRAM-DESC",
+      "SCRATCHERS",
+      "SENSOR-ARRAY",
+      "SEX-IMPL",
+      "SH-CAM",
+      "SHOTGUN",
+      "SKATE-FOOT",
+      "SKILL-CHIP",
+      "SKIN-WEAVE",
+      "SLICE-DICE",
+      "SMART-GLASSES",
+      "SMARTGUN-LINK",
+      "SMG",
+      "SNAKE",
+      "SNIPER-RIFLE",
+      "STD-FOOT",
+      "STD-HAND",
+      "SUB-GRIP",
+      "SUB-POCKET",
+      "SUBDERMAL-ARMOR",
+      "SUPERCHROME-COVER",
+      "TACT-BOOST",
+      "TALON-FOOT",
+      "TARGET-SCOPE",
+      "TECHSCANNER",
+      "TELE-OPT",
+      "TOOL-HAND",
+      "TOX-BIND",
+      "UNDERBARREL-GL",
+      "UNDERBARREL-SHOTGUN",
+      "VAMPYRES",
+      "VERY-HEAVY-MELEE",
+      "VERY-HEAVY-PISTOL",
+      "VIRTUALITY",
+      "VOICE-STRESS",
+      "WEB-FOOT",
+      "WOLVERS"
+    ]
+  },
+  "totals": {
+    "collections": {
+      "items": 157,
+      "gear": 4,
+      "characters": 3
+    },
+    "issues": 90,
+    "bySeverity": {
+      "warning": 77,
+      "error": 11,
+      "info": 2
+    },
+    "byType": {
+      "cyberware_missing_source": 31,
+      "requirements_free_text": 18,
+      "cyberware_missing_slots": 2,
+      "homebrew_missing_gm_approval": 12,
+      "weapon_missing_profile": 4,
+      "cyberweapon_missing_rof": 4,
+      "fake_skill_name": 1,
+      "legacy_bonus_not_applied": 1,
+      "cyberware_option_missing_parent_slot": 2,
+      "installed_slot_parent_missing": 9,
+      "installed_cyberware_parent_missing_legacy": 3,
+      "installed_required_cyberware_missing": 2,
+      "effect_legacy_bonus_not_applied": 1
+    },
+    "byCollection": {
+      "items": 75,
+      "characters": 15
+    }
+  },
+  "issues": [
+    {
+      "id": "0001-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[0]",
+      "code": "BIOMON",
+      "name": "Biomonitor",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.4",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0002-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[1]",
+      "code": "CHEMSKIN",
+      "name": "Chemskin",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.4",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0003-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[2]",
+      "code": "LIGHT-TAT",
+      "name": "Light Tattoo",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.4",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0004-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[36].requirements",
+      "code": "BACKUP-DRIVE",
+      "name": "Backup Drive",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "2 hardware slots"
+      }
+    },
+    {
+      "id": "0005-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[36]",
+      "code": "BACKUP-DRIVE",
+      "name": "Backup Drive",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.11",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0006-cyberware_missing_slots",
+      "severity": "warning",
+      "type": "cyberware_missing_slots",
+      "collection": "items",
+      "path": "items[36]",
+      "code": "BACKUP-DRIVE",
+      "name": "Backup Drive",
+      "message": "cyberware mentions slots but has no structured slots, slotCost, or slotCapacity field.",
+      "evidence": {
+        "requirements": "2 hardware slots",
+        "desc": "Salva programas nao-Black ICE destruidos e permite restaurar em outro deck.",
+        "normalized": {
+          "optionSlotsProvided": null,
+          "optionSlotsRequired": null,
+          "legacyRequirements": "2 hardware slots"
+        }
+      }
+    },
+    {
+      "id": "0007-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[37].requirements",
+      "code": "DNA-LOCK",
+      "name": "DNA Lock",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "2 hardware slots"
+      }
+    },
+    {
+      "id": "0008-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[37]",
+      "code": "DNA-LOCK",
+      "name": "DNA Lock",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.11",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0009-cyberware_missing_slots",
+      "severity": "warning",
+      "type": "cyberware_missing_slots",
+      "collection": "items",
+      "path": "items[37]",
+      "code": "DNA-LOCK",
+      "name": "DNA Lock",
+      "message": "cyberware mentions slots but has no structured slots, slotCost, or slotCapacity field.",
+      "evidence": {
+        "requirements": "2 hardware slots",
+        "desc": "Trava e destrava o cyberdeck por biometria.",
+        "normalized": {
+          "optionSlotsProvided": null,
+          "optionSlotsRequired": null,
+          "legacyRequirements": "2 hardware slots"
+        }
+      }
+    },
+    {
+      "id": "0010-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[38]",
+      "code": "HARD-CIRCUIT",
+      "name": "Hardened Circuitry",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.11",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0011-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[39]",
+      "code": "RANGE-UPGRADE",
+      "name": "Range Upgrade",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.11",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0012-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[40].requirements",
+      "code": "CHAINRIPP",
+      "name": "ChainRipp",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Validar suplemento"
+      }
+    },
+    {
+      "id": "0013-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[40]",
+      "code": "CHAINRIPP",
+      "name": "ChainRipp",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.13",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0014-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[41]",
+      "code": "MANTIS-BLADE",
+      "name": "Mantis Blade",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "MANTIS-BLADE"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "MANTIS-BLADE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0015-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[41].requirements",
+      "code": "MANTIS-BLADE",
+      "name": "Mantis Blade",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Validar suplemento"
+      }
+    },
+    {
+      "id": "0016-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[41]",
+      "code": "MANTIS-BLADE",
+      "name": "Mantis Blade",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.13",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0017-weapon_missing_profile",
+      "severity": "error",
+      "type": "weapon_missing_profile",
+      "collection": "items",
+      "path": "items[41]",
+      "code": "MANTIS-BLADE",
+      "name": "Mantis Blade",
+      "message": "weapon is missing required profile field(s): rof.",
+      "evidence": {
+        "damage": "",
+        "count": 3,
+        "sides": 6,
+        "damageScale": null,
+        "rof": null,
+        "magazine": null,
+        "skill": "Melee Weapon",
+        "normalized": {
+          "code": "MANTIS-BLADE",
+          "name": "Mantis Blade",
+          "source": "cyberware compilado p.13",
+          "kind": "weapon",
+          "weaponType": "Cyberweapon",
+          "weaponSkill": "Melee Weapon",
+          "damage": "3d6",
+          "rof": null,
+          "magazine": null,
+          "ammoType": null,
+          "handsRequired": 1,
+          "concealable": true,
+          "cost": 500,
+          "costCategory": null,
+          "quality": "standard",
+          "exotic": false,
+          "attachmentSlots": null,
+          "rangeTable": null,
+          "suppressiveFire": false,
+          "specialRules": [],
+          "legacyDesc": "Laminas de braco ocultaveis e letais. Item expandido sujeito a aprovacao do GM."
+        },
+        "validationIssues": [
+          {
+            "severity": "error",
+            "type": "weapon_missing_rof",
+            "message": "WeaponDefinition is missing ROF.",
+            "code": "MANTIS-BLADE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0018-cyberweapon_missing_rof",
+      "severity": "error",
+      "type": "cyberweapon_missing_rof",
+      "collection": "items",
+      "path": "items[41].rof",
+      "code": "MANTIS-BLADE",
+      "name": "Mantis Blade",
+      "message": "cyberweapon is missing ROF required by the canonical cyberweapon profile checks.",
+      "evidence": {
+        "weaponClass": "Cyberweapon",
+        "skill": "Melee Weapon",
+        "normalized": {
+          "code": "MANTIS-BLADE",
+          "name": "Mantis Blade",
+          "source": "cyberware compilado p.13",
+          "kind": "weapon",
+          "weaponType": "Cyberweapon",
+          "weaponSkill": "Melee Weapon",
+          "damage": "3d6",
+          "rof": null,
+          "magazine": null,
+          "ammoType": null,
+          "handsRequired": 1,
+          "concealable": true,
+          "cost": 500,
+          "costCategory": null,
+          "quality": "standard",
+          "exotic": false,
+          "attachmentSlots": null,
+          "rangeTable": null,
+          "suppressiveFire": false,
+          "specialRules": [],
+          "legacyDesc": "Laminas de braco ocultaveis e letais. Item expandido sujeito a aprovacao do GM."
+        },
+        "validationIssues": [
+          {
+            "severity": "error",
+            "type": "weapon_missing_rof",
+            "message": "WeaponDefinition is missing ROF.",
+            "code": "MANTIS-BLADE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0019-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[42]",
+      "code": "MONOWIRE",
+      "name": "Monowire",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "MONOWIRE"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "MONOWIRE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0020-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[42].requirements",
+      "code": "MONOWIRE",
+      "name": "Monowire",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Validar suplemento"
+      }
+    },
+    {
+      "id": "0021-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[42]",
+      "code": "MONOWIRE",
+      "name": "Monowire",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.13",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0022-weapon_missing_profile",
+      "severity": "error",
+      "type": "weapon_missing_profile",
+      "collection": "items",
+      "path": "items[42]",
+      "code": "MONOWIRE",
+      "name": "Monowire",
+      "message": "weapon is missing required profile field(s): rof.",
+      "evidence": {
+        "damage": "",
+        "count": 4,
+        "sides": 6,
+        "damageScale": null,
+        "rof": null,
+        "magazine": null,
+        "skill": "Melee Weapon",
+        "normalized": {
+          "code": "MONOWIRE",
+          "name": "Monowire",
+          "source": "cyberware compilado p.13",
+          "kind": "weapon",
+          "weaponType": "Cyberweapon",
+          "weaponSkill": "Melee Weapon",
+          "damage": "4d6",
+          "rof": null,
+          "magazine": null,
+          "ammoType": null,
+          "handsRequired": 1,
+          "concealable": true,
+          "cost": 1000,
+          "costCategory": null,
+          "quality": "standard",
+          "exotic": false,
+          "attachmentSlots": null,
+          "rangeTable": null,
+          "suppressiveFire": false,
+          "specialRules": [],
+          "legacyDesc": "Fio monomolecular tipo chicote. Item expandido sujeito a aprovacao do GM."
+        },
+        "validationIssues": [
+          {
+            "severity": "error",
+            "type": "weapon_missing_rof",
+            "message": "WeaponDefinition is missing ROF.",
+            "code": "MONOWIRE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0023-cyberweapon_missing_rof",
+      "severity": "error",
+      "type": "cyberweapon_missing_rof",
+      "collection": "items",
+      "path": "items[42].rof",
+      "code": "MONOWIRE",
+      "name": "Monowire",
+      "message": "cyberweapon is missing ROF required by the canonical cyberweapon profile checks.",
+      "evidence": {
+        "weaponClass": "Cyberweapon",
+        "skill": "Melee Weapon",
+        "normalized": {
+          "code": "MONOWIRE",
+          "name": "Monowire",
+          "source": "cyberware compilado p.13",
+          "kind": "weapon",
+          "weaponType": "Cyberweapon",
+          "weaponSkill": "Melee Weapon",
+          "damage": "4d6",
+          "rof": null,
+          "magazine": null,
+          "ammoType": null,
+          "handsRequired": 1,
+          "concealable": true,
+          "cost": 1000,
+          "costCategory": null,
+          "quality": "standard",
+          "exotic": false,
+          "attachmentSlots": null,
+          "rangeTable": null,
+          "suppressiveFire": false,
+          "specialRules": [],
+          "legacyDesc": "Fio monomolecular tipo chicote. Item expandido sujeito a aprovacao do GM."
+        },
+        "validationIssues": [
+          {
+            "severity": "error",
+            "type": "weapon_missing_rof",
+            "message": "WeaponDefinition is missing ROF.",
+            "code": "MONOWIRE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0024-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[43].requirements",
+      "code": "REFLEX-CO",
+      "name": "Reflex Co-Processor",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Validar suplemento"
+      }
+    },
+    {
+      "id": "0025-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[43]",
+      "code": "REFLEX-CO",
+      "name": "Reflex Co-Processor",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.15",
+        "sourceType": "",
+        "cat": "NEURAL",
+        "normalized": {
+          "cyberwareType": "neuralware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0026-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[44]",
+      "code": "COMBAT-TAIL",
+      "name": "Combat Tail",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "COMBAT-TAIL"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "COMBAT-TAIL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0027-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[44].requirements",
+      "code": "COMBAT-TAIL",
+      "name": "Combat Tail",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Neural Link; validar suplemento"
+      }
+    },
+    {
+      "id": "0028-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[44]",
+      "code": "COMBAT-TAIL",
+      "name": "Combat Tail",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.16",
+        "sourceType": "",
+        "cat": "EXTERNAL",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0029-weapon_missing_profile",
+      "severity": "error",
+      "type": "weapon_missing_profile",
+      "collection": "items",
+      "path": "items[44]",
+      "code": "COMBAT-TAIL",
+      "name": "Combat Tail",
+      "message": "weapon is missing required profile field(s): rof.",
+      "evidence": {
+        "damage": "",
+        "count": 3,
+        "sides": 6,
+        "damageScale": null,
+        "rof": null,
+        "magazine": null,
+        "skill": "Melee Weapon",
+        "normalized": {
+          "code": "COMBAT-TAIL",
+          "name": "Combat Tail",
+          "source": "cyberware compilado p.16",
+          "kind": "weapon",
+          "weaponType": "Cyberweapon",
+          "weaponSkill": "Melee Weapon",
+          "damage": "3d6",
+          "rof": null,
+          "magazine": null,
+          "ammoType": null,
+          "handsRequired": 0,
+          "concealable": false,
+          "cost": 1000,
+          "costCategory": null,
+          "quality": "standard",
+          "exotic": false,
+          "attachmentSlots": null,
+          "rangeTable": null,
+          "suppressiveFire": false,
+          "specialRules": [],
+          "legacyDesc": "Cauda armada conectada a espinha; requer Neural Link. Item expandido."
+        },
+        "validationIssues": [
+          {
+            "severity": "error",
+            "type": "weapon_missing_rof",
+            "message": "WeaponDefinition is missing ROF.",
+            "code": "COMBAT-TAIL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0030-cyberweapon_missing_rof",
+      "severity": "error",
+      "type": "cyberweapon_missing_rof",
+      "collection": "items",
+      "path": "items[44].rof",
+      "code": "COMBAT-TAIL",
+      "name": "Combat Tail",
+      "message": "cyberweapon is missing ROF required by the canonical cyberweapon profile checks.",
+      "evidence": {
+        "weaponClass": "Cyberweapon",
+        "skill": "Melee Weapon",
+        "normalized": {
+          "code": "COMBAT-TAIL",
+          "name": "Combat Tail",
+          "source": "cyberware compilado p.16",
+          "kind": "weapon",
+          "weaponType": "Cyberweapon",
+          "weaponSkill": "Melee Weapon",
+          "damage": "3d6",
+          "rof": null,
+          "magazine": null,
+          "ammoType": null,
+          "handsRequired": 0,
+          "concealable": false,
+          "cost": 1000,
+          "costCategory": null,
+          "quality": "standard",
+          "exotic": false,
+          "attachmentSlots": null,
+          "rangeTable": null,
+          "suppressiveFire": false,
+          "specialRules": [],
+          "legacyDesc": "Cauda armada conectada a espinha; requer Neural Link. Item expandido."
+        },
+        "validationIssues": [
+          {
+            "severity": "error",
+            "type": "weapon_missing_rof",
+            "message": "WeaponDefinition is missing ROF.",
+            "code": "COMBAT-TAIL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0031-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[45]",
+      "code": "SMART-GLASSES",
+      "name": "Smart Glasses",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.19",
+        "sourceType": "",
+        "cat": "OPTICS",
+        "normalized": {
+          "cyberwareType": "cyberoptics"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0032-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[46]",
+      "code": "EMP-THREAD",
+      "name": "EMP Threading",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0033-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[47]",
+      "code": "SKINWATCH",
+      "name": "Skinwatch",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0034-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[48].requirements",
+      "code": "TECHHAIR",
+      "name": "Techhair",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Chemskin recomendado"
+      }
+    },
+    {
+      "id": "0035-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[48]",
+      "code": "TECHHAIR",
+      "name": "Techhair",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0036-fake_skill_name",
+      "severity": "error",
+      "type": "fake_skill_name",
+      "collection": "items",
+      "path": "items[95].skillBonus.\"Disguise\"",
+      "code": "FACE-QC",
+      "name": "Quick Change Faceplate",
+      "message": "skillBonus references unsupported key \"Disguise\".",
+      "evidence": {
+        "key": "Disguise",
+        "canonical": "Disguise",
+        "value": 1,
+        "canonicalAction": "Convert to contextual effect, or split into Acting and Wardrobe & Style only when an explicit rule says so."
+      }
+    },
+    {
+      "id": "0037-legacy_bonus_not_applied",
+      "severity": "info",
+      "type": "legacy_bonus_not_applied",
+      "collection": "items",
+      "path": "items[95]",
+      "code": "FACE-QC",
+      "name": "Quick Change Faceplate",
+      "message": "Legacy/fake bonus was normalized as a non-automatic structured effect.",
+      "evidence": {
+        "effect": {
+          "type": "contextualEffect",
+          "sourceCode": "FACE-QC",
+          "value": "Disguise",
+          "condition": "Convert to contextual effect, or split into Acting and Wardrobe & Style only when an explicit rule says so."
+        }
+      }
+    },
+    {
+      "id": "0038-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[95]",
+      "code": "FACE-QC",
+      "name": "Quick Change Faceplate",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "INTERNAL",
+        "normalized": {
+          "cyberwareType": "internal"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0039-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[96]",
+      "code": "QUICK-DIGITS",
+      "name": "Quick Digits",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0040-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[97].requirements",
+      "code": "SKYDRIVERS",
+      "name": "Skydrivers",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Par (2x Cyberleg)"
+      }
+    },
+    {
+      "id": "0041-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[97]",
+      "code": "SKYDRIVERS",
+      "name": "Skydrivers",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0042-cyberware_option_missing_parent_slot",
+      "severity": "warning",
+      "type": "cyberware_option_missing_parent_slot",
+      "collection": "items",
+      "path": "items[97].requirements",
+      "code": "SKYDRIVERS",
+      "name": "Skydrivers",
+      "message": "cyberware option names a parent install but has no structured parent slot or slot cost.",
+      "evidence": {
+        "requirements": "Par (2x Cyberleg)",
+        "normalizedRequirements": [
+          {
+            "type": "unknown",
+            "legacyText": "Par (2x Cyberleg)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0043-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[98]",
+      "code": "CYBERSPINE",
+      "name": "Sycust Cyberspine",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "INTERNAL",
+        "normalized": {
+          "cyberwareType": "internal"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0044-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[99]",
+      "code": "CYBER-COND",
+      "name": "CyberConductor",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0045-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[100]",
+      "code": "CONC-SLEEVE",
+      "name": "Concealment Sleeve",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "EXTERNAL",
+        "normalized": {
+          "cyberwareType": "external"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0046-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[101]",
+      "code": "GORILLA-ARMS",
+      "name": "Gorilla Arms",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "GORILLA-ARMS"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "GORILLA-ARMS"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0047-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[101].requirements",
+      "code": "GORILLA-ARMS",
+      "name": "Gorilla Arms",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Cyberarm"
+      }
+    },
+    {
+      "id": "0048-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[101]",
+      "code": "GORILLA-ARMS",
+      "name": "Gorilla Arms",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0049-cyberware_option_missing_parent_slot",
+      "severity": "warning",
+      "type": "cyberware_option_missing_parent_slot",
+      "collection": "items",
+      "path": "items[101].requirements",
+      "code": "GORILLA-ARMS",
+      "name": "Gorilla Arms",
+      "message": "cyberware option names a parent install but has no structured parent slot or slot cost.",
+      "evidence": {
+        "requirements": "Cyberarm",
+        "normalizedRequirements": [
+          {
+            "type": "unknown",
+            "legacyText": "Cyberarm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0050-weapon_missing_profile",
+      "severity": "error",
+      "type": "weapon_missing_profile",
+      "collection": "items",
+      "path": "items[101]",
+      "code": "GORILLA-ARMS",
+      "name": "Gorilla Arms",
+      "message": "weapon is missing required profile field(s): rof.",
+      "evidence": {
+        "damage": "",
+        "count": null,
+        "sides": null,
+        "damageScale": [
+          {
+            "maxBody": 6,
+            "count": 2,
+            "sides": 6
+          },
+          {
+            "minBody": 7,
+            "maxBody": 10,
+            "count": 3,
+            "sides": 6
+          },
+          {
+            "minBody": 11,
+            "count": 4,
+            "sides": 6
+          }
+        ],
+        "rof": null,
+        "magazine": null,
+        "skill": "Brawling",
+        "normalized": {
+          "code": "GORILLA-ARMS",
+          "name": "Gorilla Arms",
+          "source": "cyberware DLC compilado",
+          "kind": "weapon",
+          "weaponType": "Cyberweapon",
+          "weaponSkill": "Brawling",
+          "damage": null,
+          "rof": null,
+          "magazine": null,
+          "ammoType": null,
+          "handsRequired": 2,
+          "concealable": false,
+          "cost": 1000,
+          "costCategory": null,
+          "quality": "standard",
+          "exotic": false,
+          "attachmentSlots": null,
+          "rangeTable": null,
+          "suppressiveFire": false,
+          "specialRules": [],
+          "legacyDesc": "Bracos ciberneticos reforcados para golpes de impacto; dano base escala pelo BODY efetivo."
+        },
+        "validationIssues": [
+          {
+            "severity": "error",
+            "type": "weapon_missing_damage",
+            "message": "WeaponDefinition is missing damage.",
+            "code": "GORILLA-ARMS"
+          },
+          {
+            "severity": "error",
+            "type": "weapon_missing_rof",
+            "message": "WeaponDefinition is missing ROF.",
+            "code": "GORILLA-ARMS"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0051-cyberweapon_missing_rof",
+      "severity": "error",
+      "type": "cyberweapon_missing_rof",
+      "collection": "items",
+      "path": "items[101].rof",
+      "code": "GORILLA-ARMS",
+      "name": "Gorilla Arms",
+      "message": "cyberweapon is missing ROF required by the canonical cyberweapon profile checks.",
+      "evidence": {
+        "weaponClass": "Cyberweapon",
+        "skill": "Brawling",
+        "normalized": {
+          "code": "GORILLA-ARMS",
+          "name": "Gorilla Arms",
+          "source": "cyberware DLC compilado",
+          "kind": "weapon",
+          "weaponType": "Cyberweapon",
+          "weaponSkill": "Brawling",
+          "damage": null,
+          "rof": null,
+          "magazine": null,
+          "ammoType": null,
+          "handsRequired": 2,
+          "concealable": false,
+          "cost": 1000,
+          "costCategory": null,
+          "quality": "standard",
+          "exotic": false,
+          "attachmentSlots": null,
+          "rangeTable": null,
+          "suppressiveFire": false,
+          "specialRules": [],
+          "legacyDesc": "Bracos ciberneticos reforcados para golpes de impacto; dano base escala pelo BODY efetivo."
+        },
+        "validationIssues": [
+          {
+            "severity": "error",
+            "type": "weapon_missing_damage",
+            "message": "WeaponDefinition is missing damage.",
+            "code": "GORILLA-ARMS"
+          },
+          {
+            "severity": "error",
+            "type": "weapon_missing_rof",
+            "message": "WeaponDefinition is missing ROF.",
+            "code": "GORILLA-ARMS"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0052-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[102]",
+      "code": "ENH-HYD-RAM",
+      "name": "Hydraulic Ram",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "ENH-HYD-RAM"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "ENH-HYD-RAM"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0053-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[102].requirements",
+      "code": "ENH-HYD-RAM",
+      "name": "Hydraulic Ram",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Gorilla Arms instalado"
+      }
+    },
+    {
+      "id": "0054-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[102]",
+      "code": "ENH-HYD-RAM",
+      "name": "Hydraulic Ram",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0055-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[103]",
+      "code": "ENH-PNEU-ACT",
+      "name": "Pneumatic Actuation",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "ENH-PNEU-ACT"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "ENH-PNEU-ACT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0056-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[103].requirements",
+      "code": "ENH-PNEU-ACT",
+      "name": "Pneumatic Actuation",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Gorilla Arms instalado"
+      }
+    },
+    {
+      "id": "0057-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[103]",
+      "code": "ENH-PNEU-ACT",
+      "name": "Pneumatic Actuation",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0058-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[104]",
+      "code": "ENH-TUNG-REIN",
+      "name": "Tungsten Reinforcement",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "ENH-TUNG-REIN"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "ENH-TUNG-REIN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0059-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[104].requirements",
+      "code": "ENH-TUNG-REIN",
+      "name": "Tungsten Reinforcement",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Gorilla Arms instalado"
+      }
+    },
+    {
+      "id": "0060-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[104]",
+      "code": "ENH-TUNG-REIN",
+      "name": "Tungsten Reinforcement",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0061-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[105]",
+      "code": "ENH-DBL-EDGE",
+      "name": "Double-Edged",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "ENH-DBL-EDGE"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "ENH-DBL-EDGE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0062-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[105].requirements",
+      "code": "ENH-DBL-EDGE",
+      "name": "Double-Edged",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Mantis Blades instaladas"
+      }
+    },
+    {
+      "id": "0063-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[105]",
+      "code": "ENH-DBL-EDGE",
+      "name": "Double-Edged",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0064-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[106]",
+      "code": "ENH-MONO-EDG",
+      "name": "Monomolecular Edge",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "ENH-MONO-EDG"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "ENH-MONO-EDG"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0065-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[106].requirements",
+      "code": "ENH-MONO-EDG",
+      "name": "Monomolecular Edge",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Mantis Blades instaladas"
+      }
+    },
+    {
+      "id": "0066-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[106]",
+      "code": "ENH-MONO-EDG",
+      "name": "Monomolecular Edge",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0067-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[107]",
+      "code": "ENH-BARB-LIN",
+      "name": "Barbed Line",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "ENH-BARB-LIN"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "ENH-BARB-LIN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0068-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[107].requirements",
+      "code": "ENH-BARB-LIN",
+      "name": "Barbed Line",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Monowire instalado"
+      }
+    },
+    {
+      "id": "0069-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[107]",
+      "code": "ENH-BARB-LIN",
+      "name": "Barbed Line",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0070-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[108]",
+      "code": "ENH-ELECTRO",
+      "name": "Electroshock",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "ENH-ELECTRO"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "ENH-ELECTRO"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0071-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[108].requirements",
+      "code": "ENH-ELECTRO",
+      "name": "Electroshock",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Monowire instalado"
+      }
+    },
+    {
+      "id": "0072-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[108]",
+      "code": "ENH-ELECTRO",
+      "name": "Electroshock",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0073-homebrew_missing_gm_approval",
+      "severity": "warning",
+      "type": "homebrew_missing_gm_approval",
+      "collection": "items",
+      "path": "items[109]",
+      "code": "ENH-THERMAL",
+      "name": "Thermal-Bladed",
+      "message": "homebrew-limiar reserved item is missing requiresGmApproval: true.",
+      "evidence": {
+        "expectedSourceType": "homebrew-limiar",
+        "requiresGmApproval": null,
+        "validationIssues": [
+          {
+            "severity": "warning",
+            "type": "source_type_missing",
+            "message": "Item has no sourceType.",
+            "code": "ENH-THERMAL"
+          },
+          {
+            "severity": "warning",
+            "type": "homebrew_missing_gm_approval",
+            "message": "Homebrew Limiar item requires GM approval flag.",
+            "code": "ENH-THERMAL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "0074-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[109].requirements",
+      "code": "ENH-THERMAL",
+      "name": "Thermal-Bladed",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Monowire instalado"
+      }
+    },
+    {
+      "id": "0075-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[109]",
+      "code": "ENH-THERMAL",
+      "name": "Thermal-Bladed",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0076-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[0].equipped",
+      "code": "vesper",
+      "name": "VESPER",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "INTERFACE-PLUGS",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0077-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[0].equipped",
+      "code": "vesper",
+      "name": "VESPER",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "SKIN-WEAVE",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0078-installed_cyberware_parent_missing_legacy",
+      "severity": "warning",
+      "type": "installed_cyberware_parent_missing_legacy",
+      "collection": "characters",
+      "path": "characters[0].equipped",
+      "code": "vesper",
+      "name": "VESPER",
+      "message": "Cyberware option requires a parent instance, but legacy install has no parentInstanceId.",
+      "evidence": {
+        "itemCode": "INTERFACE-PLUGS",
+        "detail": {
+          "requiredParentCode": "NEURAL-LINK"
+        }
+      }
+    },
+    {
+      "id": "0079-installed_required_cyberware_missing",
+      "severity": "error",
+      "type": "installed_required_cyberware_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Required cyberware is not installed.",
+      "evidence": {
+        "itemCode": "KERENZIKOV",
+        "detail": {
+          "requiredCode": "NEURAL-LINK",
+          "requirement": {
+            "type": "requiredCyberware",
+            "code": "NEURAL-LINK"
+          }
+        }
+      }
+    },
+    {
+      "id": "0080-installed_required_cyberware_missing",
+      "severity": "error",
+      "type": "installed_required_cyberware_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Required cyberware is not installed.",
+      "evidence": {
+        "itemCode": "TARGET-SCOPE",
+        "detail": {
+          "requiredCode": "CYBEREYE",
+          "requirement": {
+            "type": "requiredCyberware",
+            "code": "CYBEREYE"
+          }
+        }
+      }
+    },
+    {
+      "id": "0081-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "KERENZIKOV",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0082-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "TARGET-SCOPE",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0083-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "SUBDERMAL-ARMOR",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0084-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "BIG-KNUCKS",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0085-installed_cyberware_parent_missing_legacy",
+      "severity": "warning",
+      "type": "installed_cyberware_parent_missing_legacy",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option requires a parent instance, but legacy install has no parentInstanceId.",
+      "evidence": {
+        "itemCode": "TARGET-SCOPE",
+        "detail": {
+          "requiredParentCode": "CYBEREYE"
+        }
+      }
+    },
+    {
+      "id": "0086-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "NASAL-FILTER",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0087-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "AUDIOVOX",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0088-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "TECHSCANNER",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0089-installed_cyberware_parent_missing_legacy",
+      "severity": "warning",
+      "type": "installed_cyberware_parent_missing_legacy",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Cyberware option requires a parent instance, but legacy install has no parentInstanceId.",
+      "evidence": {
+        "itemCode": "TECHSCANNER",
+        "detail": {
+          "requiredParentCode": "CYBERARM"
+        }
+      }
+    },
+    {
+      "id": "0090-effect_legacy_bonus_not_applied",
+      "severity": "info",
+      "type": "effect_legacy_bonus_not_applied",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Legacy/fake effect was preserved but not applied as automatic bonus.",
+      "evidence": {
+        "itemCode": "NASAL-FILTER",
+        "detail": {
+          "effectType": "contextualEffect",
+          "condition": null
+        }
+      }
+    }
+  ]
+}
