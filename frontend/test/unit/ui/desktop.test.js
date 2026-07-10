@@ -53,6 +53,7 @@ function renderDeps(overrides = {}) {
     roll: vi.fn(),
     triggerFileInput: vi.fn(),
     go: vi.fn(),
+    openCampaignMap: vi.fn(),
     toggleRole: vi.fn(),
     loginGm: vi.fn(),
     logoutGm: vi.fn(),
@@ -103,6 +104,17 @@ describe('ui/views/desktop desktopRenderVals', () => {
     expect(vals.viewTitle).toBe('MARKET');
     expect(vals.isMarket).toBe(true);
     expect(vals.isDesktop).toBe(false);
+  });
+
+  it('routes the MAP tile to the campaign map launcher instead of the legacy view', () => {
+    const openCampaignMap = vi.fn();
+    const go = vi.fn();
+    const vals = desktopRenderVals(baseState(), renderDeps({ openCampaignMap, go }));
+
+    vals.nav.map();
+
+    expect(openCampaignMap).toHaveBeenCalledOnce();
+    expect(go).not.toHaveBeenCalled();
   });
 
   it('builds character vitals and flags from the forwarded sheet data', () => {

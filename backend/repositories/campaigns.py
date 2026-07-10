@@ -52,6 +52,25 @@ def get_campaign(campaign_id: str) -> dict[str, object] | None:
     return row_dict(row) if row else None
 
 
+def is_campaign_member(campaign_id: str, session: dict[str, str]) -> bool:
+    """Accepted-membership gate for table state (map, etc). `public`
+    visibility only helps discovery/join — it never grants this. Site
+    admins are an explicit operational bypass; a `gm` role alone is not,
+    since that account still needs to actually belong to this campaign."""
+    if session.get("role") == "admin":
+        return True
+    username = session["username"]
+    campaign = get_campaign(campaign_id)
+    if campaign and campaign.get("created_by") == username:
+        return True
+    with db() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM campaign_members WHERE campaign_id = ? AND username = ?",
+            (campaign_id, username),
+        ).fetchone()
+    return row is not None
+
+
 def upsert_campaign(payload: dict[str, object], session: dict[str, str]) -> dict[str, object]:
     name = str(payload.get("name") or "").strip()[:120]
     campaign_id = str(payload.get("id") or slug(name))[:120]

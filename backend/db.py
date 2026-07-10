@@ -332,8 +332,11 @@ def init_db() -> None:
               grid_size INTEGER NOT NULL DEFAULT 64,
               fog_enabled INTEGER NOT NULL DEFAULT 1,
               shadow_opacity REAL NOT NULL DEFAULT 0.92,
+              darkness REAL NOT NULL DEFAULT 0,
               active INTEGER NOT NULL DEFAULT 0,
               difficult_terrain TEXT NOT NULL DEFAULT '[]',
+              exploration_mode TEXT NOT NULL DEFAULT 'shared',
+              revision INTEGER NOT NULL DEFAULT 0,
               created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
@@ -356,6 +359,10 @@ def init_db() -> None:
               vision INTEGER NOT NULL DEFAULT 240,
               visible INTEGER NOT NULL DEFAULT 1,
               move REAL,
+              resource_visibility TEXT NOT NULL DEFAULT 'party',
+              vision_distance_units REAL,
+              rotation REAL NOT NULL DEFAULT 0,
+              elevation REAL NOT NULL DEFAULT 0,
               created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               UNIQUE(campaign_id, scene_id, character_id),
@@ -384,6 +391,113 @@ def init_db() -> None:
               y REAL NOT NULL,
               radius REAL NOT NULL,
               created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+              FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_map_reveals_personal (
+              id TEXT PRIMARY KEY,
+              campaign_id TEXT NOT NULL,
+              scene_id TEXT NOT NULL,
+              username TEXT NOT NULL,
+              token_id TEXT,
+              x REAL NOT NULL,
+              y REAL NOT NULL,
+              radius REAL NOT NULL,
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+              FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_map_templates (
+              id TEXT PRIMARY KEY,
+              campaign_id TEXT NOT NULL,
+              scene_id TEXT NOT NULL,
+              kind TEXT NOT NULL DEFAULT 'circle',
+              x REAL NOT NULL DEFAULT 0,
+              y REAL NOT NULL DEFAULT 0,
+              direction_deg REAL NOT NULL DEFAULT 0,
+              distance_units REAL NOT NULL DEFAULT 0,
+              angle_deg REAL NOT NULL DEFAULT 53,
+              width_units REAL NOT NULL DEFAULT 0,
+              color TEXT NOT NULL DEFAULT '#3fe0d0',
+              label TEXT,
+              hidden INTEGER NOT NULL DEFAULT 0,
+              lifecycle TEXT NOT NULL DEFAULT 'manual',
+              expires_at TEXT,
+              owner_username TEXT,
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+              FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_map_pings (
+              id TEXT PRIMARY KEY,
+              campaign_id TEXT NOT NULL,
+              scene_id TEXT NOT NULL,
+              username TEXT NOT NULL,
+              x REAL NOT NULL,
+              y REAL NOT NULL,
+              color TEXT NOT NULL DEFAULT '#3fe0d0',
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+              FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_map_walls (
+              id TEXT PRIMARY KEY,
+              campaign_id TEXT NOT NULL,
+              scene_id TEXT NOT NULL,
+              x1 REAL NOT NULL,
+              y1 REAL NOT NULL,
+              x2 REAL NOT NULL,
+              y2 REAL NOT NULL,
+              kind TEXT NOT NULL DEFAULT 'wall',
+              open INTEGER NOT NULL DEFAULT 0,
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+              FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_map_lights (
+              id TEXT PRIMARY KEY,
+              campaign_id TEXT NOT NULL,
+              scene_id TEXT NOT NULL,
+              kind TEXT NOT NULL DEFAULT 'ambient',
+              x REAL NOT NULL DEFAULT 0,
+              y REAL NOT NULL DEFAULT 0,
+              token_id TEXT,
+              bright_units REAL NOT NULL DEFAULT 0,
+              dim_units REAL NOT NULL DEFAULT 0,
+              color TEXT NOT NULL DEFAULT '#f0ead8',
+              label TEXT,
+              enabled INTEGER NOT NULL DEFAULT 1,
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+              FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_map_drawings (
+              id TEXT PRIMARY KEY,
+              campaign_id TEXT NOT NULL,
+              scene_id TEXT NOT NULL,
+              points TEXT NOT NULL DEFAULT '[]',
+              color TEXT NOT NULL DEFAULT '#3fe0d0',
+              width REAL NOT NULL DEFAULT 3,
+              label TEXT,
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+              FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_map_pins (
+              id TEXT PRIMARY KEY,
+              campaign_id TEXT NOT NULL,
+              scene_id TEXT NOT NULL,
+              x REAL NOT NULL,
+              y REAL NOT NULL,
+              icon TEXT NOT NULL DEFAULT '•',
+              label TEXT NOT NULL DEFAULT '',
+              visibility TEXT NOT NULL DEFAULT 'all',
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
               FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
             );
@@ -419,12 +533,31 @@ def init_db() -> None:
         }
         if "difficult_terrain" not in scene_cols:
             conn.execute("ALTER TABLE campaign_map_scenes ADD COLUMN difficult_terrain TEXT NOT NULL DEFAULT '[]'")
+        if "exploration_mode" not in scene_cols:
+            conn.execute("ALTER TABLE campaign_map_scenes ADD COLUMN exploration_mode TEXT NOT NULL DEFAULT 'shared'")
+        if "revision" not in scene_cols:
+            conn.execute("ALTER TABLE campaign_map_scenes ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+        if "darkness" not in scene_cols:
+            conn.execute("ALTER TABLE campaign_map_scenes ADD COLUMN darkness REAL NOT NULL DEFAULT 0")
 
         token_cols = {
             row["name"] for row in conn.execute("PRAGMA table_info(campaign_map_tokens)").fetchall()
         }
         if "move" not in token_cols:
             conn.execute("ALTER TABLE campaign_map_tokens ADD COLUMN move REAL")
+        if "resource_visibility" not in token_cols:
+            conn.execute("ALTER TABLE campaign_map_tokens ADD COLUMN resource_visibility TEXT NOT NULL DEFAULT 'party'")
+            # Backfill: pre-existing npc/marker tokens kept their HP hidden from
+            # players under the old kind-based rule. The column default above
+            # (needed for the ALTER itself) would otherwise flip all of them to
+            # 'party' and leak HP/conditions on upgrade.
+            conn.execute("UPDATE campaign_map_tokens SET resource_visibility = 'gm' WHERE kind != 'player'")
+        if "vision_distance_units" not in token_cols:
+            conn.execute("ALTER TABLE campaign_map_tokens ADD COLUMN vision_distance_units REAL")
+        if "rotation" not in token_cols:
+            conn.execute("ALTER TABLE campaign_map_tokens ADD COLUMN rotation REAL NOT NULL DEFAULT 0")
+        if "elevation" not in token_cols:
+            conn.execute("ALTER TABLE campaign_map_tokens ADD COLUMN elevation REAL NOT NULL DEFAULT 0")
 
         user = conn.execute(
             "SELECT username FROM users WHERE username = ?",

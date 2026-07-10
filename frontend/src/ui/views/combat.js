@@ -18,6 +18,7 @@ import {
 } from '../../domain/combat/index.ts';
 import { NPC_TEMPLATES, NPC_ATTACK_SKILL_OPTIONS, npcDraftFromTemplate } from '../../domain/combat/npcTemplates.ts';
 import { resolveStabilizationDV } from '../../domain/combat/stabilizationEngine.ts';
+import { weaponRangeBand } from '../../domain/combat/combatAttackEngine.ts';
 import { netActionsPerTurn } from '../../domain/netrunning/index.ts';
 import { weaponRollTone as viewWeaponRollTone } from '../view/constants.js';
 
@@ -592,6 +593,17 @@ export function combatHandlers(component) {
   }
   function rollCombatAttack(actorId, weapon) {
     if (!canRollCombatActor(actorId)) return component.flash('Voce so pode rolar pelo seu proprio combatente');
+    const mapContext = (component.state.mapAttackContexts || {})[actorId] || null;
+    if (mapContext) {
+      const current = currentCombatantId(component.state.combatState);
+      if (current !== actorId || combatTargetFor(actorId) !== mapContext.targetCharacterId) {
+        component.setState(s => ({ mapAttackContexts: { ...(s.mapAttackContexts || {}), [actorId]: null } }));
+        return component.flash('Medida de ataque expirou: confirme alvo e turno novamente');
+      }
+    }
+    const range = mapContext ? weaponRangeBand(weapon, mapContext.rangeMeters) : null;
+    const hasCustomRangeTable = !!(weapon && weapon.rangeTable && typeof weapon.rangeTable === 'object' && weapon.rangeTable.custom);
+    if (mapContext && hasCustomRangeTable && !range) return component.flash('Esta arma nao possui uma banda valida para a distancia medida');
     const actor = combatCharacter(actorId) || component.activeCharacter();
     const mod = combatAttackMod(actor, weapon);
     const ctx = cyberContextToHit(actor);
@@ -601,9 +613,10 @@ export function combatHandlers(component) {
       sides: 10,
       count: 1,
       mod: mod.mod + ctx.mod,
-      breakdown: component.cyberSourceBreakdown(mod.sources.concat(ctx.sources)),
+      ...(range ? { dv: range.dv } : {}),
+      breakdown: component.cyberSourceBreakdown(mod.sources.concat(ctx.sources)).concat(range ? [`RANGE ${mapContext.rangeMeters}m // ${range.range} // DV ${range.dv}`] : []),
       label: (((actor.name || 'OPERATIVO') + ' :: ' + ((weapon && weapon.name) || 'ARMA') + ' ATAQUE').toUpperCase()) + combatTargetLabelSuffix(actorId),
-      onResolved: combatGmRollReporter(actor),
+      onResolved: (result) => { const reporter = combatGmRollReporter(actor); if (reporter) reporter(result); if (mapContext) component.setState(s => ({ mapAttackContexts: { ...(s.mapAttackContexts || {}), [actorId]: null } })); },
     });
     // Per-roll reset: to-hit toggles are consumed by this attack.
     setAttackContext({ beyond51m: false, aimedShot: false });

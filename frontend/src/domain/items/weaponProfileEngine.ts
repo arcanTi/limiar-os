@@ -36,6 +36,7 @@ export interface RuntimeWeaponProfile {
   special: string | string[];
   tier: string;
   attachesTo: string | string[] | null;
+  rangeTable?: unknown;
 }
 
 export function weaponProfile(item: LegacyCatalogItem | null | undefined, { resolveProduct }: WeaponProfileDeps = {}): RuntimeWeaponProfile {
@@ -80,6 +81,7 @@ export function weaponProfile(item: LegacyCatalogItem | null | undefined, { reso
     special: src.special || '',
     tier: src.tier || '',
     attachesTo: src.attachesTo || null,
+    rangeTable: src.rangeTable || (heldSource && heldSource.rangeTable) || null,
   };
 }
 

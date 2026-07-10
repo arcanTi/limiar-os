@@ -6,12 +6,16 @@
 
 export const GRID_METERS_PER_CELL = 2;
 
-export function cellsToMeters(cells: number): number {
-  return Math.max(0, Number(cells) || 0) * GRID_METERS_PER_CELL;
+// unitsPerCell/difficultTerrainMultiplier default to CPR (2m/cell, 2x cost)
+// but are parametrized so a future non-CPR system adapter (D&D 5ft/cell,
+// zombies with no difficult-terrain rule, ...) can pass its own config
+// without forking this module — see PLANO-MAPA-FOUNDRY.md section 4.
+export function cellsToMeters(cells: number, unitsPerCell: number = GRID_METERS_PER_CELL): number {
+  return Math.max(0, Number(cells) || 0) * unitsPerCell;
 }
 
-export function metersToCells(meters: number): number {
-  return Math.max(0, Number(meters) || 0) / GRID_METERS_PER_CELL;
+export function metersToCells(meters: number, unitsPerCell: number = GRID_METERS_PER_CELL): number {
+  return Math.max(0, Number(meters) || 0) / unitsPerCell;
 }
 
 export function pixelsToCells(pixels: number, gridSizePx: number): number {
@@ -43,11 +47,11 @@ export function moveRangePixels(effectiveMove: unknown, gridSizePx: number, opti
 }
 
 // Difficult terrain: 2m spent per 1m traveled (2 cells of cost per 1 cell
-// crossed). Non-difficult cells cost 1 cell of movement as normal.
-export function pathMovementCost(cellCount: number, difficultCellCount: number): number {
+// crossed), CPR default. Non-difficult cells cost 1 cell of movement as normal.
+export function pathMovementCost(cellCount: number, difficultCellCount: number, difficultMultiplier: number = 2): number {
   const total = Math.max(0, Number(cellCount) || 0);
   const difficult = Math.max(0, Math.min(total, Number(difficultCellCount) || 0));
-  return (total - difficult) + difficult * 2;
+  return (total - difficult) + difficult * difficultMultiplier;
 }
 
 export interface GridCell {
@@ -91,20 +95,28 @@ export interface SegmentMovementCost {
   costMeters: number;
 }
 
+export interface SegmentMovementCostConfig {
+  unitsPerCell?: number;
+  difficultMultiplier?: number;
+}
+
 // Cost of a measured segment: the start cell is free (you're already there);
 // each subsequent cell entered costs 1, or 2 if it's marked difficult
-// terrain. difficultCells is the set of "x,y" keys (see cellKey).
+// terrain (CPR defaults). difficultCells is the set of "x,y" keys (see cellKey).
 export function segmentMovementCost(
   from: { x: number; y: number },
   to: { x: number; y: number },
   gridSizePx: number,
   difficultCells: Set<string> | string[] = [],
+  config: SegmentMovementCostConfig = {},
 ): SegmentMovementCost {
+  const unitsPerCell = config.unitsPerCell ?? GRID_METERS_PER_CELL;
+  const difficultMultiplier = config.difficultMultiplier ?? 2;
   const difficult = difficultCells instanceof Set ? difficultCells : new Set(difficultCells);
   const cells = cellsAlongSegment(from, to, gridSizePx);
   const steps = cells.slice(1);
   const difficultCellCount = steps.filter(c => difficult.has(cellKey(c.x, c.y))).length;
   const cellCount = steps.length;
-  const costCells = pathMovementCost(cellCount, difficultCellCount);
-  return { cellCount, difficultCellCount, costCells, costMeters: cellsToMeters(costCells) };
+  const costCells = pathMovementCost(cellCount, difficultCellCount, difficultMultiplier);
+  return { cellCount, difficultCellCount, costCells, costMeters: cellsToMeters(costCells, unitsPerCell) };
 }

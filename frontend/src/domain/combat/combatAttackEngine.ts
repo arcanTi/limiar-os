@@ -80,16 +80,22 @@ function rollTotalFromParts(parts: RollParts = {}, rng: () => number): { total: 
   return { total: base + d10 + modifiers, d10, base, modifiers };
 }
 
-function dvFromWeaponRangeTable(context: AttackContext = {}): number | null {
-  if (!context.useWeaponRangeTable || !context.weapon?.rangeTable?.custom) return null;
-  const meters = numberOrNull(context.rangeMeters);
+export function weaponRangeBand(weapon: AttackContext['weapon'], rangeMeters: unknown): { range: string; dv: number } | null {
+  if (!weapon?.rangeTable?.custom) return null;
+  const meters = numberOrNull(rangeMeters);
   if (meters === null) return null;
-  const row = (context.weapon.rangeTable.rows || []).find(entry => {
+  const row = (weapon.rangeTable.rows || []).find(entry => {
     const match = String(entry.range || '').match(/^(\d+)-(\d+)m\/yds$/);
     if (!match) return false;
     return meters >= Number(match[1]) && meters <= Number(match[2]);
   });
-  return row ? numberOrNull(row.dv) : null;
+  const dv = row ? numberOrNull(row.dv) : null;
+  return row && dv !== null ? { range: String(row.range), dv } : null;
+}
+
+function dvFromWeaponRangeTable(context: AttackContext = {}): number | null {
+  if (!context.useWeaponRangeTable) return null;
+  return weaponRangeBand(context.weapon, context.rangeMeters)?.dv ?? null;
 }
 
 export interface AttackCheckResult {

@@ -86,6 +86,30 @@ describe('movement: segmentMovementCost (measure tool crossing difficult terrain
     const result = segmentMovementCost({ x: 0, y: 0 }, { x: 192, y: 0 }, 64, difficult);
     expect(result).toEqual({ cellCount: 3, difficultCellCount: 2, costCells: 5, costMeters: 10 });
   });
+
+  it('accepts a non-CPR unitsPerCell/difficultMultiplier config (F2b: system-adapter seam)', () => {
+    const difficult = new Set([cellKey(1, 0)]);
+    const result = segmentMovementCost({ x: 0, y: 0 }, { x: 192, y: 0 }, 64, difficult, { unitsPerCell: 1.5, difficultMultiplier: 3 });
+    // 3 cells, 1 difficult: costCells = (3-1) + 1*3 = 5; costMeters = 5 * 1.5
+    expect(result).toEqual({ cellCount: 3, difficultCellCount: 1, costCells: 5, costMeters: 7.5 });
+  });
+});
+
+describe('movement: unitsPerCell override (F2b: default stays CPR, seam accepts other systems)', () => {
+  it('defaults to CPR (2m/cell) when no config is passed', () => {
+    expect(cellsToMeters(5)).toBe(10);
+    expect(metersToCells(10)).toBe(5);
+  });
+
+  it('accepts a different unitsPerCell without touching the CPR default', () => {
+    expect(cellsToMeters(5, 1.5)).toBe(7.5);
+    expect(metersToCells(7.5, 1.5)).toBe(5);
+  });
+
+  it('accepts a different difficultMultiplier in pathMovementCost', () => {
+    expect(pathMovementCost(5, 2)).toBe(7);
+    expect(pathMovementCost(5, 2, 3)).toBe(9);
+  });
 });
 
 describe('movement: effectiveMoveStat (base MOVE - armor penalty - condition movePenalty)', () => {

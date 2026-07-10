@@ -104,6 +104,7 @@ import { nexusHandlers, nexusRenderVals } from './views/nexus.js';
 import { tarotHandlers, tarotRenderVals } from './views/tarot.js';
 import { sheetHandlers, sheetRenderVals } from './views/sheet.js';
 import { combatHandlers, combatRenderVals } from './views/combat.js';
+import { clearMapAttackIntent, loadMapAttackIntent, mapTokenVisibleNow } from '../domain/map/mapAttackIntent.ts';
 import { desktopHandlers, desktopRenderVals } from './views/desktop.js';
 import {
   chipStyle as viewChipStyle,
@@ -177,6 +178,9 @@ class Component extends DCLogic {
     // open. Transient — falls back to the current turn when unset/invalid.
     combatFocusId: '',
     combatReinforceOpen: false,
+    // A one-shot handoff from campaign-map.exe. It is keyed by attacker so a
+    // GM's focused card cannot accidentally consume another combatant's range.
+    mapAttackContexts: {},
     combatNpcDraft: { name: '', body: '5', ref: '5', hpMax: '35', headSp: '11', bodySp: '11', qty: '1', templateId: '', attackRows: [{ name: '', dice: '2d6', skill: 'Handgun' }] },
     tarotDeck: [],
     tarotState: null,
@@ -377,6 +381,7 @@ class Component extends DCLogic {
         gearItems: active.gear || this.state.gearItems,
         gmStatus: this.state.gmAuthenticated ? this.state.gmStatus : 'Backend conectado',
       });
+      await this.consumeMapAttackIntent();
     } catch (err) {
       this.setState({ gmStatus: 'Falha ao carregar backend: ' + err.message });
     }
@@ -681,6 +686,68 @@ class Component extends DCLogic {
       patch.gameTab = 'tarot';
     }
     this.setState(patch);
+  }
+
+  async openCampaignMap() {
+    const api = this.api();
+    if (!api?.auth?.token() || !api?.campaigns?.list) {
+      this.flash('Login necessario para abrir o mapa da campanha');
+      return;
+    }
+    try {
+      const campaigns = await api.campaigns.list();
+      const user = this.state.authUser || {};
+      const isAdmin = user.role === 'admin';
+      const campaign = (Array.isArray(campaigns) ? campaigns : []).find((entry) => {
+        if (!entry || entry.status === 'archived') return false;
+        return isAdmin
+          || entry.isMember
+          || entry.created_by === user.username
+          || entry.createdBy === user.username;
+      });
+      const campaignId = String(campaign?.id || '').trim();
+      if (!campaignId) {
+        this.flash('Participe ou crie uma campanha antes de abrir o mapa');
+        return;
+      }
+      window.location.assign('/campaign-map.html?campaign=' + encodeURIComponent(campaignId));
+    } catch (_) {
+      this.flash('Nao foi possivel abrir o mapa da campanha');
+    }
+  }
+
+  async consumeMapAttackIntent() {
+    if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('mapAttack')) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mapAttack');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    const intent = loadMapAttackIntent(window.sessionStorage);
+    if (!intent) return this.flash('Medida de ataque expirada');
+    try {
+      const mapState = await this.api().campaignMaps.get(intent.campaignId);
+      const tokens = Array.isArray(mapState && mapState.tokens) ? mapState.tokens : [];
+      const attacker = tokens.find(token => token && token.id === intent.attackerTokenId && token.characterId === intent.attackerCharacterId);
+      const target = tokens.find(token => token && token.id === intent.targetTokenId && token.characterId === intent.targetCharacterId);
+      const combat = this.combatHandlers().normalizeCombatState(this.state.combatState, this.state.characters);
+      const current = this.combatHandlers().currentCombatantId(combat);
+      const username = this.state.authUser && this.state.authUser.username;
+      const controlled = !!this.state.gm || !!(attacker && attacker.ownerUsername === username);
+      const visible = mapTokenVisibleNow(mapState || {}, target, { gm: !!this.state.gm, username });
+      if (!attacker || !target || !controlled || !visible || !combat.active || current !== intent.attackerCharacterId) {
+        clearMapAttackIntent(window.sessionStorage);
+        return this.flash('Medida de ataque nao e mais valida');
+      }
+      clearMapAttackIntent(window.sessionStorage);
+      this.setState(s => ({
+        view: 'combat', sheetOpen: false, selected: null,
+        combatFocusId: intent.attackerCharacterId,
+        combatTargets: { ...(s.combatTargets || {}), [intent.attackerCharacterId]: intent.targetCharacterId },
+        mapAttackContexts: { ...(s.mapAttackContexts || {}), [intent.attackerCharacterId]: intent },
+      }));
+    } catch (_) {
+      clearMapAttackIntent(window.sessionStorage);
+      this.flash('Nao foi possivel validar a medida de ataque');
+    }
   }
 
   // Switch Player/GM. If we are sitting on the Breach tab, remount so the
@@ -1482,6 +1549,7 @@ class Component extends DCLogic {
       roll: (opts) => this.roll(opts),
       triggerFileInput: (id) => this.triggerFileInput(id),
       go: (v) => this.go(v),
+      openCampaignMap: () => this.openCampaignMap(),
       toggleRole: (gm) => this.toggleRole(gm),
       loginGm: () => this.loginGm(),
       registerPlayerUser: () => this.registerPlayerUser(),

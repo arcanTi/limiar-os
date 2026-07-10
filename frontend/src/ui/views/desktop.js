@@ -122,7 +122,7 @@ export function desktopRenderVals(state = {}, deps = {}) {
   const nav = {
     home: () => deps.go('desktop'),
     inventory: () => deps.go('inventory'),
-    map: () => deps.go('map'),
+    map: () => deps.openCampaignMap(),
     dice: () => deps.go('dice'),
     games: () => { deps.go('games'); },
     combat: () => deps.go('combat'),
