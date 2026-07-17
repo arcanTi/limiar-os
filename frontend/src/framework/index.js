@@ -237,7 +237,7 @@ const patchNode = (parent, current, next) => {
   patchChildren(current, next);
 };
 
-const patchRoot = (root, nodes) => {
+export const patchRoot = (root, nodes) => {
   const holder = document.createElement('div');
   holder.append(...nodes);
   patchChildren(root, holder);

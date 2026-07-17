@@ -9,6 +9,7 @@ import {
   selectCampaign,
   selectedCharacterForCampaign,
 } from '../../domain/campaigns/index.ts';
+import { patchRoot } from '../../framework/index.js';
 
 const defaultDraft = { name: '', description: '', visibility: 'public', status: 'active' };
 
@@ -311,7 +312,9 @@ function createOverlayController(root, api) {
       if (options.render !== false) this.render();
     },
     render() {
-      root.innerHTML = renderCampaignsOverlay(this.state);
+      const temp = document.createElement('template');
+      temp.innerHTML = renderCampaignsOverlay(this.state);
+      patchRoot(root, [...temp.content.childNodes]);
     },
   };
   return { controller, handlers: campaignsHandlers(controller, api) };
