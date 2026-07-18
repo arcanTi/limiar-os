@@ -8,7 +8,7 @@
 // (moveRange, measurementPolicy, onMeasureBetweenTokens) add hooks here when
 // they land, not before.
 
-import { normalizeCriticalInjuries, normalizeStatusEffects } from '../conditions/index.ts';
+import { normalizeCriticalInjuries, normalizeStatusEffects, removeStatusEffect, toggleCriticalInjuryTreated } from '../conditions/index.ts';
 import { resolveStabilizationDV } from '../combat/stabilizationEngine.ts';
 import type { WoundState } from '../combat/stabilizationEngine.ts';
 
@@ -148,4 +148,31 @@ export function cprAmmoBadge(token: TokenVitals): AmmoBadge | null {
   const current = Number(ammo.currentAmmo ?? ammo.magazine);
   const magazine = Number(ammo.magazine);
   return { weaponId: ammo.weaponId, label: `${current}/${magazine}`, needsReload: current <= 0 };
+}
+
+export interface CharacterConditionsSource {
+  criticalInjuries?: unknown;
+  statusEffects?: unknown;
+}
+
+export interface CharacterConditionsPatch {
+  criticalInjuries?: unknown;
+  statusEffects?: unknown;
+}
+
+// Token HUD clickable badges (Onda 1 A1): clicking an injury badge marks it
+// treated (which is exactly what makes cprTokenBadges stop surfacing it —
+// no separate "hidden" flag to invent); clicking a status badge removes it
+// outright, since statuses have no treated/untreated state. Returns a patch
+// to merge into the character record, or null for an unrecognized badge
+// kind — the map page never touches conditions/index.ts directly, it goes
+// through this seam like every other CPR rule.
+export function cprDismissBadge(character: CharacterConditionsSource, badge: TokenBadge): CharacterConditionsPatch | null {
+  if (badge.kind === 'injury') {
+    return { criticalInjuries: toggleCriticalInjuryTreated(normalizeCriticalInjuries(character.criticalInjuries), badge.id) };
+  }
+  if (badge.kind === 'status') {
+    return { statusEffects: removeStatusEffect(normalizeStatusEffects(character.statusEffects), badge.id) };
+  }
+  return null;
 }

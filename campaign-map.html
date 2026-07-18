@@ -14,24 +14,25 @@
       <div class="actions"><button class="btn" id="reloadBtn">recarregar</button><button class="btn" id="fitBtn">encaixar</button><button class="btn" id="backBtn">voltar</button></div>
     </header>
     <nav class="toolbar">
-      <button class="tool active" data-tool="select" title="Selecionar/mover">M</button>
-      <button class="tool" data-tool="pan" title="Mover camera">P</button>
-      <button class="tool" data-tool="measure" title="Medir">R</button>
-      <button class="tool" data-tool="template" title="Template de area (AoE): arraste da origem ate a distancia/direcao">A</button>
-      <button class="tool master-only" data-tool="wall" title="Parede ou porta: arraste um segmento">W</button>
-      <button class="tool master-only" data-tool="prop" title="Prop/cobertura destrutivel (G2): arraste um retangulo">C</button>
-      <button class="tool master-only" data-tool="light" title="Luz: arraste para definir alcance">L</button>
-      <button class="tool master-only" data-tool="fog" title="Area oculta">O</button>
-      <button class="tool master-only" data-tool="terrain" title="Terreno dificil (2m por 1m percorrido)">T</button>
-      <button class="tool master-only" data-tool="drawing" title="Desenho livre: arraste para desenhar">D</button>
-      <button class="tool master-only" data-tool="pin" title="Pin/nota de cena: clique para colocar">N</button>
+      <button class="tool active" data-tool="select" title="Selecionar/mover (M)"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 1.5L11 19z"/></svg></button>
+      <button class="tool" data-tool="pan" title="Mover camera (P)"><svg viewBox="0 0 24 24"><path d="M12 3v8m0 0V3m0 8l-3-3m3 3l3-3M6 13v3a3 3 0 003 3h6a3 3 0 003-3v-6a2 2 0 00-4 0M9 13v-2a2 2 0 00-4 0v5"/></svg></button>
+      <button class="tool" data-tool="measure" title="Medir (R)"><svg viewBox="0 0 24 24"><path d="M4 16L16 4M6 10l2 2M9 7l2 2M13 3l3 3M4 16l4 4L20 8l-4-4z"/></svg></button>
+      <button class="tool" data-tool="template" title="Template de area (AoE): arraste da origem ate a distancia/direcao (A)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/></svg></button>
+      <button class="tool master-only" data-tool="wall" title="Parede ou porta: arraste um segmento (W)"><svg viewBox="0 0 24 24"><path d="M3 8h18M3 8v4M9 8v4M15 8v4M21 8v4M3 12h18M3 12v4M7 12v4M13 12v4M19 12v4M3 16h18"/></svg></button>
+      <button class="tool master-only" data-tool="prop" title="Prop/cobertura destrutivel (G2): arraste um retangulo (C)"><svg viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="1"/><path d="M4 7l8-4 8 4"/></svg></button>
+      <button class="tool master-only" data-tool="light" title="Luz: arraste para definir alcance (L)"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3 11.2c.6.4 1 1 1 1.8h4c0-.8.4-1.4 1-1.8A6 6 0 0012 3z"/></svg></button>
+      <button class="tool master-only" data-tool="fog" title="Area oculta (O)"><svg viewBox="0 0 24 24"><path d="M6 17a4 4 0 010-8 5 5 0 019.6-1.5A4.5 4.5 0 0118.5 17H6z"/></svg></button>
+      <button class="tool master-only" data-tool="terrain" title="Terreno dificil: 2m por 1m percorrido (T)"><svg viewBox="0 0 24 24"><path d="M3 18l5-8 3 4 2-3 8 7z"/></svg></button>
+      <button class="tool master-only" data-tool="drawing" title="Desenho livre: arraste para desenhar (D)"><svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3"/></svg></button>
+      <button class="tool master-only" data-tool="pin" title="Pin/nota de cena: clique para colocar (N)"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.6 7-11.5A7 7 0 105 9.5C5 14.4 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></button>
       <div class="divider"></div>
-      <button class="tool" id="sideBtn" title="Painel">☰</button>
-      <button class="tool" id="zoomInBtn" title="Zoom +">+</button>
-      <button class="tool" id="zoomOutBtn" title="Zoom -">-</button>
-      <button class="tool" id="centerBtn" title="Encaixar">□</button>
+      <button class="tool" id="sideBtn" title="Painel"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <button class="tool" id="zoomInBtn" title="Zoom +"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="tool" id="zoomOutBtn" title="Zoom -"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+      <button class="tool" id="centerBtn" title="Encaixar"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
     </nav>
-    <main class="stage"><canvas id="canvas" tabindex="0"></canvas><div class="hud" id="hud">Zoom 100%</div><div class="ctx-menu hidden" id="tokenMenu"></div><div class="empty-scene hidden" id="emptySceneMsg"></div></main>
+    <main class="stage"><canvas id="canvas" tabindex="0"></canvas><div class="hud" id="hud">Zoom 100%</div><div class="ctx-menu hidden" id="tokenMenu"></div><div class="token-hud hidden" id="tokenHud"></div><div class="empty-scene hidden" id="emptySceneMsg"></div></main>
+    <div class="modal-backdrop hidden" id="modalBackdrop"><div class="modal" id="modalBox"></div></div>
     <aside class="side">
       <div class="tabs">
         <button class="tab active" data-panel="scenes">cenas</button>
