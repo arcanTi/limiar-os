@@ -825,7 +825,7 @@ def map_state(campaign_id: str, session: dict[str, str]) -> dict[str, Any]:
 
 
 def save_scene(campaign_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    name = str(payload.get("name") or "Cena").strip()[:120]
+    name = sanitize_text(str(payload.get("name") or "Cena").strip(), 120)
     scene_id = str(payload.get("id") or f"{campaign_id}-{slug(name)}")[:160]
     fit = str(payload.get("backgroundFit") or payload.get("background_fit") or "contain")
     if fit not in ("contain", "cover", "native", "stretch"):
@@ -970,7 +970,7 @@ def upsert_token(campaign_id: str, payload: dict[str, Any]) -> dict[str, Any]:
                 campaign_id,
                 scene["id"],
                 character_id,
-                str(payload.get("name") or "Token")[:120],
+                sanitize_text(str(payload.get("name") or "Token"), 120),
                 kind,
                 str(payload.get("ownerUsername") or payload.get("owner_username") or "")[:120] or None,
                 float(payload.get("x") or 120),

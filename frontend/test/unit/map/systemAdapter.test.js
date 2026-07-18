@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cprOnMeasureBetweenTokens, cprTokenBadges, cprWoundVisual } from '../../../src/domain/map/systemAdapter.ts';
+import { cprDismissBadge, cprOnMeasureBetweenTokens, cprTokenBadges, cprWoundVisual } from '../../../src/domain/map/systemAdapter.ts';
 
 describe('map systemAdapter (CPR): cprWoundVisual', () => {
   it('returns null when the token has no HP tracked (nothing to color)', () => {
@@ -75,5 +75,23 @@ describe('map systemAdapter (CPR): cprOnMeasureBetweenTokens', () => {
     expect(cprOnMeasureBetweenTokens({
       attackerToken: { id: 'a-token' }, targetToken: { id: 't-token', characterId: 't' }, cells: 3, rangeMeters: 6,
     })).toBeNull();
+  });
+});
+
+describe('map systemAdapter (CPR): cprDismissBadge', () => {
+  it('marks an injury badge treated rather than deleting it', () => {
+    const character = { criticalInjuries: [{ instanceId: 'ci-1', injury: 'brokenArm', name_pt: 'Braco quebrado', location: 'body', treated: false }] };
+    const patch = cprDismissBadge(character, { kind: 'injury', id: 'ci-1', label: 'Braco quebrado' });
+    expect(patch.criticalInjuries).toEqual([expect.objectContaining({ instanceId: 'ci-1', treated: true })]);
+  });
+
+  it('removes a status badge outright', () => {
+    const character = { statusEffects: [{ instanceId: 'se-1', id: 'onFire', label_pt: 'Em chamas' }] };
+    const patch = cprDismissBadge(character, { kind: 'status', id: 'se-1', label: 'Em chamas' });
+    expect(patch.statusEffects).toEqual([]);
+  });
+
+  it('returns null for an unrecognized badge kind', () => {
+    expect(cprDismissBadge({}, { kind: 'bogus', id: 'x', label: '' })).toBeNull();
   });
 });
