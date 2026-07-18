@@ -228,9 +228,24 @@ Bloqueada por pre-condicao de produto: segunda campanha REAL (pull, nao push).
 ### Fase ROBUSTEZ (= M8, por gatilho, nao por agenda)
 
 - [ ] Compactacao de reveals (gatilho: payload >~200KB ou lag de fog).
-- [ ] Limite de conexoes long-poll por usuario/campanha + timeout.
+- [x] Limite de conexoes long-poll por usuario/campanha + timeout — semaforo
+      de 64 waiters em `campaign_sync.py` (2026-07-18, junto com fix de path
+      traversal).
 - [ ] Export/import de cena JSON (GM-only, validado no servidor).
 - [ ] Auditoria de indices SQLite (`campaign_id, scene_id`).
+- [ ] **Token de sessao para cookie httpOnly** (registrado 2026-07-18,
+      auditoria de infra). Hoje o token fica em `localStorage`
+      (`frontend/src/infrastructure/session.ts`), legivel por qualquer XSS
+      futuro. Nao e urgente sozinho — os dois vetores concretos que o
+      tornariam explorable (path traversal, SVG stored-XSS) ja foram
+      fechados na mesma auditoria — mas e a defesa que falta se um XSS novo
+      aparecer. Escopo real: emitir cookie `httpOnly; SameSite=Strict` no
+      login (`backend/api/auth.py`), middleware CSRF pra toda rota
+      mutante (cookie nao viaja em header `Authorization`, entao vira
+      submissao automatica — precisa de token CSRF separado), e reescrever
+      `frontend/src/infrastructure/api/http.ts` + `session.ts` pra parar de
+      gerenciar o token manualmente. Maior que os outros itens desta fase;
+      tratar como sub-tema proprio, nao como um checkbox de uma tarde.
 
 ## 6. Gaps de mecanica — status vivo (era G1–G12)
 
