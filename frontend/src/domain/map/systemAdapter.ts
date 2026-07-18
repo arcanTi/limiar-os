@@ -63,6 +63,18 @@ export interface MapAttackCommand {
   rangeMeters: number;
 }
 
+export interface MapAoeResolveContext {
+  template: { kind?: string; label?: string };
+  tokens: { id?: string; characterId?: string | null }[];
+}
+
+export interface MapAoeCommand {
+  kind: 'aoe';
+  targetCharacterIds: string[];
+  areaKind: string;
+  areaLabel: string;
+}
+
 // The map knows no combat implementation. CPR merely opts into the generic
 // handoff when both tokens represent characters.
 export function cprOnMeasureBetweenTokens(ctx: MapAttackMeasurement): MapAttackCommand | null {
@@ -72,6 +84,19 @@ export function cprOnMeasureBetweenTokens(ctx: MapAttackMeasurement): MapAttackC
   const targetCharacterId = String(ctx.targetToken?.characterId || '');
   if (!attackerTokenId || !attackerCharacterId || !targetTokenId || !targetCharacterId || !(Number(ctx.cells) >= 0) || !(Number(ctx.rangeMeters) >= 0)) return null;
   return { kind: 'attack', attackerTokenId, attackerCharacterId, targetTokenId, targetCharacterId, targetName: String(ctx.targetToken.name || targetCharacterId), cells: Number(ctx.cells), rangeMeters: Number(ctx.rangeMeters) };
+}
+
+// Fase AREA: RESOLVER on a map template hands the map's already-filtered
+// token list (inside templateCells() AND inside the acting user's visible
+// audience — the map page does both checks before calling this, the adapter
+// never re-derives geometry/visibility) to the system as a generic
+// "who's in the blast" list. CPR just extracts distinct character ids; a
+// system with no area rule at all returns null here and the map page shows
+// no RESOLVER action for its templates.
+export function cprOnResolveTemplate(ctx: MapAoeResolveContext): MapAoeCommand | null {
+  const targetCharacterIds = Array.from(new Set((ctx.tokens || []).map(token => String(token.characterId || '')).filter(Boolean)));
+  if (!targetCharacterIds.length) return null;
+  return { kind: 'aoe', targetCharacterIds, areaKind: String(ctx.template?.kind || ''), areaLabel: String(ctx.template?.label || '') };
 }
 
 const WOUND_RING_COLOR: Record<WoundState, string> = {

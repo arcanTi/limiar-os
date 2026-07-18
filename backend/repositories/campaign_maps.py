@@ -474,6 +474,117 @@ def toggle_door(campaign_id: str, wall_id: str, expected_revision: Any) -> dict[
     return {**normalize_wall(row_dict(updated)), "sceneRevision": revision + 1}
 
 
+# G2 (Fase AREA): destructible cover. Same document shape/lifecycle as walls
+# above (id + scene.revision/expectedRevision, GM-only placement/removal) —
+# copied deliberately rather than inventing a new persistence style. A prop
+# blocks LOS while hp > 0 (frontend/src/domain/map/visionEngine.ts turns its
+# rectangle into wall-like segments); once hp hits 0 it's just visual rubble,
+# the client stops feeding it into vision. Attacking a prop uses normal
+# damage — no armor/ablation, props aren't characters — so `damage_prop`
+# is a flat HP subtraction, open to any campaign member (not GM-gated) the
+# same way a player's own attack roll already applies character damage
+# without a GM click.
+MATERIALS = ("wood", "metal", "concrete", "glass", "improvised")
+
+
+def normalize_prop(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "campaignId": row["campaign_id"],
+        "sceneId": row["scene_id"],
+        "x": float(row.get("x") or 0),
+        "y": float(row.get("y") or 0),
+        "w": float(row.get("w") or 32),
+        "h": float(row.get("h") or 32),
+        "hp": max(0.0, float(row.get("hp") or 0)),
+        "hpMax": max(0.0, float(row.get("hp_max") or 0)),
+        "material": row.get("material") or "wood",
+        "label": row.get("label") or "",
+        "color": row.get("color") or "#8a7455",
+        "destroyed": max(0.0, float(row.get("hp") or 0)) <= 0,
+    }
+
+
+def list_props(campaign_id: str, scene_id: str) -> list[dict[str, Any]]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM campaign_map_props WHERE campaign_id = ? AND scene_id = ? ORDER BY created_at",
+            (campaign_id, scene_id),
+        ).fetchall()
+    return [normalize_prop(row_dict(row)) for row in rows]
+
+
+def save_prop(campaign_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    scene = active_scene(campaign_id)
+    prop_id = str(payload.get("id") or f"prop-{secrets.token_hex(8)}")[:160]
+    material = str(payload.get("material") or "wood")
+    if material not in MATERIALS:
+        material = "wood"
+    w = max(4.0, min(float(scene["width"]), float(payload.get("w") or 32)))
+    h = max(4.0, min(float(scene["height"]), float(payload.get("h") or 32)))
+    try:
+        x = max(0.0, min(float(scene["width"]), float(payload.get("x"))))
+        y = max(0.0, min(float(scene["height"]), float(payload.get("y"))))
+    except (TypeError, ValueError):
+        raise ValueError("prop coordinates required")
+    is_new = payload.get("id") is None
+    with db() as conn:
+        existing = conn.execute("SELECT hp FROM campaign_map_props WHERE id = ?", (prop_id,)).fetchone()
+        hp_max = max(0.0, float(payload.get("hpMax") or payload.get("hp_max") or 10))
+        if existing is not None and "hp" not in payload:
+            hp = float(row_dict(existing)["hp"])
+        else:
+            hp = max(0.0, min(hp_max, float(payload.get("hp") if payload.get("hp") is not None else hp_max)))
+        revision = _require_scene_revision(conn, scene["id"], payload.get("expectedRevision"))
+        conn.execute(
+            """INSERT INTO campaign_map_props(id,campaign_id,scene_id,x,y,w,h,hp,hp_max,material,label,color)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+               x=excluded.x,y=excluded.y,w=excluded.w,h=excluded.h,hp=excluded.hp,hp_max=excluded.hp_max,
+               material=excluded.material,label=excluded.label,color=excluded.color,updated_at=CURRENT_TIMESTAMP""",
+            (
+                prop_id, campaign_id, scene["id"], x, y, w, h, hp, hp_max, material,
+                sanitize_text(str(payload.get("label") or ""), 120),
+                str(payload.get("color") or "#8a7455")[:24],
+            ),
+        )
+        conn.execute("UPDATE campaign_map_scenes SET revision = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (revision + 1, scene["id"]))
+        row = conn.execute("SELECT * FROM campaign_map_props WHERE id = ?", (prop_id,)).fetchone()
+    touch_map_update(campaign_id)
+    return {**normalize_prop(row_dict(row)), "sceneRevision": revision + 1}
+
+
+def delete_prop(campaign_id: str, prop_id: str, expected_revision: Any) -> dict[str, Any]:
+    scene = active_scene(campaign_id)
+    with db() as conn:
+        revision = _require_scene_revision(conn, scene["id"], expected_revision)
+        cur = conn.execute("DELETE FROM campaign_map_props WHERE campaign_id = ? AND scene_id = ? AND id = ?", (campaign_id, scene["id"], prop_id))
+        if not cur.rowcount:
+            raise ValueError("prop not found")
+        conn.execute("UPDATE campaign_map_scenes SET revision = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (revision + 1, scene["id"]))
+    touch_map_update(campaign_id)
+    return {"deleted": True, "sceneRevision": revision + 1}
+
+
+def damage_prop(campaign_id: str, prop_id: str, amount: Any, expected_revision: Any) -> dict[str, Any]:
+    scene = active_scene(campaign_id)
+    try:
+        delta = max(0.0, float(amount))
+    except (TypeError, ValueError):
+        raise ValueError("damage amount required")
+    with db() as conn:
+        revision = _require_scene_revision(conn, scene["id"], expected_revision)
+        row = conn.execute("SELECT * FROM campaign_map_props WHERE campaign_id = ? AND scene_id = ? AND id = ?", (campaign_id, scene["id"], prop_id)).fetchone()
+        prop = row_dict(row)
+        if not prop:
+            raise ValueError("prop not found")
+        next_hp = max(0.0, float(prop.get("hp") or 0) - delta)
+        conn.execute("UPDATE campaign_map_props SET hp = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (next_hp, prop_id))
+        conn.execute("UPDATE campaign_map_scenes SET revision = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (revision + 1, scene["id"]))
+        updated = conn.execute("SELECT * FROM campaign_map_props WHERE id = ?", (prop_id,)).fetchone()
+    touch_map_update(campaign_id)
+    return {**normalize_prop(row_dict(updated)), "sceneRevision": revision + 1}
+
+
 def normalize_fog(fog: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": fog["id"],
@@ -657,6 +768,10 @@ def normalize_template(row: dict[str, Any]) -> dict[str, Any]:
         "label": row.get("label") or "",
         "hidden": bool(row.get("hidden")),
         "lifecycle": row.get("lifecycle") or "manual",
+        "revision": int(row.get("revision") or 0),
+        "resolved": row.get("resolved_at") is not None,
+        "resolvedAt": row.get("resolved_at"),
+        "resolvedRound": row.get("resolved_round"),
         "ownerUsername": row.get("owner_username"),
     }
 
@@ -669,14 +784,54 @@ def _template_visible_to(row: dict[str, Any], session: dict[str, str] | None) ->
     return is_staff(session) or row.get("owner_username") == session.get("username")
 
 
+# A resolved `untilResolved` template (grenade/AoE, Fase AREA) disappears from
+# every non-GM payload immediately — the blast already happened, a player has
+# no reason to keep seeing the marker. Staff keeps seeing it, dimmed by the
+# client from `resolved`, for one extra combat round after the round it was
+# resolved in (so the table can still eyeball "that's where it went off");
+# past that window — or after a flat time cutoff for when combat isn't
+# running, so a resolved template outside combat doesn't linger forever —
+# the row is lazily deleted on the next list_templates call, no background
+# job needed.
+TEMPLATE_RESOLVED_STALE_SECONDS = 600
+
+
+def _prune_resolved_templates(conn: Any, campaign_id: str, scene_id: str, combat: dict[str, Any]) -> None:
+    active = 1 if combat.get("active") else 0
+    cur = conn.execute(
+        """
+        DELETE FROM campaign_map_templates
+        WHERE campaign_id = ? AND scene_id = ? AND resolved_at IS NOT NULL
+          AND (
+            (? = 1 AND resolved_round IS NOT NULL AND ? > resolved_round + 1)
+            OR ((? = 0 OR resolved_round IS NULL) AND resolved_at <= datetime('now', ?))
+          )
+        """,
+        (
+            campaign_id,
+            scene_id,
+            active,
+            combat.get("roundNumber") or 0,
+            active,
+            f"-{TEMPLATE_RESOLVED_STALE_SECONDS} seconds",
+        ),
+    )
+    if cur.rowcount:
+        touch_map_update(campaign_id)
+
+
 def list_templates(campaign_id: str, scene_id: str, session: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    combat = _combat_summary()
     with db() as conn:
+        _prune_resolved_templates(conn, campaign_id, scene_id, combat)
         rows = conn.execute(
             "SELECT * FROM campaign_map_templates WHERE campaign_id = ? AND scene_id = ? ORDER BY created_at",
             (campaign_id, scene_id),
         ).fetchall()
     dicts = [row_dict(row) for row in rows]
-    return [normalize_template(row) for row in dicts if _template_visible_to(row, session)]
+    staff = is_staff(session) if session else False
+    visible = [row for row in dicts if _template_visible_to(row, session) and (staff or row.get("resolved_at") is None)]
+    return [normalize_template(row) for row in visible]
 
 
 def save_template(campaign_id: str, payload: dict[str, Any], session: dict[str, str]) -> dict[str, Any] | None:
@@ -717,6 +872,7 @@ def save_template(campaign_id: str, payload: dict[str, Any], session: dict[str, 
               label = excluded.label,
               hidden = excluded.hidden,
               lifecycle = excluded.lifecycle,
+              revision = campaign_map_templates.revision + 1,
               updated_at = CURRENT_TIMESTAMP
             """,
             (
@@ -762,6 +918,50 @@ def delete_template(campaign_id: str, template_id: str, session: dict[str, str])
     if cur.rowcount:
         touch_map_update(campaign_id)
     return cur.rowcount > 0
+
+
+class TemplateRevisionConflict(Exception):
+    pass
+
+
+# Fase AREA: "resolving" a template (grenade/AoE with lifecycle
+# `untilResolved`) is just this state transition — no new damage route. The
+# cockpit applies the actual HP/armor consequences through the existing
+# character routes (ApplyCombatDamage / applyCharacterPatch); this call only
+# marks the template consumed so it stops offering RESOLVER again and starts
+# aging out of both audiences per `_template_stale`/`_prune_resolved_templates`.
+# `expected_revision` guards the second-confirmation window against a double
+# resolve (two clients racing the same RESOLVER click).
+def resolve_template(campaign_id: str, template_id: str, expected_revision: Any, session: dict[str, str]) -> dict[str, Any] | None:
+    """None: not found or caller isn't the owner/staff — route maps that to 403/404."""
+    combat = _combat_summary()
+    with db() as conn:
+        row = conn.execute(
+            "SELECT * FROM campaign_map_templates WHERE id = ? AND campaign_id = ?",
+            (template_id, campaign_id),
+        ).fetchone()
+        if not row:
+            return None
+        current = row_dict(row)
+        if not is_staff(session) and current.get("owner_username") != session.get("username"):
+            return None
+        try:
+            expected = int(expected_revision)
+        except (TypeError, ValueError):
+            raise TemplateRevisionConflict()
+        if expected != int(current.get("revision") or 0):
+            raise TemplateRevisionConflict()
+        conn.execute(
+            """
+            UPDATE campaign_map_templates
+            SET resolved_at = CURRENT_TIMESTAMP, resolved_round = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (combat["roundNumber"], template_id),
+        )
+        updated = conn.execute("SELECT * FROM campaign_map_templates WHERE id = ?", (template_id,)).fetchone()
+    touch_map_update(campaign_id)
+    return normalize_template(row_dict(updated))
 
 
 def list_scenes(campaign_id: str) -> list[dict[str, Any]]:
@@ -844,6 +1044,7 @@ def map_state(campaign_id: str, session: dict[str, str]) -> dict[str, Any]:
         "reveals": reveals_out,
         "templates": list_templates(campaign_id, scene_id, session),
         "walls": list_walls(campaign_id, scene_id),
+        "props": list_props(campaign_id, scene_id),
         "lights": list_lights(campaign_id, scene_id),
         "drawings": list_drawings(campaign_id, scene_id),
         "pins": list_pins(campaign_id, scene_id, session),

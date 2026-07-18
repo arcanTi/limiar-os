@@ -22,4 +22,9 @@ export const CPRED_STATUS_PRESETS: StatusPreset[] = [
   { id: 'deadly_on_fire', label_pt: 'Deadly On Fire', duration: null, modifiers: {} },
   { id: 'facedown_lost', label_pt: 'Facedown Perdido: -2 em todas as acoes contra o oponente ate derrota-lo', duration: null, modifiers: { actionBonus: -2 } },
   { id: 'unconscious', label_pt: 'Inconsciente (estabilizado de Mortally Wounded)', duration: { value: 1, unit: 'min' }, modifiers: {} },
+  // G1 (Fase AREA): suppressive fire failing its WILL DV15 save. No numeric
+  // modifiers on purpose — enforcement here is advisory, same as the rest of
+  // PLANO-COMBATE-MAPA's decisions: the badge just flags it, the GM decides
+  // what "suppressed" means at the table (pinned, can't advance, etc).
+  { id: 'suppressed', label_pt: 'Suprimido: falhou WILL DV15 contra fogo de supressao', duration: { value: 1, unit: 'round' }, modifiers: {} },
 ];

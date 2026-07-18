@@ -22,6 +22,11 @@ import { weaponRangeBand } from '../../domain/combat/combatAttackEngine.ts';
 import { canFireWeapon as combatCanFireWeapon, spendAmmo as combatSpendAmmo } from '../../domain/combat/combatAmmoEngine.ts';
 import { netActionsPerTurn } from '../../domain/netrunning/index.ts';
 import { weaponRollTone as viewWeaponRollTone } from '../view/constants.js';
+import { rollD10 } from '../../domain/combat/combatDice.ts';
+import { resolveAreaAttack } from '../../domain/combat/combatResolver.ts';
+import { templateCells } from '../../domain/map/templateEngine.ts';
+import { mapTokenVisibleNow } from '../../domain/map/mapAttackIntent.ts';
+import { propsToWalls } from '../../domain/map/visionEngine.ts';
 
 // SYS.06 // COMBAT: turn order, per-combatant attack/damage/check rolls,
 // initiative, the standard Critical Injury (2+ sixes) flow, situational
@@ -81,6 +86,10 @@ export function combatRenderVals(state = {}, deps = {}) {
         // defender's own device instead of the GM eyeballing the chat.
         isMelee: !!item.melee,
         requestEvasion: () => deps.requestEvasion(id, item),
+        // G1: weapons flagged suppressiveFire (itemNormalizers, driven by the
+        // "Suppressive Fire" special-rule text) get a batch WILL-save action.
+        hasSuppressiveFire: !!item.suppressiveFire,
+        suppressiveFire: () => deps.requestSuppressiveFire(id, item),
       };
     });
     const ctxAvail = deps.attackContextAvailable(character);
@@ -110,6 +119,21 @@ export function combatRenderVals(state = {}, deps = {}) {
       inc: () => deps.adjustAdHocMod(id, 1),
       dec: () => deps.adjustAdHocMod(id, -1),
     };
+    // G8: situational chips computed by the map at the F4 measure-and-attack
+    // handoff (Component.consumeMapAttackIntent -> domain/map/situationalMods)
+    // — pre-filled suggestions the GM applies/dismisses into the same ad-hoc
+    // MOD stepper above instead of typing a modifier from memory. Only exist
+    // while this attacker still has a live map-attack context (F4 flow).
+    const mapAttackContext = (S.mapAttackContexts || {})[id] || null;
+    const situationalChips = (mapAttackContext && mapAttackContext.situationalChips || []).map(chip => {
+      const applied = (mapAttackContext.appliedChipIds || []).includes(chip.id);
+      return {
+        id: chip.id,
+        label: chip.label + ' ' + (chip.mod >= 0 ? '+' : '') + chip.mod,
+        style: deps.chipStyle(applied),
+        toggle: () => deps.toggleSituationalChip(id, chip.id),
+      };
+    });
     // Who this combatant is aiming at — GM (or the player, for their own
     // attacks) picks it here; rollCombatAttack/rollCombatDamage read it back
     // via combatTargetFor() to label the roll, and it pre-fills the Critical
@@ -224,6 +248,8 @@ export function combatRenderVals(state = {}, deps = {}) {
       hasEvasionStatus: !!deps.evasionStatusFor(id),
       luck,
       adHocMod,
+      situationalChips,
+      hasSituationalChips: situationalChips.length > 0,
       netActions,
       onInitiativeInput: (e) => deps.setInitiative(id, e.target.value),
       initiativePending: combatState.active && (entry.initiative === null || entry.initiative === undefined) && character.kind !== 'npc',
@@ -426,6 +452,8 @@ export function combatRenderVals(state = {}, deps = {}) {
     combatHeaderTimerClass,
     critInjuryPending,
     hasCritInjuryPending: !!critInjuryPending,
+    mapAoeResolve: deps.mapAoeResolveVals ? deps.mapAoeResolveVals() : null,
+    hasMapAoeResolve: !!(S.mapAoeContext),
     facedownContestPending,
     hasFacedownContestPending: !!facedownContestPending,
     currentCombatantId,
@@ -1358,6 +1386,173 @@ export function combatHandlers(component) {
     const text = [weapon && weapon.name, weapon && weapon.type, weapon && weapon.notes, weapon && weapon.weaponClass].filter(Boolean).join(' ').toLowerCase();
     return /\b(grenade|granada|explosive|explosivo|rocket|foguete|missile|mina)\b/.test(text);
   }
+
+  // --- Fase AREA: RESOLVER (map) -> cockpit apply (2nd confirmation) -------
+  // Component.consumeMapAoeIntent already validated combat-active/GM/target
+  // characters and put the hydrated intent in S.mapAoeContext, pre-selecting
+  // every target the map found. This is the "apply" half: a real damage roll
+  // through the previously-orphan resolveAreaAttack engine (README-PLANO.md
+  // sec. 7 item 1 — first production caller), applied via the SAME character
+  // patch route every other combat damage in this file already uses, then
+  // the template is marked resolved on the map (expectedRevision-guarded).
+  function characterForCombatActor(target) {
+    const derived = component.derivedStats(target.base, target);
+    return {
+      id: target.id,
+      hp: target.health && target.health.cur,
+      maxHp: target.health && target.health.max,
+      armor: { head: { sp: derived.currentHeadSp }, body: { sp: derived.currentBodySp } },
+      installedCyberware: component.installedCyberware(target),
+      criticalInjuries: target.criticalInjuries,
+    };
+  }
+  function mapAoeResolveVals() {
+    const ctx = component.state.mapAoeContext;
+    if (!ctx) return null;
+    const included = ctx.includedTargetIds || ctx.targetCharacterIds || [];
+    const targetRows = (ctx.targetCharacterIds || []).map(id => combatCharacter(id)).filter(Boolean).map(target => {
+      const checked = included.includes(target.id);
+      return { id: target.id, name: target.name || target.id, checked, notChecked: !checked, toggle: () => toggleMapAoeTarget(target.id) };
+    });
+    return {
+      title: 'RESOLVER AREA :: ' + (ctx.areaLabel || ctx.areaKind || 'template').toUpperCase(),
+      targetRows,
+      hasTargets: targetRows.length > 0,
+      diceCount: ctx.diceCount ?? 4,
+      diceSides: ctx.diceSides ?? 6,
+      onDiceCount: (e) => setMapAoeDamageDice({ diceCount: component.asNumber(e.target.value, 4, 1, 20) }),
+      onDiceSides: (e) => setMapAoeDamageDice({ diceSides: component.asNumber(e.target.value, 6, 2, 100) }),
+      canApply: included.length > 0,
+      rollAndApply: () => rollAndApplyMapAoe(),
+      dismiss: () => dismissMapAoeResolve(),
+    };
+  }
+  function toggleMapAoeTarget(targetId) {
+    component.setState(s => {
+      if (!s.mapAoeContext) return {};
+      const current = s.mapAoeContext.includedTargetIds || s.mapAoeContext.targetCharacterIds || [];
+      const next = current.includes(targetId) ? current.filter(id => id !== targetId) : current.concat(targetId);
+      return { mapAoeContext: { ...s.mapAoeContext, includedTargetIds: next } };
+    });
+  }
+  function setMapAoeDamageDice(patch) {
+    component.setState(s => (s.mapAoeContext ? { mapAoeContext: { ...s.mapAoeContext, ...patch } } : {}));
+  }
+  function dismissMapAoeResolve() {
+    component.setState({ mapAoeContext: null });
+  }
+  async function rollAndApplyMapAoe() {
+    if (!component.ensureGm('Login do mestre necessario para resolver area')) return;
+    const ctx = component.state.mapAoeContext;
+    if (!ctx) return;
+    const includedIds = ctx.includedTargetIds || ctx.targetCharacterIds || [];
+    const targets = includedIds.map(id => combatCharacter(id)).filter(Boolean);
+    if (!targets.length) return component.flash('Selecione ao menos um alvo');
+    const count = component.asNumber(ctx.diceCount, 4, 1, 20);
+    const sides = component.asNumber(ctx.diceSides, 6, 2, 100);
+    const faces = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * sides));
+    const damageRoll = { rolls: faces, total: faces.reduce((sum, face) => sum + face, 0) };
+    // attackRoll/targetDV force a guaranteed hit: the "did it land" question
+    // was already answered by the player throwing into the template's blast
+    // radius (that's what RESOLVER's target list represents), so resolveArea
+    // Attack only needs to run its damage-vs-armor pipeline, not a to-hit rol
+    // against attacker stats this flow never collected.
+    const contexts = targets.map(target => ({
+      weapon: { code: 'AOE', damage: `${count}d${sides}` },
+      target: characterForCombatActor(target),
+      attackRoll: { total: 999 },
+      targetDV: 0,
+      damageRoll,
+    }));
+    const results = resolveAreaAttack(contexts, Math.random);
+    const lines = [];
+    results.forEach((result, idx) => {
+      const target = targets[idx];
+      const hpLoss = Math.max(0, component.asNumber(result.hpDamage, 0, 0, 9999));
+      const ablatedDelta = result.armorAblated ? Math.max(0, component.asNumber(result.armorSPBefore, 0, 0, 99) - component.asNumber(result.armorSPAfter, 0, 0, 99)) : 0;
+      const nextHealth = { ...target.health, cur: Math.max(0, (target.health.cur || 0) - hpLoss) };
+      const nextSpDamage = { ...(target.spDamage || {}), body: Math.max(0, ((target.spDamage && target.spDamage.body) || 0) + ablatedDelta) };
+      component.applyCharacterPatch(target.id, { health: nextHealth, spDamage: nextSpDamage });
+      lines.push(
+        (target.name || target.id).toUpperCase() + ' :: HP -' + hpLoss
+        + (ablatedDelta ? ' // armadura ablada -' + ablatedDelta : '')
+        + (result.criticalTriggered ? ' // 2+ SEIS: resolver Lesao Critica manualmente na ficha' : ''),
+      );
+    });
+    component.postChat({
+      kind: 'text',
+      sender: 'SISTEMA',
+      text: 'AREA RESOLVIDA :: ' + (ctx.areaLabel || ctx.areaKind || 'template').toUpperCase() + ' :: ' + count + 'd' + sides + ' = ' + damageRoll.total + '\n' + lines.join('\n'),
+    });
+    try {
+      if (component.api() && component.api().campaignMaps) {
+        await component.api().campaignMaps.resolveTemplate(ctx.campaignId, { templateId: ctx.templateId, expectedRevision: ctx.expectedRevision });
+      }
+    } catch (err) {
+      component.flash('Dano aplicado, mas falha ao marcar o template resolvido no mapa: ' + err.message, 3600);
+    }
+    component.setState({ mapAoeContext: null });
+  }
+
+  // --- G1: Fogo Supressivo -------------------------------------------------
+  // Places a 25m circle template centered on the acting combatant's current
+  // target (the map's own "who am I aiming the suppression at" input — this
+  // cockpit has no point-and-click map surface of its own, MOTOR fase owns
+  // richer map interactions), lists every character-linked token inside it
+  // that the acting session can actually see (F3 visibility rule, same as
+  // the AoE RESOLVER flow), then rolls a WILL DV15 save per target. This
+  // uses the same silent/no-overlay batch-rolling style already established
+  // by rollInitiative's NPC branch — component.roll()'s single animated
+  // overlay (one _rollId in flight) isn't built for N simultaneous rolls.
+  async function requestSuppressiveFire(actorId, weapon) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode usar fogo supressivo pelo seu proprio combatente');
+    const targetId = combatTargetFor(actorId);
+    if (!targetId) return component.flash('Selecione um alvo (centro da area) antes de usar fogo supressivo');
+    const campaignId = component.state.activeCampaignId;
+    if (!campaignId) return component.flash('Nenhum mapa de campanha ativo para posicionar o template');
+    const api = component.api();
+    if (!api || !api.campaignMaps) return component.flash('Mapa indisponivel');
+    const actor = combatCharacter(actorId) || component.activeCharacter();
+    try {
+      const mapState = await api.campaignMaps.get(campaignId);
+      const tokens = Array.isArray(mapState && mapState.tokens) ? mapState.tokens : [];
+      const centerToken = tokens.find(token => token && token.characterId === targetId);
+      if (!centerToken) return component.flash('Alvo selecionado nao tem token no mapa ativo');
+      const saved = await api.campaignMaps.saveTemplate(campaignId, {
+        kind: 'circle', x: centerToken.x, y: centerToken.y, distanceUnits: 25,
+        color: '#d6aa4e', label: 'SUPRESSAO :: ' + ((actor && actor.name) || actorId).toUpperCase() + ((weapon && weapon.name) ? ' (' + weapon.name + ')' : ''), lifecycle: 'manual',
+      });
+      const gridSize = component.asNumber(mapState.scene && mapState.scene.gridSize, 64, 8, 512);
+      const cells = templateCells({ kind: 'circle', x: saved.x, y: saved.y, distanceUnits: saved.distanceUnits }, { gridSizePx: gridSize });
+      const cellSet = new Set(cells.map(c => c.x + ':' + c.y));
+      const username = component.state.authUser && component.state.authUser.username;
+      const affected = tokens.filter(token => {
+        if (!token || !token.characterId || token.characterId === actorId) return false;
+        if (!cellSet.has(Math.floor(token.x / gridSize) + ':' + Math.floor(token.y / gridSize))) return false;
+        return mapTokenVisibleNow(mapState, token, { gm: !!component.state.gm, username });
+      });
+      if (!affected.length) return component.flash('Nenhum alvo visivel na area de supressao');
+      resolveSuppressiveFireBatch(actor, affected.map(token => token.characterId));
+    } catch (err) {
+      component.flash(err.message || 'Falha ao posicionar template de fogo supressivo', 3200);
+    }
+  }
+  function resolveSuppressiveFireBatch(actor, targetCharacterIds) {
+    const rows = targetCharacterIds.map(id => combatCharacter(id)).filter(Boolean).map(target => {
+      const derived = component.derivedStats(target.base, target);
+      const willMod = component.asNumber(derived.effectiveStats && derived.effectiveStats.WILL, 0, 0, 99);
+      const die = rollD10();
+      const total = die + willMod;
+      const success = total >= 15;
+      if (!success) component.addStatusEffect('suppressed', { targetId: target.id, source: 'suppressiveFire' });
+      return (target.name || target.id).toUpperCase() + ' :: ' + die + '+' + willMod + '=' + total + (success ? ' :: RESISTIU' : ' :: SUPRIMIDO');
+    });
+    component.postChat({
+      kind: 'text',
+      sender: 'SISTEMA',
+      text: 'FOGO SUPRESSIVO :: ' + ((actor && actor.name) || 'OPERATIVO').toUpperCase() + ' :: WILL DV15\n' + rows.join('\n'),
+    });
+  }
   // GM (or a player, for their own attacks) picks who a combatant is
   // currently aiming at. Purely a label on the roll — this app never
   // auto-resolves hits against a target's DV/SP, so there's nothing else to
@@ -1593,6 +1788,26 @@ export function combatHandlers(component) {
     const next = Math.max(-8, Math.min(8, pendingRollMods(actorId).adHoc + delta));
     setPendingRollMods(actorId, { adHoc: next });
   }
+  // G8: apply/dismiss a map-derived situational chip (darkness/no-LOS/
+  // in-cover) into the same ad-hoc MOD stepper CM0 already exposes. Toggling
+  // folds the chip's suggested value into adjustAdHocMod (still clamped
+  // [-8,8] there) and flips the chip's own applied flag so the pill reflects
+  // it — a second click un-applies by subtracting the same delta back out.
+  function toggleSituationalChip(actorId, chipId) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode ajustar chips do seu proprio combatente');
+    const ctx = (component.state.mapAttackContexts || {})[actorId];
+    const chip = ctx && (ctx.situationalChips || []).find(row => row.id === chipId);
+    if (!ctx || !chip) return;
+    const appliedIds = ctx.appliedChipIds || [];
+    const applied = appliedIds.includes(chipId);
+    adjustAdHocMod(actorId, applied ? -chip.mod : chip.mod);
+    component.setState(s => ({
+      mapAttackContexts: {
+        ...(s.mapAttackContexts || {}),
+        [actorId]: { ...ctx, appliedChipIds: applied ? appliedIds.filter(cid => cid !== chipId) : [...appliedIds, chipId] },
+      },
+    }));
+  }
   // Reads + zeroes the staged mods and deducts spent Luck from the pool.
   // Called synchronously when a roll is triggered (not onResolved) so firing
   // a second roll before the dice animation settles can't double-spend the
@@ -1734,8 +1949,15 @@ export function combatHandlers(component) {
     pendingRollMods,
     adjustLuckSpend,
     adjustAdHocMod,
+    toggleSituationalChip,
     consumePendingRollMods,
     resetLuckForSession,
     reloadWeapon,
+    requestSuppressiveFire,
+    mapAoeResolveVals,
+    toggleMapAoeTarget,
+    setMapAoeDamageDice,
+    rollAndApplyMapAoe,
+    dismissMapAoeResolve,
   };
 }

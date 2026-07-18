@@ -157,3 +157,135 @@ def test_map_state_token_ammo_suppressed_for_gm_only_visibility(db_path):
     gm_state = maps.map_state(campaign_id, {"username": "gm", "role": "gm"})
     gm_out = next(t for t in gm_state["tokens"] if t["id"] == token["id"])
     assert gm_out["ammo"]["weaponId"] == "pistol"
+
+
+# --- Fase AREA: template `untilResolved` lifecycle -------------------------
+
+def test_resolve_template_marks_resolved_and_disappears_for_players(db_path):
+    campaign_id = "camp-1"
+    gm = {"username": "gm", "role": "gm"}
+    tpl = maps.save_template(campaign_id, {"kind": "circle", "x": 10, "y": 10, "distanceUnits": 5, "lifecycle": "untilResolved"}, gm)
+    assert tpl["revision"] == 0
+    assert tpl["resolved"] is False
+
+    resolved = maps.resolve_template(campaign_id, tpl["id"], tpl["revision"], gm)
+    assert resolved["resolved"] is True
+    assert resolved["revision"] == 1
+
+    player_view = maps.list_templates(campaign_id, tpl["sceneId"], {"username": "player1", "role": "player"})
+    assert player_view == []
+
+    gm_view = maps.list_templates(campaign_id, tpl["sceneId"], gm)
+    assert [t["id"] for t in gm_view] == [tpl["id"]]
+    assert gm_view[0]["resolved"] is True
+
+
+def test_resolve_template_rejects_stale_expected_revision(db_path):
+    campaign_id = "camp-1"
+    gm = {"username": "gm", "role": "gm"}
+    tpl = maps.save_template(campaign_id, {"kind": "circle", "x": 0, "y": 0, "distanceUnits": 5, "lifecycle": "untilResolved"}, gm)
+    try:
+        maps.resolve_template(campaign_id, tpl["id"], tpl["revision"] + 1, gm)
+        assert False, "expected TemplateRevisionConflict"
+    except maps.TemplateRevisionConflict:
+        pass
+
+
+def test_resolve_template_denies_non_owner_non_staff(db_path):
+    campaign_id = "camp-1"
+    owner = {"username": "alice", "role": "player"}
+    other = {"username": "bob", "role": "player"}
+    tpl = maps.save_template(campaign_id, {"kind": "circle", "x": 0, "y": 0, "distanceUnits": 5, "lifecycle": "untilResolved"}, owner)
+    assert maps.resolve_template(campaign_id, tpl["id"], tpl["revision"], other) is None
+
+
+def test_resolve_template_stays_dimmed_for_gm_one_round_then_prunes(db_path):
+    campaign_id = "camp-1"
+    gm = {"username": "gm", "role": "gm"}
+    set_setting("combat-state", {
+        "active": True, "round": 1, "turnIndex": 0,
+        "order": ["ganger"], "combatants": {"ganger": {"side": "enemy", "acted": False, "defeated": False}},
+    })
+    tpl = maps.save_template(campaign_id, {"kind": "circle", "x": 0, "y": 0, "distanceUnits": 5, "lifecycle": "untilResolved"}, gm)
+    maps.resolve_template(campaign_id, tpl["id"], tpl["revision"], gm)
+
+    # Same round it was resolved in: still visible (dimmed) for the GM.
+    assert [t["id"] for t in maps.list_templates(campaign_id, tpl["sceneId"], gm)] == [tpl["id"]]
+
+    # One round later: still visible per the "one extra round" grace window.
+    set_setting("combat-state", {
+        "active": True, "round": 2, "turnIndex": 0,
+        "order": ["ganger"], "combatants": {"ganger": {"side": "enemy", "acted": False, "defeated": False}},
+    })
+    assert [t["id"] for t in maps.list_templates(campaign_id, tpl["sceneId"], gm)] == [tpl["id"]]
+
+    # Two rounds later: stale, lazily pruned even for the GM.
+    set_setting("combat-state", {
+        "active": True, "round": 3, "turnIndex": 0,
+        "order": ["ganger"], "combatants": {"ganger": {"side": "enemy", "acted": False, "defeated": False}},
+    })
+    assert maps.list_templates(campaign_id, tpl["sceneId"], gm) == []
+
+
+def test_delete_template_still_works_on_a_resolved_template(db_path):
+    campaign_id = "camp-1"
+    gm = {"username": "gm", "role": "gm"}
+    tpl = maps.save_template(campaign_id, {"kind": "circle", "x": 0, "y": 0, "distanceUnits": 5, "lifecycle": "untilResolved"}, gm)
+    maps.resolve_template(campaign_id, tpl["id"], tpl["revision"], gm)
+    assert maps.delete_template(campaign_id, tpl["id"], gm) is True
+
+
+# --- G2: destructible cover (props) -----------------------------------------
+
+def test_save_prop_persists_and_bumps_scene_revision(db_path):
+    campaign_id = "camp-1"
+    scene = maps.active_scene(campaign_id)
+    prop = maps.save_prop(campaign_id, {"x": 50, "y": 60, "w": 40, "h": 20, "hpMax": 15, "material": "wood", "expectedRevision": scene["revision"]})
+    assert prop["hp"] == 15
+    assert prop["hpMax"] == 15
+    assert prop["destroyed"] is False
+    assert prop["sceneRevision"] == scene["revision"] + 1
+
+    listed = maps.list_props(campaign_id, scene["id"])
+    assert [p["id"] for p in listed] == [prop["id"]]
+
+
+def test_save_prop_rejects_stale_scene_revision(db_path):
+    campaign_id = "camp-1"
+    maps.active_scene(campaign_id)
+    try:
+        maps.save_prop(campaign_id, {"x": 0, "y": 0, "hpMax": 10, "expectedRevision": 999})
+        assert False, "expected SceneRevisionConflict"
+    except maps.SceneRevisionConflict:
+        pass
+
+
+def test_damage_prop_reduces_hp_and_marks_destroyed_at_zero(db_path):
+    campaign_id = "camp-1"
+    scene = maps.active_scene(campaign_id)
+    prop = maps.save_prop(campaign_id, {"x": 0, "y": 0, "hpMax": 10, "expectedRevision": scene["revision"]})
+
+    hit = maps.damage_prop(campaign_id, prop["id"], 4, prop["sceneRevision"])
+    assert hit["hp"] == 6
+    assert hit["destroyed"] is False
+
+    killed = maps.damage_prop(campaign_id, prop["id"], 999, hit["sceneRevision"])
+    assert killed["hp"] == 0
+    assert killed["destroyed"] is True
+
+
+def test_delete_prop_removes_it_from_the_scene(db_path):
+    campaign_id = "camp-1"
+    scene = maps.active_scene(campaign_id)
+    prop = maps.save_prop(campaign_id, {"x": 0, "y": 0, "hpMax": 10, "expectedRevision": scene["revision"]})
+    result = maps.delete_prop(campaign_id, prop["id"], prop["sceneRevision"])
+    assert result["deleted"] is True
+    assert maps.list_props(campaign_id, scene["id"]) == []
+
+
+def test_map_state_includes_props(db_path):
+    campaign_id = "camp-1"
+    scene = maps.active_scene(campaign_id)
+    maps.save_prop(campaign_id, {"x": 0, "y": 0, "hpMax": 10, "expectedRevision": scene["revision"]})
+    props = maps.map_state(campaign_id, {"username": "gm", "role": "gm"})["props"]
+    assert len(props) == 1

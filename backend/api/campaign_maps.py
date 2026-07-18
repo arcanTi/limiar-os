@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from ..domain.validation import ValidationError
 from ..repositories.campaign_maps import (
     SceneRevisionConflict,
+    TemplateRevisionConflict,
     activate_scene,
     add_fog,
     add_ping,
@@ -13,10 +14,12 @@ from ..repositories.campaign_maps import (
     can_edit_campaign_map,
     clear_difficult_terrain,
     clear_reveals,
+    damage_prop,
     delete_fog,
     delete_drawing,
     delete_light,
     delete_pin,
+    delete_prop,
     delete_template,
     delete_wall,
     delete_token,
@@ -25,10 +28,12 @@ from ..repositories.campaign_maps import (
     move_token,
     move_tokens,
     wait_for_map_update,
+    resolve_template,
     save_scene,
     save_drawing,
     save_light,
     save_pin,
+    save_prop,
     save_template,
     save_wall,
     sync_player_tokens,
@@ -251,6 +256,25 @@ class CampaignMapRoutes:
             return self.write_error(HTTPStatus.FORBIDDEN, "Template access denied")
         return self.write_json({"deleted": result})
 
+    def _post_campaign_map_resolve_template(self, campaign_id: str) -> None:
+        # Fase AREA: owner or GM only, same trust level as delete_template —
+        # this is the map-side half of the "2 confirmations" RESOLVER flow
+        # (the cockpit apply is the second confirmation).
+        session = self._campaign_map_session(campaign_id)
+        if not session:
+            return None
+        try:
+            payload = self.read_json()
+        except ValidationError as e:
+            return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
+        try:
+            result = resolve_template(campaign_id, str(payload.get("templateId") or ""), payload.get("expectedRevision"), session)
+        except TemplateRevisionConflict:
+            return self.write_error(HTTPStatus.CONFLICT, "Template changed; reload map", "TEMPLATE_REVISION_CONFLICT")
+        if result is None:
+            return self.write_error(HTTPStatus.FORBIDDEN, "Template access denied")
+        return self.write_json(result)
+
     def _post_campaign_map_sync(self, campaign_id: str) -> None:
         session = self._campaign_map_session(campaign_id)
         if not session:
@@ -295,6 +319,49 @@ class CampaignMapRoutes:
         try:
             payload = self.read_json()
             return self.write_json(toggle_door(campaign_id, str(payload.get("wallId") or ""), payload.get("expectedRevision")))
+        except SceneRevisionConflict:
+            return self.write_error(HTTPStatus.CONFLICT, "Scene changed; reload map", "SCENE_REVISION_CONFLICT")
+        except (ValidationError, ValueError) as e:
+            return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
+
+    def _post_campaign_map_prop(self, campaign_id: str) -> None:
+        session = self._campaign_map_session(campaign_id)
+        if not session:
+            return None
+        if not can_edit_campaign_map(campaign_id, session):
+            return self.write_error(HTTPStatus.FORBIDDEN, "GM login required")
+        try:
+            return self.write_json(save_prop(campaign_id, self.read_json()), HTTPStatus.CREATED)
+        except SceneRevisionConflict:
+            return self.write_error(HTTPStatus.CONFLICT, "Scene changed; reload map", "SCENE_REVISION_CONFLICT")
+        except (ValidationError, ValueError) as e:
+            return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
+
+    def _post_campaign_map_delete_prop(self, campaign_id: str) -> None:
+        session = self._campaign_map_session(campaign_id)
+        if not session:
+            return None
+        if not can_edit_campaign_map(campaign_id, session):
+            return self.write_error(HTTPStatus.FORBIDDEN, "GM login required")
+        try:
+            payload = self.read_json()
+            return self.write_json(delete_prop(campaign_id, str(payload.get("propId") or ""), payload.get("expectedRevision")))
+        except SceneRevisionConflict:
+            return self.write_error(HTTPStatus.CONFLICT, "Scene changed; reload map", "SCENE_REVISION_CONFLICT")
+        except (ValidationError, ValueError) as e:
+            return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
+
+    def _post_campaign_map_prop_damage(self, campaign_id: str) -> None:
+        # Any campaign member can log damage to a prop — same trust level as
+        # a player's own attack roll already applying character damage
+        # without a GM click. Props aren't armored characters (G2): flat HP
+        # subtraction, no ablation route needed.
+        session = self._campaign_map_session(campaign_id)
+        if not session:
+            return None
+        try:
+            payload = self.read_json()
+            return self.write_json(damage_prop(campaign_id, str(payload.get("propId") or ""), payload.get("amount"), payload.get("expectedRevision")))
         except SceneRevisionConflict:
             return self.write_error(HTTPStatus.CONFLICT, "Scene changed; reload map", "SCENE_REVISION_CONFLICT")
         except (ValidationError, ValueError) as e:
@@ -437,10 +504,14 @@ class CampaignMapRoutes:
             "ping": self._post_campaign_map_ping,
             "template": self._post_campaign_map_template,
             "template/delete": self._post_campaign_map_delete_template,
+            "template/resolve": self._post_campaign_map_resolve_template,
             "sync": self._post_campaign_map_sync,
             "wall": self._post_campaign_map_wall,
             "wall/delete": self._post_campaign_map_delete_wall,
             "door/toggle": self._post_campaign_map_door_toggle,
+            "prop": self._post_campaign_map_prop,
+            "prop/delete": self._post_campaign_map_delete_prop,
+            "prop/damage": self._post_campaign_map_prop_damage,
             "light": self._post_campaign_map_light,
             "light/delete": self._post_campaign_map_delete_light,
             "light/toggle": self._post_campaign_map_light_toggle,

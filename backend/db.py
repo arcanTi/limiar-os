@@ -423,7 +423,28 @@ def init_db() -> None:
               hidden INTEGER NOT NULL DEFAULT 0,
               lifecycle TEXT NOT NULL DEFAULT 'manual',
               expires_at TEXT,
+              revision INTEGER NOT NULL DEFAULT 0,
+              resolved_at TEXT,
+              resolved_round INTEGER,
               owner_username TEXT,
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+              FOREIGN KEY(scene_id) REFERENCES campaign_map_scenes(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_map_props (
+              id TEXT PRIMARY KEY,
+              campaign_id TEXT NOT NULL,
+              scene_id TEXT NOT NULL,
+              x REAL NOT NULL DEFAULT 0,
+              y REAL NOT NULL DEFAULT 0,
+              w REAL NOT NULL DEFAULT 32,
+              h REAL NOT NULL DEFAULT 32,
+              hp REAL NOT NULL DEFAULT 10,
+              hp_max REAL NOT NULL DEFAULT 10,
+              material TEXT NOT NULL DEFAULT 'wood',
+              label TEXT,
+              color TEXT NOT NULL DEFAULT '#8a7455',
               created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
@@ -539,6 +560,19 @@ def init_db() -> None:
             conn.execute("ALTER TABLE campaign_map_scenes ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
         if "darkness" not in scene_cols:
             conn.execute("ALTER TABLE campaign_map_scenes ADD COLUMN darkness REAL NOT NULL DEFAULT 0")
+
+        # Migration: Fase AREA — finishes the `untilResolved` template
+        # lifecycle (grenade/AoE resolve) with an optimistic-concurrency
+        # revision plus a resolved marker the GM sees dimmed for one round.
+        template_cols = {
+            row["name"] for row in conn.execute("PRAGMA table_info(campaign_map_templates)").fetchall()
+        }
+        if "revision" not in template_cols:
+            conn.execute("ALTER TABLE campaign_map_templates ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+        if "resolved_at" not in template_cols:
+            conn.execute("ALTER TABLE campaign_map_templates ADD COLUMN resolved_at TEXT")
+        if "resolved_round" not in template_cols:
+            conn.execute("ALTER TABLE campaign_map_templates ADD COLUMN resolved_round INTEGER")
 
         token_cols = {
             row["name"] for row in conn.execute("PRAGMA table_info(campaign_map_tokens)").fetchall()

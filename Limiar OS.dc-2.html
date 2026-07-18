@@ -655,6 +655,41 @@
         </div>
       </sc-if>
 
+      <!-- Fase AREA: 2nd confirmation of the RESOLVER (map) -> cockpit (here)
+           handoff for a grenade/AoE template. Targets pre-selected by the
+           map (templateCells + F3 visibility); GM can still deselect any
+           before rolling. Applies real damage via resolveAreaAttack and
+           marks the template resolved on the map when done. -->
+      <sc-if value="{{ hasMapAoeResolve }}">
+        <div class="lm-combat-crit-pending" style="border:1px solid rgba(63,224,208,0.5);background:rgba(63,224,208,0.08);padding:14px 16px;margin-bottom:16px;">
+          <div class="lm-combat-section-label" style="color:#3fe0d0;">{{ mapAoeResolve.title }}</div>
+          <sc-if value="{{ mapAoeResolve.hasTargets }}">
+            <div style="display:flex;flex-direction:column;gap:4px;margin:10px 0;">
+              <sc-for list="{{ mapAoeResolve.targetRows }}" as="t" hint-placeholder-count="3">
+                <label style="display:flex;align-items:center;gap:6px;">
+                  <sc-if value="{{ t.checked }}"><input type="checkbox" checked onChange="{{ t.toggle }}" /></sc-if>
+                  <sc-if value="{{ t.notChecked }}"><input type="checkbox" onChange="{{ t.toggle }}" /></sc-if>
+                  {{ t.name }}
+                </label>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+            <label class="lm-combat-stat lm-combat-stat--input">DADOS
+              <input type="number" min="1" max="20" value="{{ mapAoeResolve.diceCount }}" onInput="{{ mapAoeResolve.onDiceCount }}" style="width:56px;" />
+            </label>
+            <span>d</span>
+            <label class="lm-combat-stat lm-combat-stat--input">LADOS
+              <input type="number" min="2" max="100" value="{{ mapAoeResolve.diceSides }}" onInput="{{ mapAoeResolve.onDiceSides }}" style="width:56px;" />
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onClick="{{ mapAoeResolve.rollAndApply }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--cut">ROLAR E APLICAR DANO</button>
+            <button onClick="{{ mapAoeResolve.dismiss }}" class="lm-ui-btn lm-ui-btn--ghost-teal">CANCELAR</button>
+          </div>
+        </div>
+      </sc-if>
+
       <div class="lm-combat-layout">
         <div class="lm-combat-main">
           <sc-if value="{{ notGm }}">
@@ -826,6 +861,13 @@
                     <span class="lm-chip">{{ combatFocusCard.adHocMod.label }}</span>
                     <button onClick="{{ combatFocusCard.adHocMod.inc }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">+</button>
                   </div>
+                  <sc-if value="{{ combatFocusCard.hasSituationalChips }}">
+                    <div class="lm-combat-toggle-row">
+                      <sc-for list="{{ combatFocusCard.situationalChips }}" as="chip" hint-placeholder-count="2">
+                        <button onClick="{{ chip.toggle }}" class="{{ chip.style }}" title="Chip do mapa (G8): aplica/remove no MOD acima">{{ chip.label }}</button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
                   <sc-if value="{{ combatFocusCard.hasWeapons }}">
                     <div class="lm-combat-subtitle lm-combat-subtitle--danger">{{ tx.weapons }}</div>
                     <sc-if value="{{ combatFocusCard.hasEvasionStatus }}"><div class="lm-combat-row-meta" style="margin-bottom:6px;">{{ combatFocusCard.evasionStatus.label }}</div></sc-if>
@@ -834,6 +876,7 @@
                         <div class="lm-combat-row lm-combat-row--weapon">
                           <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}<sc-if value="{{ w.hasAmmo }}"> // {{ w.ammoLabel }}</sc-if></div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
                           <sc-if value="{{ w.isMelee }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
+                          <sc-if value="{{ w.hasSuppressiveFire }}"><button onClick="{{ w.suppressiveFire }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">SUPRESSAO</button></sc-if>
                           <button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
                           <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                           <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
@@ -931,6 +974,13 @@
                       <span class="lm-chip">{{ c.adHocMod.label }}</span>
                       <button onClick="{{ c.adHocMod.inc }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">+</button>
                     </div>
+                    <sc-if value="{{ c.hasSituationalChips }}">
+                      <div class="lm-combat-toggle-row">
+                        <sc-for list="{{ c.situationalChips }}" as="chip" hint-placeholder-count="2">
+                          <button onClick="{{ chip.toggle }}" class="{{ chip.style }}" title="Chip do mapa (G8): aplica/remove no MOD acima">{{ chip.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
                     <sc-if value="{{ c.hasWeapons }}">
                       <div class="lm-combat-subtitle lm-combat-subtitle--danger">{{ tx.weapons }}</div>
                       <sc-if value="{{ c.hasEvasionStatus }}"><div class="lm-combat-row-meta" style="margin-bottom:6px;">{{ c.evasionStatus.label }}</div></sc-if>
@@ -939,6 +989,7 @@
                           <div class="lm-combat-row lm-combat-row--weapon">
                             <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}<sc-if value="{{ w.hasAmmo }}"> // {{ w.ammoLabel }}</sc-if></div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
                             <sc-if value="{{ w.isMelee }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
+                            <sc-if value="{{ w.hasSuppressiveFire }}"><button onClick="{{ w.suppressiveFire }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">SUPRESSAO</button></sc-if>
                             <button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
                             <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                             <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
