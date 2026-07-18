@@ -15,8 +15,13 @@ import threading
 TOPICS = ("map", "chat", "combat", "roster")
 
 _LOG_LIMIT = 200
+# ThreadingHTTPServer spawns one OS thread per request with no cap, and each
+# long-poll wait blocks its thread for up to 25s. Bound concurrent waiters so
+# a runaway or malicious client can't exhaust the server's thread pool.
+_MAX_CONCURRENT_WAITERS = 64
 
 _lock = threading.Condition()
+_waiter_slots = threading.Semaphore(_MAX_CONCURRENT_WAITERS)
 _versions: dict[str, int] = {}
 _topic_log: dict[str, list[tuple[int, str]]] = {}
 
@@ -53,20 +58,28 @@ def current_version(campaign_id: str) -> int:
 
 
 def wait_for_campaign_update(campaign_id: str, since: int, timeout: float = 25.0) -> dict[str, object]:
-    with _lock:
-        _versions.setdefault(campaign_id, 0)
-        if _versions[campaign_id] == since:
-            _lock.wait(timeout=max(0.1, min(float(timeout), 25.0)))
-        version = _versions.get(campaign_id, 0)
-        changed = version != since
-        if not changed:
-            return {"version": version, "changed": False, "topics": []}
-        log = _topic_log.get(campaign_id, [])
-        oldest_logged = log[0][0] if log else version
-        if since != 0 and since < oldest_logged - 1:
-            # Buffer truncated past `since` — can't compute an exact delta,
-            # so report every topic dirty rather than silently under-report.
-            topics = list(TOPICS)
-        else:
-            topics = sorted({t for v, t in log if v > since})
-        return {"version": version, "changed": True, "topics": topics}
+    # At capacity, skip the wait and return the current state immediately —
+    # the client's poll loop will retry, which self-throttles instead of
+    # piling up another blocked thread.
+    acquired = _waiter_slots.acquire(timeout=0.05)
+    try:
+        with _lock:
+            _versions.setdefault(campaign_id, 0)
+            if acquired and _versions[campaign_id] == since:
+                _lock.wait(timeout=max(0.1, min(float(timeout), 25.0)))
+            version = _versions.get(campaign_id, 0)
+            changed = version != since
+            if not changed:
+                return {"version": version, "changed": False, "topics": []}
+            log = _topic_log.get(campaign_id, [])
+            oldest_logged = log[0][0] if log else version
+            if since != 0 and since < oldest_logged - 1:
+                # Buffer truncated past `since` — can't compute an exact delta,
+                # so report every topic dirty rather than silently under-report.
+                topics = list(TOPICS)
+            else:
+                topics = sorted({t for v, t in log if v > since})
+            return {"version": version, "changed": True, "topics": topics}
+    finally:
+        if acquired:
+            _waiter_slots.release()

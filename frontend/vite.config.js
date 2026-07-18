@@ -44,13 +44,17 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       include: [
-        'src/domain/dice/**/*.js',
-        'src/domain/economy/**/*.js',
-        'src/domain/character/**/*.js',
-        'src/domain/conditions/**/*.js',
+        'src/domain/dice/**/*.{js,ts}',
+        'src/domain/economy/**/*.{js,ts}',
+        'src/domain/character/**/*.{js,ts}',
+        'src/domain/conditions/**/*.{js,ts}',
       ],
       thresholds: {
-        lines: 60,
+        // Real coverage here is ~95% (the include globs were stale .js
+        // patterns matching zero files post-TS migration, silently passing
+        // at 60% regardless of actual coverage). 85% leaves headroom without
+        // being a no-op gate.
+        lines: 85,
       },
     },
   },

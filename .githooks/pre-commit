@@ -6,3 +6,12 @@ python3 -m pytest backend/tests -q
 cd frontend
 npm test
 npm run typecheck
+npm run build
+
+# dist/ is committed (no CI/build step at deploy time — see README), so a
+# commit that leaves it stale relative to src/ would silently ship old code.
+cd ..
+if ! git diff --quiet -- dist/; then
+  echo "error: dist/ is out of date. 'npm run build' changed it — stage the rebuilt files and commit again." >&2
+  exit 1
+fi

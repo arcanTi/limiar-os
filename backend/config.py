@@ -24,8 +24,9 @@ _ALLOWED_IMAGE_TYPES = {
     "image/gif": ".gif",
     "image/webp": ".webp",
     "image/avif": ".avif",
-    "image/svg+xml": ".svg",
 }
+# SVG is deliberately excluded: it's an XSS vector (can embed <script>) and
+# uploads are served inline at /uploads/ without CSP protection.
 # Rate limiting: (max_requests, window_seconds)
 _LOGIN_RATE = (10, 60)  # 10 login attempts per minute per IP (anti brute-force)
 _CHAT_RATE = (30, 60)  # 30 chat messages per minute per IP (anti spam)

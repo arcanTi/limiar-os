@@ -182,6 +182,9 @@ The frontend is built with Vite/ES modules. The served HTML loads `dist/limiar-a
 
 ## Run locally
 
+Requires Python 3.10+ (the codebase uses `X | None` union syntax without a
+`__future__` import, which needs native PEP 604 support).
+
 ```bash
 cd limiar-os
 python3 server.py

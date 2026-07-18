@@ -21,7 +21,12 @@ class BaseHandler(SimpleHTTPRequestHandler):
         path = unquote(urlparse(path).path)
         if path == "/":
             return str(ROOT / INDEX_FILE)
-        return str(ROOT / path.lstrip("/"))
+        # Resolve and confine under ROOT — bare `ROOT / path` lets `..` segments
+        # (raw or percent-encoded) escape the project directory entirely.
+        candidate = (ROOT / path.lstrip("/")).resolve()
+        if candidate != ROOT and ROOT not in candidate.parents:
+            return str(ROOT / INDEX_FILE)
+        return str(candidate)
 
     def end_headers(self) -> None:
         self.send_header("Cache-Control", "no-store")
@@ -30,6 +35,9 @@ class BaseHandler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path.startswith("/uploads/"):
             self.send_header("Content-Disposition", "inline")
+            # Uploaded files are user-controlled; deny script/style execution
+            # even for content types the upload allowlist doesn't expect.
+            self.send_header("Content-Security-Policy", "sandbox; default-src 'none'")
         else:
             self.send_header(
                 "Content-Security-Policy",
