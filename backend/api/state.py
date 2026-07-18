@@ -4,6 +4,7 @@ HQ improvement points, tarot deck state, and combat tracker state."""
 from http import HTTPStatus
 
 from ..domain.validation import ValidationError, validate_hq
+from ..repositories import campaign_sync
 from ..repositories.records import get_setting, set_setting
 from ..util import utc_now_iso
 
@@ -63,7 +64,9 @@ class StateRoutes:
             payload = self.read_json()
         except ValidationError as e:
             return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
-        return self.write_json(set_setting("combat-state", payload))
+        result = set_setting("combat-state", payload)
+        campaign_sync.bump_all("combat")
+        return self.write_json(result)
 
     def _post_combat_end_turn(self) -> None:
         try:
@@ -112,4 +115,6 @@ class StateRoutes:
             "turnIndex": next_turn_index,
             "updatedAt": utc_now_iso(),
         }
-        return self.write_json(set_setting("combat-state", next_state))
+        result = set_setting("combat-state", next_state)
+        campaign_sync.bump_all("combat")
+        return self.write_json(result)

@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from backend import db as db_module
+from backend.api import auth as auth_module
 from backend.api.auth import _login_timestamps
 
 
@@ -74,7 +75,7 @@ def test_admin_can_create_users_but_player_cannot(auth_handler, make_session):
     player = make_session("player", role="player")
 
     denied = auth_handler(
-        {"username": "newbie", "password": "password-123", "role": "player"},
+        {"username": "newbie", "password": "password-123", "role": "player", "email": "newbie@example.com"},
         token=player["token"],
     )
     denied._post_users()
@@ -82,14 +83,96 @@ def test_admin_can_create_users_but_player_cannot(auth_handler, make_session):
     assert denied.status == HTTPStatus.UNAUTHORIZED
 
     allowed = auth_handler(
-        {"username": "newbie", "password": "password-123", "role": "player"},
+        {"username": "newbie", "password": "password-123", "role": "player", "email": "newbie@example.com"},
         token=admin["token"],
     )
     allowed._post_users()
 
     assert allowed.status == HTTPStatus.CREATED
     assert allowed.payload["username"] == "newbie"
+    assert allowed.payload["email"] == "newbie@example.com"
     assert "password_hash" not in allowed.payload
+
+
+def test_gm_can_create_player_account_with_email(auth_handler, make_session):
+    gm = make_session("gm-user", role="gm")
+
+    created = auth_handler(
+        {"username": "newplayer", "password": "password-123", "role": "player", "email": "newplayer@example.com"},
+        token=gm["token"],
+    )
+    created._post_users()
+
+    assert created.status == HTTPStatus.CREATED
+    assert created.payload["email"] == "newplayer@example.com"
+
+
+def test_gm_create_player_requires_valid_email(auth_handler, make_session):
+    gm = make_session("gm-user", role="gm")
+
+    missing = auth_handler(
+        {"username": "newplayer", "password": "password-123", "role": "player"},
+        token=gm["token"],
+    )
+    missing._post_users()
+    assert missing.status == HTTPStatus.BAD_REQUEST
+
+    invalid = auth_handler(
+        {"username": "newplayer", "password": "password-123", "role": "player", "email": "not-an-email"},
+        token=gm["token"],
+    )
+    invalid._post_users()
+    assert invalid.status == HTTPStatus.BAD_REQUEST
+
+
+def test_gm_cannot_create_or_edit_staff_accounts(auth_handler, make_session, make_user):
+    gm = make_session("gm-user", role="gm")
+    make_user("other-gm", "password-123", "gm")
+
+    create_gm = auth_handler(
+        {"username": "sneaky", "password": "password-123", "role": "gm", "email": "sneaky@example.com"},
+        token=gm["token"],
+    )
+    create_gm._post_users()
+    assert create_gm.status == HTTPStatus.UNAUTHORIZED
+
+    edit_other_gm = auth_handler(
+        {"username": "other-gm", "password": "password-123", "role": "player"},
+        token=gm["token"],
+    )
+    edit_other_gm._post_users()
+    assert edit_other_gm.status == HTTPStatus.UNAUTHORIZED
+
+
+def test_gm_can_reset_existing_player_password_without_email(auth_handler, make_session):
+    gm = make_session("gm-user", role="gm")
+    make_session("rook", role="player", password="old-password-1")
+
+    reset = auth_handler(
+        {"username": "rook", "password": "new-password-1", "role": "player"},
+        token=gm["token"],
+    )
+    reset._post_users()
+
+    assert reset.status == HTTPStatus.OK
+
+    relogin = auth_handler({"username": "rook", "password": "new-password-1"})
+    relogin._post_login()
+    assert relogin.status == HTTPStatus.OK
+
+
+def test_gm_can_delete_player_but_not_staff(auth_handler, make_session, make_user):
+    gm = make_session("gm-user", role="gm")
+    make_user("rook", "password-123", "player")
+    make_user("other-gm", "password-123", "gm")
+
+    delete_player = auth_handler(token=gm["token"])
+    delete_player._delete_user("rook")
+    assert delete_player.status == HTTPStatus.OK
+
+    delete_gm = auth_handler(token=gm["token"])
+    delete_gm._delete_user("other-gm")
+    assert delete_gm.status == HTTPStatus.UNAUTHORIZED
 
 
 def test_admin_delete_user_is_restricted_and_cannot_delete_self(auth_handler, make_session):
@@ -112,6 +195,94 @@ def test_admin_delete_user_is_restricted_and_cannot_delete_self(auth_handler, ma
 
     assert allowed.status == HTTPStatus.OK
     assert allowed.payload == {"deleted": True}
+
+
+def test_google_login_returns_503_when_not_configured(auth_handler, monkeypatch):
+    monkeypatch.setattr(auth_module, "GOOGLE_CLIENT_ID", "")
+    _login_timestamps.clear()
+
+    handler = auth_handler({"idToken": "whatever"})
+    handler._post_google_login()
+
+    assert handler.status == HTTPStatus.SERVICE_UNAVAILABLE
+    assert session_count() == 0
+
+
+def test_google_login_rejects_invalid_token(auth_handler, monkeypatch):
+    monkeypatch.setattr(auth_module, "GOOGLE_CLIENT_ID", "test-client-id")
+    monkeypatch.setattr(auth_module, "_verify_google_id_token", lambda _token: None)
+    _login_timestamps.clear()
+
+    handler = auth_handler({"idToken": "bad-token"})
+    handler._post_google_login()
+
+    assert handler.status == HTTPStatus.UNAUTHORIZED
+    assert session_count() == 0
+
+
+def test_google_login_creates_new_user_and_session(auth_handler, monkeypatch):
+    monkeypatch.setattr(auth_module, "GOOGLE_CLIENT_ID", "test-client-id")
+    monkeypatch.setattr(
+        auth_module,
+        "_verify_google_id_token",
+        lambda _token: {"sub": "google-sub-1", "email": "newplayer@example.com"},
+    )
+    _login_timestamps.clear()
+
+    handler = auth_handler({"idToken": "good-token"})
+    handler._post_google_login()
+
+    assert handler.status == HTTPStatus.OK
+    assert handler.payload["token"]
+    assert handler.payload["user"] == {"username": "newplayer@example.com", "role": "player"}
+    assert session_count() == 1
+
+    with db_module.db() as conn:
+        row = conn.execute(
+            "SELECT google_sub, email, role FROM users WHERE username = ?",
+            ("newplayer@example.com",),
+        ).fetchone()
+    assert row["google_sub"] == "google-sub-1"
+    assert row["email"] == "newplayer@example.com"
+    assert row["role"] == "player"
+
+
+def test_google_login_second_time_reuses_existing_account(auth_handler, monkeypatch):
+    monkeypatch.setattr(auth_module, "GOOGLE_CLIENT_ID", "test-client-id")
+    monkeypatch.setattr(
+        auth_module,
+        "_verify_google_id_token",
+        lambda _token: {"sub": "google-sub-2", "email": "returning@example.com"},
+    )
+    _login_timestamps.clear()
+
+    first = auth_handler({"idToken": "good-token"})
+    first._post_google_login()
+    second = auth_handler({"idToken": "good-token"})
+    second._post_google_login()
+
+    assert first.status == HTTPStatus.OK
+    assert second.status == HTTPStatus.OK
+    assert first.payload["user"]["username"] == second.payload["user"]["username"]
+
+    with db_module.db() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE email = ?",
+            ("returning@example.com",),
+        ).fetchone()[0]
+    assert count == 1
+    assert session_count() == 2
+
+
+def test_password_login_still_works_after_google_migration(auth_handler, make_user):
+    make_user("alice", "correct-password", "player")
+    _login_timestamps.clear()
+
+    handler = auth_handler({"username": "alice", "password": "correct-password"})
+    handler._post_login()
+
+    assert handler.status == HTTPStatus.OK
+    assert handler.payload["user"] == {"username": "alice", "role": "player"}
 
 
 def test_missing_and_expired_tokens_are_treated_as_logged_out(auth_handler, make_session):

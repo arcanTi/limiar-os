@@ -282,6 +282,7 @@ function fakeComponent(overrides = {}) {
       this.state = { ...this.state, ...next };
     }),
     ensureGm: overrides.ensureGm || vi.fn(() => true),
+    redirectToLogin: overrides.redirectToLogin || vi.fn(),
     flash: vi.fn(),
     tx: vi.fn(() => ({ sheetCreated: 'CREATED', sheetSaved: 'SAVED' })),
     api: overrides.api || vi.fn(() => null),
@@ -345,7 +346,7 @@ describe('ui/views/sheet sheetHandlers', () => {
   it('editSheet requires GM auth or sheet ownership', () => {
     const component = fakeComponent({ state: { gmAuthenticated: false }, canManageOwnSheet: vi.fn(() => false) });
     sheetHandlers(component).editSheet();
-    expect(component.state.gmLoginOpen).toBe(true);
+    expect(component.redirectToLogin).toHaveBeenCalled();
     expect(component.state.sheetEditing).toBeUndefined();
   });
 

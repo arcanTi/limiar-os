@@ -19,6 +19,7 @@ import {
 import { NPC_TEMPLATES, NPC_ATTACK_SKILL_OPTIONS, npcDraftFromTemplate } from '../../domain/combat/npcTemplates.ts';
 import { resolveStabilizationDV } from '../../domain/combat/stabilizationEngine.ts';
 import { weaponRangeBand } from '../../domain/combat/combatAttackEngine.ts';
+import { canFireWeapon as combatCanFireWeapon, spendAmmo as combatSpendAmmo } from '../../domain/combat/combatAmmoEngine.ts';
 import { netActionsPerTurn } from '../../domain/netrunning/index.ts';
 import { weaponRollTone as viewWeaponRollTone } from '../view/constants.js';
 
@@ -60,6 +61,9 @@ export function combatRenderVals(state = {}, deps = {}) {
       const halfSpLabel = deps.ignoresHalfSpBadge(item) ? ' // ' + tx.halfSp : '';
       const enhLabel = item.enhancementSummary ? ' // ENH ' + item.enhancementSummary : '';
       const riderLabel = Array.isArray(item.riders) && item.riders.length ? ' // RIDER ' + item.riders.map(rider => rider.type || rider.note).filter(Boolean).join('/') : '';
+      // Ammo HUD (CM0): only weapons with a numeric magazine track ammo —
+      // melee/bows/exotics without one show no counter (see normalizeGearItem).
+      const hasAmmo = item.magazine != null;
       return {
         ...item,
         dmgLabel: deps.gearDamageText(item),
@@ -69,6 +73,14 @@ export function combatRenderVals(state = {}, deps = {}) {
         damage: () => deps.rollCombatDamage(id, item),
         canShieldDamage: !!targetShield,
         shieldDamage: () => deps.rollCombatShieldDamage(id, item),
+        hasAmmo,
+        ammoLabel: hasAmmo ? (item.currentAmmo ?? item.magazine) + '/' + item.magazine : '',
+        needsReload: hasAmmo && Number(item.currentAmmo ?? item.magazine) <= 0,
+        reload: () => deps.reloadWeapon(id, item.id),
+        // CM2 (G7): melee weapons get a "PEDIR EVASAO" action that prompts the
+        // defender's own device instead of the GM eyeballing the chat.
+        isMelee: !!item.melee,
+        requestEvasion: () => deps.requestEvasion(id, item),
       };
     });
     const ctxAvail = deps.attackContextAvailable(character);
@@ -77,6 +89,27 @@ export function combatRenderVals(state = {}, deps = {}) {
     if (ctxAvail.cover) attackToggles.push({ label: tx.ctxCover, style: deps.chipStyle(ctxState.cover), toggle: () => deps.toggleAttackContext('cover') });
     if (ctxAvail.beyond51m) attackToggles.push({ label: tx.ctxBeyond51m, style: deps.chipStyle(ctxState.beyond51m), toggle: () => deps.toggleAttackContext('beyond51m') });
     if (ctxAvail.aimedShot) attackToggles.push({ label: tx.ctxAimedShot, style: deps.chipStyle(ctxState.aimedShot), toggle: () => deps.toggleAttackContext('aimedShot') });
+    // LUCK + ad-hoc modifier (CM0): staged per actor, consumed by the next
+    // attack/damage/check roll of THIS character (see consumePendingRollMods).
+    // inc/dec clamp server-side (adjustLuckSpend/adjustAdHocMod) and flash a
+    // denial if this isn't the viewer's own combatant — no disabled-attribute
+    // gating here, this template engine stringifies `disabled="{{ }}"` as an
+    // always-present attribute regardless of the boolean's value.
+    const pendingMods = deps.pendingRollMods(id);
+    const luckMax = character.luckCurrent || 0;
+    const luck = {
+      current: luckMax,
+      spend: pendingMods.luck,
+      label: 'LUCK ' + (pendingMods.luck ? '-' + pendingMods.luck + ' / ' : '') + luckMax,
+      inc: () => deps.adjustLuckSpend(id, 1),
+      dec: () => deps.adjustLuckSpend(id, -1),
+    };
+    const adHocMod = {
+      value: pendingMods.adHoc,
+      label: 'MOD ' + (pendingMods.adHoc >= 0 ? '+' : '') + pendingMods.adHoc,
+      inc: () => deps.adjustAdHocMod(id, 1),
+      dec: () => deps.adjustAdHocMod(id, -1),
+    };
     // Who this combatant is aiming at — GM (or the player, for their own
     // attacks) picks it here; rollCombatAttack/rollCombatDamage read it back
     // via combatTargetFor() to label the roll, and it pre-fills the Critical
@@ -187,6 +220,10 @@ export function combatRenderVals(state = {}, deps = {}) {
       hasKit,
       noKit: !hasKit,
       stabilize,
+      evasionStatus: deps.evasionStatusFor(id) || { label: '' },
+      hasEvasionStatus: !!deps.evasionStatusFor(id),
+      luck,
+      adHocMod,
       netActions,
       onInitiativeInput: (e) => deps.setInitiative(id, e.target.value),
       initiativePending: combatState.active && (entry.initiative === null || entry.initiative === undefined) && character.kind !== 'npc',
@@ -412,6 +449,7 @@ export function combatRenderVals(state = {}, deps = {}) {
     nextTurn: () => deps.nextTurn(),
     endMyTurn: () => deps.endMyTurn(),
     prevTurn: () => deps.prevTurn(),
+    resetLuckForSession: () => deps.resetLuckForSession(),
     npcTemplateChips,
     combatNpcName: combatNpcDraft.name || '',
     combatNpcBody: combatNpcDraft.body || '',
@@ -591,6 +629,79 @@ export function combatHandlers(component) {
     const target = combatCharacter(targetId);
     return target ? ' :: ALVO ' + (target.name || targetId).toUpperCase() : '';
   }
+  // CM2 (G7): evasion as a live prompt instead of "GM reads the opposed roll
+  // off chat". Attacker asks -> defender's own device gets a REQ bubble (fast
+  // now that M3 pushes chat updates instead of a 3.5s poll) -> their result
+  // comes back tagged evasionFor/requestId and is consumed as the melee
+  // attack's DV. Advisory only: unanswered requests just expire, they never
+  // block the attack roll (decision 1 in PLANO-COMBATE-MAPA.md).
+  const EVASION_TIMEOUT_MS = 45000;
+  function requestEvasion(actorId, weapon) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode pedir evasao pelo seu proprio combatente');
+    const targetId = combatTargetFor(actorId);
+    if (!targetId) return component.flash('Selecione um alvo antes de pedir evasao');
+    const target = combatCharacter(targetId);
+    if (!target) return component.flash('Alvo invalido');
+    const actor = combatCharacter(actorId) || component.activeCharacter();
+    const mod = combatCheckMod(target, 'Evasion');
+    const requestId = actorId + ':' + targetId + ':' + Date.now();
+    const text = 'EVASAO :: ' + (actor.name || actorId).toUpperCase() + ' ataca ' + (target.name || targetId).toUpperCase()
+      + ' corpo a corpo' + ((weapon && weapon.name) ? ' (' + weapon.name + ')' : '');
+    component.postChat({
+      kind: 'request',
+      text,
+      request: { label: 'EVASAO', sides: 10, count: 1, mod: mod.mod, check: true, combatantId: targetId, evasionFor: actorId, requestId },
+    });
+    component.setState(s => ({ pendingEvasion: { ...(s.pendingEvasion || {}), [actorId]: { targetId, requestId, expiresAt: Date.now() + EVASION_TIMEOUT_MS } } }));
+  }
+  // Advisory status line for the attacker's own card — never blocks rollCombatAttack.
+  function evasionStatusFor(actorId) {
+    const targetId = combatTargetFor(actorId);
+    if (!targetId) return null;
+    const result = (component.state.evasionResults || {})[actorId];
+    if (result && result.targetId === targetId) return { label: 'EVASAO DO ALVO: ' + result.total, pending: false, expired: false };
+    const pending = (component.state.pendingEvasion || {})[actorId];
+    if (pending && pending.targetId === targetId) {
+      if (Date.now() > pending.expiresAt) return { label: 'EVASAO EXPIROU (sem resposta)', pending: false, expired: true };
+      return { label: 'AGUARDANDO EVASAO DO ALVO...', pending: true, expired: false };
+    }
+    return null;
+  }
+  // One-shot: an evasion result only ever feeds the very next attack roll
+  // against that same target, then it's gone (mirrors LUCK/ad-hoc consumption).
+  function consumeEvasionResult(actorId, targetId) {
+    const results = component.state.evasionResults || {};
+    const entry = results[actorId];
+    if (!entry || entry.targetId !== targetId) return null;
+    const next = { ...results };
+    delete next[actorId];
+    component.setState({ evasionResults: next });
+    return entry;
+  }
+  // Attacker-side listener (mirrors applyInitiativeRolls): scans new chat
+  // rolls for the tagged evasion response and resolves the matching pending
+  // request, keyed by requestId so a stale/duplicate reply can't be applied.
+  function applyEvasionRolls(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    const pending = component.state.pendingEvasion || {};
+    if (!Object.keys(pending).length) return;
+    if (!component._evasionApplied) component._evasionApplied = new Set();
+    const nextResults = { ...(component.state.evasionResults || {}) };
+    const nextPending = { ...pending };
+    let changed = false;
+    list.forEach(m => {
+      if (!(m && m.kind === 'roll' && m.roll && m.roll.evasionFor)) return;
+      if (component._evasionApplied.has(m.id)) return;
+      component._evasionApplied.add(m.id);
+      const actorId = m.roll.evasionFor;
+      const req = pending[actorId];
+      if (!req || req.requestId !== m.roll.evasionRequestId) return;
+      nextResults[actorId] = { targetId: req.targetId, total: component.asNumber(m.roll.total, 0, -99, 999) };
+      delete nextPending[actorId];
+      changed = true;
+    });
+    if (changed) component.setState({ evasionResults: nextResults, pendingEvasion: nextPending });
+  }
   function rollCombatAttack(actorId, weapon) {
     if (!canRollCombatActor(actorId)) return component.flash('Voce so pode rolar pelo seu proprio combatente');
     const mapContext = (component.state.mapAttackContexts || {})[actorId] || null;
@@ -607,14 +718,31 @@ export function combatHandlers(component) {
     const actor = combatCharacter(actorId) || component.activeCharacter();
     const mod = combatAttackMod(actor, weapon);
     const ctx = cyberContextToHit(actor);
+    const pending = consumePendingRollMods(actorId);
+    // CM2 (G7): a captured evasion prompt result becomes this melee attack's
+    // DV — one-shot, only when it's still for the currently selected target.
+    const evasion = (!range && weapon && weapon.melee) ? consumeEvasionResult(actorId, combatTargetFor(actorId)) : null;
+    // Ammo (CM0): spent on the shot fired (attack roll), never on damage.
+    // Advisory only — a warning is added to the breakdown, the roll still
+    // happens (canFireWeapon/spendAmmo never take the count below 0).
+    const ammoState = weaponAmmoState(weapon);
+    const ammoCheck = ammoState ? combatCanFireWeapon(weapon, ammoState, 'singleShot') : null;
+    if (ammoState) {
+      const spent = combatSpendAmmo(weapon, ammoState, 'singleShot');
+      persistGearPatch(actorId, weapon.id, { currentAmmo: spent.ammoState.currentAmmo });
+    }
     component.roll({
       actorId,
       check: true,
       sides: 10,
       count: 1,
-      mod: mod.mod + ctx.mod,
-      ...(range ? { dv: range.dv } : {}),
-      breakdown: component.cyberSourceBreakdown(mod.sources.concat(ctx.sources)).concat(range ? [`RANGE ${mapContext.rangeMeters}m // ${range.range} // DV ${range.dv}`] : []),
+      mod: mod.mod + ctx.mod + pending.luck + pending.adHoc,
+      ...(range ? { dv: range.dv } : evasion ? { dv: evasion.total } : {}),
+      breakdown: component.cyberSourceBreakdown(mod.sources.concat(ctx.sources))
+        .concat(range ? [`RANGE ${mapContext.rangeMeters}m // ${range.range} // DV ${range.dv}`] : [])
+        .concat(evasion ? [`EVASAO DO ALVO: ${evasion.total}`] : [])
+        .concat(pendingModBreakdown(pending))
+        .concat(ammoCheck && ammoCheck.needsReload ? [`SEM MUNICAO (${ammoCheck.currentAmmo}/${weapon.magazine}) — recarregue`] : []),
       label: (((actor.name || 'OPERATIVO') + ' :: ' + ((weapon && weapon.name) || 'ARMA') + ' ATAQUE').toUpperCase()) + combatTargetLabelSuffix(actorId),
       onResolved: (result) => { const reporter = combatGmRollReporter(actor); if (reporter) reporter(result); if (mapContext) component.setState(s => ({ mapAttackContexts: { ...(s.mapAttackContexts || {}), [actorId]: null } })); },
     });
@@ -626,13 +754,14 @@ export function combatHandlers(component) {
     const actor = combatCharacter(actorId) || component.activeCharacter();
     const reporter = combatGmRollReporter(actor);
     const cover = cyberContextDamage(actor);
-    const baseBreakdown = weapon && weapon.enhancementSummary ? ['ENH ' + weapon.enhancementSummary] : [];
+    const pending = consumePendingRollMods(actorId);
+    const baseBreakdown = (weapon && weapon.enhancementSummary ? ['ENH ' + weapon.enhancementSummary] : []).concat(pendingModBreakdown(pending));
     const contributions = combatDamageContributions(weapon, cover.contributions, actor);
     component.roll({
       actorId,
       sides: weapon && weapon.sides,
       count: weapon && weapon.count,
-      mod: 0,
+      mod: pending.luck + pending.adHoc,
       rollScope: 'damage',
       contributions,
       breakdown: baseBreakdown,
@@ -803,13 +932,14 @@ export function combatHandlers(component) {
     if (!canRollCombatActor(actorId)) return component.flash('Voce so pode rolar pelo seu proprio combatente');
     const actor = combatCharacter(actorId) || component.activeCharacter();
     const mod = combatCheckMod(actor, skillName);
+    const pending = consumePendingRollMods(actorId);
     component.roll({
       actorId,
       check: true,
       sides: 10,
       count: 1,
-      mod: mod.mod,
-      breakdown: component.cyberSourceBreakdown(mod.sources),
+      mod: mod.mod + pending.luck + pending.adHoc,
+      breakdown: component.cyberSourceBreakdown(mod.sources).concat(pendingModBreakdown(pending)),
       label: ((actor.name || 'OPERATIVO') + ' :: ' + (label || mod.skillName || skillName || 'TESTE')).toUpperCase(),
       onResolved: combatGmRollReporter(actor),
     });
@@ -1028,6 +1158,31 @@ export function combatHandlers(component) {
     });
     if (!result.ok) { if (result.error) component.flash(result.error, 3200); return; }
     component.setState(combatStatePatch(result.combatState));
+    const nextState = normalizeCombatState(result.combatState);
+    const nextId = currentCombatantId(nextState);
+    if (nextId && nextId !== currentId) maybeAutoDeathSave(nextId, nextState.round);
+  }
+  // CM2 (G10): the moment a turn flips to a Mortally Wounded combatant,
+  // auto-post their Death Save as a request (same prompt mechanism as
+  // evasion) instead of relying on someone remembering to click the sheet's
+  // manual button. Advisory: dismissible, never blocks the turn.
+  function maybeAutoDeathSave(characterId, roundNumber) {
+    const info = combatStabilizationInfo(characterId);
+    if (info.state !== 'mortallyWounded') return;
+    const character = combatCharacter(characterId);
+    if (!character) return;
+    const derived = component.derivedStats(character.base, character);
+    if (derived.skipDeathSave) return;
+    const key = characterId + ':' + roundNumber;
+    if (!component._deathSaveApplied) component._deathSaveApplied = new Set();
+    if (component._deathSaveApplied.has(key)) return;
+    component._deathSaveApplied.add(key);
+    const text = 'DEATH SAVE AUTOMATICO :: ' + (character.name || characterId).toUpperCase() + ' esta MORTALLY WOUNDED (DV ' + derived.deathSave + ')';
+    component.postChat({
+      kind: 'request',
+      text,
+      request: { label: 'DEATH SAVE', sides: 10, count: 1, mod: 0, check: false, deathSaveTarget: derived.deathSave, combatantId: characterId },
+    });
   }
   async function prevTurn() {
     if (!component.ensureGm('Login do mestre necessario para voltar turno')) return;
@@ -1407,6 +1562,90 @@ export function combatHandlers(component) {
     return { contributions };
   }
 
+  // --- CM0 (PLANO-COMBATE-MAPA): LUCK spend + ad-hoc modifier, staged per
+  // actor and consumed by the next attack/damage/check roll of that same
+  // character. Both are the character's own resource, so they use
+  // applyCharacterPatch (no GM gate) behind canRollCombatActor — the same
+  // trust level as rolling an attack with your own weapon, unlike
+  // useCombatUtility's shared-inventory GM gate above. Enforcement is
+  // advisory only (PLANO-COMBATE-MAPA decision): nothing here blocks a roll,
+  // it only feeds into the mod and the breakdown text.
+  function pendingRollMods(actorId) {
+    const row = (component.state.pendingRollMods || {})[actorId] || {};
+    return { luck: component.asNumber(row.luck, 0, 0, 10), adHoc: component.asNumber(row.adHoc, 0, -8, 8) };
+  }
+  function setPendingRollMods(actorId, patch) {
+    component.setState(s => ({
+      pendingRollMods: { ...(s.pendingRollMods || {}), [actorId]: { ...pendingRollMods(actorId), ...patch } },
+    }));
+  }
+  function luckAvailable(actorId) {
+    const actor = combatCharacter(actorId);
+    return actor ? component.normalizeCharacter(actor).luckCurrent || 0 : 0;
+  }
+  function adjustLuckSpend(actorId, delta) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode gastar LUCK do seu proprio combatente');
+    const next = Math.max(0, Math.min(luckAvailable(actorId), pendingRollMods(actorId).luck + delta));
+    setPendingRollMods(actorId, { luck: next });
+  }
+  function adjustAdHocMod(actorId, delta) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode ajustar o modificador do seu proprio combatente');
+    const next = Math.max(-8, Math.min(8, pendingRollMods(actorId).adHoc + delta));
+    setPendingRollMods(actorId, { adHoc: next });
+  }
+  // Reads + zeroes the staged mods and deducts spent Luck from the pool.
+  // Called synchronously when a roll is triggered (not onResolved) so firing
+  // a second roll before the dice animation settles can't double-spend the
+  // same staged points — matches when Luck is actually declared (before
+  // rolling), not when the result comes back.
+  function consumePendingRollMods(actorId) {
+    const pending = pendingRollMods(actorId);
+    setPendingRollMods(actorId, { luck: 0, adHoc: 0 });
+    if (pending.luck > 0) {
+      component.applyCharacterPatch(actorId, { luckCurrent: Math.max(0, luckAvailable(actorId) - pending.luck) });
+    }
+    return pending;
+  }
+  function pendingModBreakdown(pending) {
+    const rows = [];
+    if (pending.luck) rows.push('+' + pending.luck + ' LUCK');
+    if (pending.adHoc) rows.push((pending.adHoc > 0 ? '+' : '') + pending.adHoc + ' MOD');
+    return rows;
+  }
+  // GM-only: refresh every PC's Luck pool to their LUCK stat (CPR RAW:
+  // refreshed at the start of a session). NPCs don't track Luck spend here.
+  function resetLuckForSession() {
+    if (!component.ensureGm('Login do mestre necessario para resetar LUCK')) return;
+    (component.state.characters || []).filter(c => c.kind !== 'npc').forEach(c => {
+      component.applyCharacterPatch(c.id, { luckCurrent: component.normalizeStats(c.base).LUCK });
+    });
+    component.flash('LUCK restaurado para todos os PCs');
+  }
+
+  // --- CM0: weapon magazine ammo. Only tracked for gear with a numeric
+  // `magazine` (bows/melee/exotics without one are untouched — CPR arrow/
+  // charge counts are a separate, not-yet-modeled mechanic; see
+  // normalizeGearItem). Spend happens on the ATTACK roll (the shot fired),
+  // never on the DAMAGE roll.
+  function weaponAmmoState(weapon) {
+    if (!weapon || weapon.magazine == null) return null;
+    return { currentAmmo: weapon.currentAmmo, magazine: weapon.magazine };
+  }
+  function persistGearPatch(actorId, itemId, patch) {
+    const actor = combatCharacter(actorId);
+    if (!actor) return;
+    const gear = component.normalizeGearList(actor.gear || []).map(row => row.id === itemId ? { ...row, ...patch } : row);
+    component.applyCharacterPatch(actorId, { gear });
+  }
+  function reloadWeapon(actorId, itemId) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode recarregar seu proprio equipamento');
+    const actor = combatCharacter(actorId);
+    const item = actor && component.normalizeGearList(actor.gear || []).find(row => row.id === itemId);
+    if (!item || item.magazine == null) return;
+    persistGearPatch(actorId, itemId, { currentAmmo: item.magazine });
+    component.flash((item.name || 'Arma') + ' recarregada');
+  }
+
   return {
     combatDomainOptions,
     defaultCombatState,
@@ -1433,6 +1672,9 @@ export function combatHandlers(component) {
     combatGmRollReporter,
     combatTargetLabelSuffix,
     rollCombatAttack,
+    requestEvasion,
+    evasionStatusFor,
+    applyEvasionRolls,
     rollCombatDamage,
     rollCombatShieldDamage,
     applyCombatShieldDamage,
@@ -1489,5 +1731,11 @@ export function combatHandlers(component) {
     attackContextAvailable,
     cyberContextToHit,
     cyberContextDamage,
+    pendingRollMods,
+    adjustLuckSpend,
+    adjustAdHocMod,
+    consumePendingRollMods,
+    resetLuckForSession,
+    reloadWeapon,
   };
 }

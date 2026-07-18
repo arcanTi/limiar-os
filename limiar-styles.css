@@ -9,7 +9,6 @@
   @keyframes panelIn { from { transform: translateX(102%); } to { transform: translateX(0); } }
   @keyframes scrimIn { from { opacity:0; } to { opacity:1; } }
   @keyframes toastIn { from { opacity:0; transform: translate(-50%,14px); } to { opacity:1; transform: translate(-50%,0); } }
-  @keyframes overlayIn { from { opacity:0; } to { opacity:1; } }
   @keyframes tarotDeal { 0% { opacity:0; transform:translate(-50%,calc(-50% + 24px)) rotate(-6deg) scale(.86); filter:blur(8px); } 58% { opacity:1; transform:translate(-50%,calc(-50% - 8px)) rotate(2deg) scale(1.03); filter:blur(0); } 100% { opacity:1; transform:translate(-50%,-50%) rotate(0) scale(1); } }
   @keyframes tarotDiscard { 0% { opacity:1; transform:translate(-50%,-50%) rotate(0) scale(1); } 55% { opacity:.88; transform:translate(-50%,calc(-50% - 18px)) rotate(4deg) scale(.97); } 100% { opacity:0; transform:translate(-50%,calc(-50% + 80px)) rotate(18deg) scale(.72); filter:blur(7px); } }
   @keyframes tarotJusticeLeft { 0% { opacity:0; transform:translate(0,0) rotate(0); clip-path:polygon(0 0,52% 0,43% 100%,0 100%); } 18% { opacity:1; } 100% { opacity:0; transform:translate(-42px,24px) rotate(-11deg); clip-path:polygon(0 0,58% 0,34% 100%,0 100%); } }
@@ -24,51 +23,6 @@
   @keyframes displayScanLine { 0% { transform:translateY(-130%); opacity:0; } 16% { opacity:.9; } 100% { transform:translateY(720%); opacity:0; } }
   @keyframes displayConnect { 0%,18% { transform:scaleX(0); opacity:0; } 36% { opacity:.95; } 76% { transform:scaleX(1); opacity:.56; } 100% { transform:scaleX(1); opacity:.18; } }
   @keyframes displayConnectAlt { 0%,22% { transform:scaleX(0); opacity:0; } 50% { transform:scaleX(1); opacity:.72; } 72% { transform:scaleX(.34); opacity:.26; } 100% { transform:scaleX(1); opacity:.18; } }
-  @keyframes loginBootPanel { from { opacity:0; transform:translateY(16px) scale(.98); filter:blur(5px); } to { opacity:1; transform:translateY(0) scale(1); filter:blur(0); } }
-  @keyframes loginBootGlow { 0%,100% { opacity:.34; transform:scale(.98); } 50% { opacity:.7; transform:scale(1.03); } }
-  @keyframes loginBootLine { 0%,22% { opacity:0; transform:translateX(-10px); } 36%,100% { opacity:1; transform:translateX(0); } }
-  @keyframes loginBootProgress { 0% { transform:scaleX(0); } 38% { transform:scaleX(.42); } 64% { transform:scaleX(.74); } 100% { transform:scaleX(1); } }
-  @keyframes loginBootCursor { 0%,52% { opacity:1; } 53%,100% { opacity:.12; } }
-  @keyframes loginBootSweep { 0% { transform:translateY(-120%); opacity:0; } 14% { opacity:.7; } 100% { transform:translateY(720%); opacity:0; } }
-  .lm-login-overlay { position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:20px;background:rgba(4,5,4,.84);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:overlayIn .18s ease; }
-  .lm-login-shell { width:min(94vw,520px);position:relative;overflow:hidden;background:linear-gradient(160deg,rgba(14,18,13,.98),rgba(8,10,7,.99) 62%,rgba(7,21,18,.96));border:1px solid rgba(63,224,208,0.36);padding:24px;clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));box-shadow:0 28px 80px rgba(0,0,0,.72),0 0 40px rgba(63,224,208,.11);animation:loginBootPanel .34s cubic-bezier(.2,.7,.2,1); }
-  .lm-login-shell::before { content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(63,224,208,.07),transparent 38%,rgba(214,170,78,.05));opacity:.8;pointer-events:none; }
-  .lm-login-shell::after { content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,#3fe0d0,#d6aa4e,transparent);box-shadow:0 0 20px rgba(63,224,208,.42);pointer-events:none; }
-  .lm-login-inner { position:relative;z-index:1; }
-  .lm-login-head { display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:16px;border-bottom:1px solid rgba(63,224,208,.16); }
-  .lm-login-title-wrap { min-width:0;display:flex;flex-direction:column;gap:4px; }
-  .lm-login-kicker { font:700 10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0; }
-  .lm-login-title { font:700 28px/1 'Chakra Petch',sans-serif;letter-spacing:1px;color:#f0ead8;text-shadow:0 0 22px rgba(63,224,208,.18); }
-  .lm-login-copy { max-width:360px;margin:4px 0 0;color:#a7ad9b;font:13px/1.45 'Chakra Petch',sans-serif;letter-spacing:.1px; }
-  .lm-login-close { flex:none;width:34px;height:34px;display:grid;place-items:center;background:rgba(63,224,208,.04);border:1px solid rgba(63,224,208,.28);color:#3fe0d0;cursor:pointer;font:700 13px 'Share Tech Mono',monospace; }
-  .lm-login-close:hover { background:rgba(63,224,208,.12);border-color:rgba(63,224,208,.55); }
-  .lm-login-boot { margin-top:14px;border:1px solid rgba(63,224,208,.18);background:rgba(2,5,4,.58);padding:12px;position:relative;overflow:hidden; }
-  .lm-login-boot::before { content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(63,224,208,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(63,224,208,.025) 1px,transparent 1px);background-size:18px 18px;opacity:.8;pointer-events:none; }
-  .lm-login-lines { position:relative;display:flex;flex-direction:column;gap:5px;font:9px/1.35 'Share Tech Mono',monospace;letter-spacing:1px;color:#7ca9a4; }
-  .lm-login-line { opacity:0;animation:loginBootLine .5s ease forwards;animation-delay:var(--boot-delay,0s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-  .lm-login-line b { color:#3fe0d0;font-weight:700; }
-  .lm-login-line strong { color:#d6aa4e;font-weight:700; }
-  .lm-login-progress { position:relative;margin-top:10px;height:7px;background:rgba(63,224,208,.08);border:1px solid rgba(63,224,208,.22);overflow:hidden; }
-  .lm-login-progress span { display:block;height:100%;transform-origin:left center;transform:scaleX(0);background:linear-gradient(90deg,#3fe0d0,#d6aa4e);box-shadow:0 0 18px rgba(63,224,208,.46);animation:loginBootProgress 1.7s cubic-bezier(.2,.8,.2,1) .2s forwards; }
-  .lm-login-ready { display:flex;justify-content:space-between;align-items:center;margin-top:10px;font:9px 'Share Tech Mono',monospace;letter-spacing:1.5px;color:#6f7a64; }
-  .lm-login-ready span:last-child { color:#3fe0d0; }
-  .lm-login-cursor { display:inline-block;width:7px;height:10px;margin-left:4px;background:#3fe0d0;vertical-align:-1px;animation:loginBootCursor .9s step-end infinite;box-shadow:0 0 9px rgba(63,224,208,.7); }
-  .lm-login-status-strip { display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;padding:9px 11px;background:rgba(63,224,208,.045);border:1px solid rgba(63,224,208,.16);font:700 10px 'Share Tech Mono',monospace;letter-spacing:1.4px;color:#6f7a64; }
-  .lm-login-status-strip strong { color:#d6aa4e;font-weight:700; }
-  .lm-login-form { display:flex;flex-direction:column;gap:12px;margin-top:14px; }
-  .lm-auth-field { display:flex;flex-direction:column;gap:6px; }
-  .lm-auth-field span { color:#7ca9a4;font:700 10px 'Share Tech Mono',monospace;letter-spacing:1.5px;text-transform:uppercase; }
-  .lm-auth-field .lm-ui-input { min-height:42px;font-size:13px;background:rgba(2,5,4,.72);border-color:rgba(63,224,208,.26); }
-  .lm-auth-field .lm-ui-input:focus { border-color:#3fe0d0;box-shadow:0 0 0 1px rgba(63,224,208,.24),0 0 18px rgba(63,224,208,.12); }
-  .lm-auth-rules { display:flex;flex-wrap:wrap;gap:8px;margin-top:-2px; }
-  .lm-auth-rule { display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border:1px solid rgba(111,122,100,.32);color:#8c9483;background:rgba(8,10,7,.72);font:700 9px 'Share Tech Mono',monospace;letter-spacing:1px;text-transform:uppercase; }
-  .lm-auth-rule--ok { color:#3fe0d0;border-color:rgba(63,224,208,.44);background:rgba(63,224,208,.08); }
-  .lm-auth-rule--bad { color:#c0635b;border-color:rgba(192,99,91,.44);background:rgba(192,99,91,.08); }
-  .lm-login-actions { display:flex;flex-direction:column;gap:9px;margin-top:4px; }
-  .lm-login-secondary { min-height:38px;background:rgba(214,170,78,.045);border:1px solid rgba(214,170,78,.26);color:#d6aa4e;cursor:pointer;font:800 10px 'Share Tech Mono',monospace;letter-spacing:1.4px;text-transform:uppercase; }
-  .lm-login-secondary:hover { background:rgba(214,170,78,.1);border-color:rgba(214,170,78,.52); }
-  .lm-login-status { min-height:18px;margin-top:10px;color:#c0635b;font:700 10px 'Share Tech Mono',monospace;letter-spacing:1px; }
-  @media (max-width:560px) { .lm-login-overlay { align-items:start;padding:14px;padding-top:34px;overflow:auto; } .lm-login-shell { padding:18px;width:min(100%,520px); } .lm-login-title { font-size:24px; } .lm-login-copy { font-size:12px; } .lm-login-status-strip { flex-direction:column;align-items:flex-start;gap:4px; } }
   @keyframes campaignDrawerIn { from { transform:translateX(-102%); } to { transform:translateX(0); } }
   .lm-campaign-launcher { position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:55;display:flex;align-items:center;gap:8px;background:linear-gradient(160deg,#0e120d,#0a0c09);border:1px solid #3fe0d0;border-left:none;color:#3fe0d0;font:700 11px 'Share Tech Mono',monospace;letter-spacing:3px;padding:18px 9px;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed;box-shadow:6px 0 24px rgba(0,0,0,.4);clip-path:polygon(0 0,100% 0,calc(100% - 8px) 8px,calc(100% - 8px) calc(100% - 8px),100% 100%,0 100%); }
   .lm-campaign-launcher:hover { background:rgba(63,224,208,.08);box-shadow:8px 0 28px rgba(63,224,208,.14); }

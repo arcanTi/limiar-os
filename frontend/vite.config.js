@@ -21,6 +21,7 @@ export default defineConfig({
       input: {
         'limiar-app': 'src/main.js',
         'campaign-map': 'src/pages/campaign-map.js',
+        'login': 'src/pages/login.js',
       },
       output: {
         entryFileNames: '[name].js',

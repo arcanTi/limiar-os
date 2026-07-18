@@ -63,6 +63,8 @@ function renderDeps(overrides = {}) {
     dismissCombatFacedownContest: vi.fn(),
     combatStabilizationInfo: () => ({ state: 'healthy', dv: null, allowedSkills: [] }),
     rollStabilize: vi.fn(),
+    evasionStatusFor: () => null,
+    requestEvasion: vi.fn(),
     toggleDefeated: vi.fn(),
     removeCombatant: vi.fn(),
     addCombatant: vi.fn(),
@@ -79,6 +81,11 @@ function renderDeps(overrides = {}) {
     prevTurn: vi.fn(),
     createCombatNpc: vi.fn(),
     setState: vi.fn(),
+    pendingRollMods: () => ({ luck: 0, adHoc: 0 }),
+    adjustLuckSpend: vi.fn(),
+    adjustAdHocMod: vi.fn(),
+    reloadWeapon: vi.fn(),
+    resetLuckForSession: vi.fn(),
     ...overrides,
   };
 }
@@ -284,6 +291,14 @@ function fakeComponent(overrides = {}) {
     skillCyberwareBonus: vi.fn(() => ({ total: 0, sources: [] })),
     cyberSourceBreakdown: vi.fn(() => []),
     stabilizeMortallyWounded: vi.fn(),
+    applyCharacterPatch: overrides.applyCharacterPatch || vi.fn(),
+    normalizeGearList: overrides.normalizeGearList || ((gear) => gear || []),
+    normalizeStats: overrides.normalizeStats || ((base) => base || {}),
+    weaponRuntimeAttackMod: vi.fn(() => 0),
+    weaponRuntimeQuality: vi.fn(() => ''),
+    gorillaTungstenProfile: vi.fn(() => null),
+    damageScaleProfile: vi.fn(() => null),
+    cyberweaponRollContext: vi.fn(() => null),
     ...overrides,
   };
 }
@@ -579,5 +594,248 @@ describe('ui/views/combat combatHandlers', () => {
     expect(npcs[0].gear[0].name).toBe('Heavy Pistol');
     expect(component.state.combatState.order).toEqual(expect.arrayContaining([npcs[0].id, npcs[1].id]));
     expect(component.flash).toHaveBeenCalledWith('2 NPCs adicionados ao combate');
+  });
+
+  // --- CM0: LUCK spend + ad-hoc modifier ---
+  it('adjustLuckSpend stages a clamped spend and blocks a non-owner, non-GM player', () => {
+    const mage = { ...mira, luckCurrent: 3 };
+    const component = fakeComponent({ state: { characters: [mage, rook], gm: false, activeCharacterId: 'mira' } });
+    const h = combatHandlers(component);
+
+    h.adjustLuckSpend('mira', 1);
+    expect(h.pendingRollMods('mira').luck).toBe(1);
+    h.adjustLuckSpend('mira', 10); // clamps at luckCurrent (3), not the raw delta
+    expect(h.pendingRollMods('mira').luck).toBe(3);
+    h.adjustLuckSpend('mira', -10); // clamps at 0
+    expect(h.pendingRollMods('mira').luck).toBe(0);
+
+    h.adjustLuckSpend('rook', 1); // not mira's own combatant, not GM
+    expect(h.pendingRollMods('rook').luck).toBe(0);
+    expect(component.flash).toHaveBeenCalled();
+  });
+
+  it('consumePendingRollMods zeroes the stage and deducts spent Luck from the pool', () => {
+    const mage = { ...mira, luckCurrent: 3 };
+    const component = fakeComponent({ state: { characters: [mage, rook], gm: false, activeCharacterId: 'mira' } });
+    const h = combatHandlers(component);
+    h.adjustLuckSpend('mira', 2);
+    h.adjustAdHocMod('mira', -1);
+
+    const pending = h.consumePendingRollMods('mira');
+    expect(pending).toEqual({ luck: 2, adHoc: -1 });
+    expect(h.pendingRollMods('mira')).toEqual({ luck: 0, adHoc: 0 });
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { luckCurrent: 1 });
+  });
+
+  it('rollCombatAttack folds staged Luck/mod into the roll and resets the stage', () => {
+    const mage = { ...mira, luckCurrent: 5, gear: [] };
+    const component = fakeComponent({ state: { characters: [mage, rook], gm: true, activeCharacterId: 'mira' } });
+    const h = combatHandlers(component);
+    h.adjustLuckSpend('mira', 2);
+    h.adjustAdHocMod('mira', 1);
+
+    h.rollCombatAttack('mira', { id: 'w1', name: 'Pistol', skill: 'Handgun' });
+
+    expect(component.roll).toHaveBeenCalledWith(expect.objectContaining({ mod: 3 })); // 0 (fallback REF) + 2 luck + 1 mod
+    expect(component.roll.mock.calls[0][0].breakdown).toEqual(expect.arrayContaining(['+2 LUCK', '+1 MOD']));
+    expect(h.pendingRollMods('mira')).toEqual({ luck: 0, adHoc: 0 });
+  });
+
+  it('resetLuckForSession refreshes every PC (not NPCs) to their LUCK stat and requires GM auth', () => {
+    const spent = { ...mira, base: { LUCK: 7 }, luckCurrent: 0 };
+    const npc = { ...rook, id: 'ganger', kind: 'npc', base: { LUCK: 9 }, luckCurrent: 0 };
+    const component = fakeComponent({
+      state: { characters: [spent, npc] },
+      normalizeStats: (base) => base,
+    });
+    const h = combatHandlers(component);
+
+    h.resetLuckForSession();
+
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { luckCurrent: 7 });
+    expect(component.applyCharacterPatch).not.toHaveBeenCalledWith('ganger', expect.anything());
+
+    const deniedComponent = fakeComponent({ ensureGm: vi.fn(() => false) });
+    combatHandlers(deniedComponent).resetLuckForSession();
+    expect(deniedComponent.applyCharacterPatch).not.toHaveBeenCalled();
+  });
+
+  // --- CM0: weapon magazine ammo ---
+  it('rollCombatAttack spends ammo on fire and warns (without blocking) when the mag is empty', () => {
+    const gunner = { ...mira, gear: [{ id: 'pistol', name: 'Heavy Pistol', skill: 'Handgun', magazine: 8, currentAmmo: 1 }] };
+    const component = fakeComponent({
+      state: { characters: [gunner, rook], gm: true, activeCharacterId: 'mira' },
+      normalizeGearList: (gear) => gear,
+    });
+    const h = combatHandlers(component);
+    const weapon = gunner.gear[0];
+
+    h.rollCombatAttack('mira', weapon);
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...weapon, currentAmmo: 0 }] });
+
+    component.applyCharacterPatch.mockClear();
+    const empty = { ...weapon, currentAmmo: 0 };
+    const emptyComponent = fakeComponent({
+      state: { characters: [{ ...gunner, gear: [empty] }, rook], gm: true, activeCharacterId: 'mira' },
+      normalizeGearList: (gear) => gear,
+    });
+    const emptyHandlers = combatHandlers(emptyComponent);
+    emptyHandlers.rollCombatAttack('mira', empty);
+    // Advisory: the roll still happens even at 0 ammo, with a warning line.
+    expect(emptyComponent.roll).toHaveBeenCalled();
+    expect(emptyComponent.roll.mock.calls[0][0].breakdown.some(line => line.includes('SEM MUNICAO'))).toBe(true);
+    expect(emptyComponent.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...empty, currentAmmo: 0 }] });
+  });
+
+  it('rollCombatAttack does not touch ammo for melee/exotic gear without a magazine', () => {
+    const knife = { id: 'knife', name: 'Knife', skill: 'Melee Weapon' };
+    const component = fakeComponent({
+      state: { characters: [{ ...mira, gear: [knife] }, rook], gm: true, activeCharacterId: 'mira' },
+      normalizeGearList: (gear) => gear,
+    });
+    const h = combatHandlers(component);
+    h.rollCombatAttack('mira', knife);
+    expect(component.applyCharacterPatch).not.toHaveBeenCalled();
+  });
+
+  it('reloadWeapon refills to the magazine and is gated to the owner or GM', () => {
+    const weapon = { id: 'pistol', name: 'Heavy Pistol', magazine: 8, currentAmmo: 2 };
+    const component = fakeComponent({
+      state: { characters: [{ ...mira, gear: [weapon] }, rook], gm: false, activeCharacterId: 'mira' },
+      normalizeGearList: (gear) => gear,
+    });
+    const h = combatHandlers(component);
+
+    h.reloadWeapon('mira', 'pistol');
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...weapon, currentAmmo: 8 }] });
+
+    component.applyCharacterPatch.mockClear();
+    h.reloadWeapon('rook', 'pistol');
+    expect(component.applyCharacterPatch).not.toHaveBeenCalled();
+    expect(component.flash).toHaveBeenCalled();
+  });
+
+  // --- CM2: evasion as a prompt (G7) ---
+  it('requestEvasion posts a targeted request using the DEFENDER\'s own Evasion mod and stages pendingEvasion', () => {
+    const component = fakeComponent({ state: { characters: [mira, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState() } });
+    const h = combatHandlers(component);
+
+    h.requestEvasion('mira', { id: 'knife', name: 'Knife', melee: true });
+
+    expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'request',
+      request: expect.objectContaining({ label: 'EVASAO', sides: 10, check: true, combatantId: 'rook', evasionFor: 'mira' }),
+    }));
+    expect(component.state.pendingEvasion.mira).toEqual(expect.objectContaining({ targetId: 'rook' }));
+  });
+
+  it('requestEvasion flashes instead of posting when the attacker has no target selected', () => {
+    const soloState = { active: true, round: 1, turnIndex: 0, order: ['mira'], combatants: { mira: { side: 'pc', acted: false, defeated: false } } };
+    const component = fakeComponent({ state: { characters: [mira], gm: true, activeCharacterId: 'mira', combatState: soloState } });
+    const h = combatHandlers(component);
+
+    h.requestEvasion('mira', { melee: true });
+
+    expect(component.flash).toHaveBeenCalled();
+    expect(component.postChat).not.toHaveBeenCalled();
+  });
+
+  it('applyEvasionRolls captures a matching reply by requestId; rollCombatAttack consumes it as the melee DV one-shot', () => {
+    const component = fakeComponent({
+      state: {
+        characters: [mira, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState(),
+        pendingEvasion: { mira: { targetId: 'rook', requestId: 'req-1', expiresAt: Date.now() + 10000 } },
+      },
+    });
+    const h = combatHandlers(component);
+
+    h.applyEvasionRolls([{ id: 'msg-1', kind: 'roll', roll: { total: 14, evasionFor: 'mira', evasionRequestId: 'req-1' } }]);
+    expect(component.state.evasionResults).toEqual({ mira: { targetId: 'rook', total: 14 } });
+    expect(component.state.pendingEvasion).toEqual({});
+
+    h.rollCombatAttack('mira', { id: 'knife', name: 'Knife', melee: true });
+    expect(component.roll).toHaveBeenCalledWith(expect.objectContaining({ dv: 14 }));
+    expect(component.roll.mock.calls[0][0].breakdown).toEqual(expect.arrayContaining(['EVASAO DO ALVO: 14']));
+    // One-shot: a second attack has nothing left to consume.
+    expect(component.state.evasionResults).toEqual({});
+  });
+
+  it('applyEvasionRolls ignores a roll tagged with a stale/mismatched requestId', () => {
+    const component = fakeComponent({
+      state: {
+        characters: [mira, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState(),
+        pendingEvasion: { mira: { targetId: 'rook', requestId: 'req-current', expiresAt: Date.now() + 10000 } },
+      },
+    });
+    const h = combatHandlers(component);
+
+    h.applyEvasionRolls([{ id: 'msg-1', kind: 'roll', roll: { total: 5, evasionFor: 'mira', evasionRequestId: 'req-stale' } }]);
+
+    expect(component.state.evasionResults || {}).toEqual({});
+    expect(component.state.pendingEvasion.mira).toEqual(expect.objectContaining({ requestId: 'req-current' }));
+  });
+
+  // --- CM2: automatic Death Save prompt on turn start (G10) ---
+  it('advanceTurn auto-posts a Death Save request when the incoming turn belongs to a Mortally Wounded combatant', async () => {
+    const dying = { ...rook, health: { cur: 0, max: 45 } };
+    const nextCombatState = { ...baseCombatState(), turnIndex: 1 };
+    const component = fakeComponent({
+      state: { characters: [mira, dying], gm: true, activeCharacterId: 'mira', combatState: baseCombatState() },
+      app: vi.fn(() => ({ endTurn: { execute: vi.fn(async () => ({ ok: true, combatState: nextCombatState })) } })),
+      derivedStats: vi.fn(() => ({ hpMax: 45, seriouslyWounded: 22, deathSave: 6, skipDeathSave: false, effectiveStats: {} })),
+    });
+    const h = combatHandlers(component);
+
+    await h.advanceTurn();
+
+    expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'request',
+      request: expect.objectContaining({ label: 'DEATH SAVE', check: false, combatantId: 'rook', deathSaveTarget: 6 }),
+    }));
+  });
+
+  it('advanceTurn does not auto-post a Death Save for a healthy incoming combatant', async () => {
+    const nextCombatState = { ...baseCombatState(), turnIndex: 1 };
+    const component = fakeComponent({
+      state: { characters: [mira, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState() },
+      app: vi.fn(() => ({ endTurn: { execute: vi.fn(async () => ({ ok: true, combatState: nextCombatState })) } })),
+    });
+    const h = combatHandlers(component);
+
+    await h.advanceTurn();
+
+    expect(component.postChat).not.toHaveBeenCalled();
+  });
+
+  it('advanceTurn skips the auto Death Save when the character has skipDeathSave (e.g. a status/cyberware immunity)', async () => {
+    const dying = { ...rook, health: { cur: 0, max: 45 } };
+    const nextCombatState = { ...baseCombatState(), turnIndex: 1 };
+    const component = fakeComponent({
+      state: { characters: [mira, dying], gm: true, activeCharacterId: 'mira', combatState: baseCombatState() },
+      app: vi.fn(() => ({ endTurn: { execute: vi.fn(async () => ({ ok: true, combatState: nextCombatState })) } })),
+      derivedStats: vi.fn(() => ({ hpMax: 45, seriouslyWounded: 22, deathSave: 6, skipDeathSave: true, effectiveStats: {} })),
+    });
+    const h = combatHandlers(component);
+
+    await h.advanceTurn();
+
+    expect(component.postChat).not.toHaveBeenCalled();
+  });
+
+  it('advanceTurn only auto-posts the Death Save once per combatant per round even if called again', async () => {
+    const dying = { ...rook, health: { cur: 0, max: 45 } };
+    const nextCombatState = { ...baseCombatState(), turnIndex: 1 };
+    const component = fakeComponent({
+      state: { characters: [mira, dying], gm: true, activeCharacterId: 'mira', combatState: baseCombatState() },
+      app: vi.fn(() => ({ endTurn: { execute: vi.fn(async () => ({ ok: true, combatState: nextCombatState })) } })),
+      derivedStats: vi.fn(() => ({ hpMax: 45, seriouslyWounded: 22, deathSave: 6, skipDeathSave: false, effectiveStats: {} })),
+    });
+    const h = combatHandlers(component);
+
+    await h.advanceTurn();
+    await h.advanceTurn();
+
+    const deathSaveCalls = component.postChat.mock.calls.filter(([payload]) => payload && payload.request && payload.request.label === 'DEATH SAVE');
+    expect(deathSaveCalls.length).toBe(1);
   });
 });

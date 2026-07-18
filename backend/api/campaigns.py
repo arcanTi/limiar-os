@@ -1,12 +1,14 @@
 """Campaign routes: creation, invitations, membership and notifications."""
 
 from http import HTTPStatus
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote, urlparse
 
 from ..domain.validation import ValidationError
+from ..repositories import campaign_sync
 from ..repositories.campaigns import (
     get_campaign,
     invite_player,
+    is_campaign_member,
     join_campaign,
     list_campaigns_for,
     notifications_for,
@@ -83,6 +85,31 @@ class CampaignRoutes:
         if not row or not row.get("canJoin"):
             return self.write_error(HTTPStatus.FORBIDDEN, "Campaign access denied")
         return self.write_json(join_campaign(campaign_id, character_id, session), HTTPStatus.CREATED)
+
+    def _get_campaign_updates(self, campaign_id: str) -> None:
+        session = self.require_login()
+        if not session:
+            return None
+        if not get_campaign(campaign_id):
+            return self.write_error(HTTPStatus.NOT_FOUND, "Campaign not found")
+        if not is_campaign_member(campaign_id, session):
+            return self.write_error(HTTPStatus.FORBIDDEN, "Campaign access denied")
+        raw_since = parse_qs(urlparse(self.path).query).get("since", ["0"])[0]
+        try:
+            since = max(0, int(raw_since))
+        except (TypeError, ValueError):
+            since = 0
+        return self.write_json(campaign_sync.wait_for_campaign_update(campaign_id, since))
+
+    def route_campaign_updates_get(self, path: str) -> bool:
+        prefix = "/api/campaigns/"
+        if not path.startswith(prefix) or not path.endswith("/updates"):
+            return False
+        campaign_id = unquote(path[len(prefix) : -len("/updates")])
+        if not campaign_id or "/" in campaign_id:
+            return False
+        self._get_campaign_updates(campaign_id)
+        return True
 
     def route_campaign_post(self, path: str) -> bool:
         if path == "/api/campaigns":

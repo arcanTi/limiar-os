@@ -19,6 +19,7 @@ from .api.state import StateRoutes
 from .api.uploads import UploadRoutes
 from .config import DB_PATH, DEFAULT_GM_USER
 from .db import init_db
+from .repositories import campaign_sync
 from .repositories.chat import clear_chat
 from .repositories.records import delete_record
 
@@ -44,6 +45,7 @@ class LimiarHandler(
 
         exact = {
             "/api/health": self._get_health,
+            "/api/meta/config": self._get_config,
             "/api/session": self._get_session,
             "/api/users": self._get_users,
             "/api/campaigns": self._get_campaigns,
@@ -64,6 +66,8 @@ class LimiarHandler(
 
         if path.startswith("/api/characters/"):
             return self._get_character_by_id(unquote(path[len("/api/characters/") :]))
+        if self.route_campaign_updates_get(path):
+            return None
         if self.route_campaign_map_get(path):
             return None
         if path.startswith("/api/reference/"):
@@ -80,6 +84,7 @@ class LimiarHandler(
         open_routes = {
             "/api/login": self._post_login,
             "/api/register": self._post_register,
+            "/api/auth/google": self._post_google_login,
             "/api/logout": self._post_logout,
             "/api/chat": self._post_chat,
             "/api/combat-state/end-turn": self._post_combat_end_turn,
@@ -152,7 +157,10 @@ class LimiarHandler(
         for prefix, kind in routes.items():
             if path.startswith(prefix):
                 record_id = unquote(path[len(prefix) :])
-                return self.write_json({"deleted": delete_record(kind, record_id)})
+                result = self.write_json({"deleted": delete_record(kind, record_id)})
+                if kind == "characters":
+                    campaign_sync.bump_all("roster")
+                return result
 
         return self.write_error(HTTPStatus.NOT_FOUND, "Unknown API route")
 

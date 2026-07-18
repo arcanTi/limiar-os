@@ -1,6 +1,7 @@
 import { asNumber } from '../../domain/shared/num.ts';
 import { normalizeHqIp } from '../../domain/character/index.ts';
 import { formatIpLogRows } from '../../domain/economy/index.ts';
+import { isAdmin as authIsAdmin } from '../../domain/auth/policies.ts';
 
 const IP_AWARD_KEYS = ['group', 'warrior', 'socializer', 'explorer', 'roleplayer'];
 
@@ -15,9 +16,11 @@ export function hqRenderVals(state = {}, deps = {}) {
   const hqIpLogRows = formatIpLogRows(hqIp.log);
   const userDraft = S.userDraft || {};
   const userRole = userDraft.role || 'player';
+  const isStaffAdmin = authIsAdmin({ authUser: S.authUser });
   const userRows = (S.users || []).map(user => ({
     ...user,
     roleLabel: String(user.role || 'player').toUpperCase(),
+    canManage: isStaffAdmin || user.role === 'player',
     onEdit: () => deps.editUserDraft(user),
     onDelete: () => deps.deleteUser(user.username),
   }));
@@ -38,14 +41,18 @@ export function hqRenderVals(state = {}, deps = {}) {
     hqIpLogRows,
     noHqIpLog: hqIpLogRows.length === 0,
     userRows,
+    canManageUsers: !!S.gmAuthenticated,
+    canManageStaffRoles: isStaffAdmin,
     userDraftUsername: userDraft.username || '',
     userDraftPassword: userDraft.password || '',
+    userDraftEmail: userDraft.email || '',
     userDraftRole: userRole,
     userRoleAdminSelected: userRole === 'admin',
     userRoleGmSelected: userRole === 'gm',
     userRolePlayerSelected: userRole === 'player',
     onUserDraftUsername: (e) => deps.setUserDraftField('username', e.target.value),
     onUserDraftPassword: (e) => deps.setUserDraftField('password', e.target.value),
+    onUserDraftEmail: (e) => deps.setUserDraftField('email', e.target.value),
     onUserDraftRole: (e) => deps.setUserDraftField('role', e.target.value),
     saveUserDraft: deps.saveUserDraft,
   };
@@ -100,27 +107,27 @@ export function hqHandlers(component) {
     setUserDraftField: (key, value) => component.setState(s => ({ userDraft: { ...(s.userDraft || {}), [key]: value } })),
 
     async saveUserDraft() {
-      if (!(component.api() && component.api().users && component.isAdmin())) return;
+      if (!(component.api() && component.api().users && component.state.gmAuthenticated)) return;
       const draft = component.state.userDraft || {};
       try {
         await component.api().users.upsert(draft);
-        component.setState({ userDraft: { username: '', password: '', role: 'player' }, gmStatus: 'Usuario salvo' });
+        component.setState({ userDraft: { username: '', password: '', role: 'player', email: '' }, gmStatus: 'Usuario salvo' });
         await component.loadUsers();
-      } catch (_) {
-        component.setState({ gmStatus: 'Falha ao salvar usuario' });
+      } catch (err) {
+        component.setState({ gmStatus: 'Falha ao salvar usuario: ' + (err.message || '') });
       }
     },
 
-    editUserDraft: (user) => component.setState({ userDraft: { username: user.username || '', password: '', role: user.role || 'player' } }),
+    editUserDraft: (user) => component.setState({ userDraft: { username: user.username || '', password: '', role: user.role || 'player', email: user.email || '' } }),
 
     async deleteUser(username) {
-      if (!(component.api() && component.api().users && component.isAdmin())) return;
+      if (!(component.api() && component.api().users && component.state.gmAuthenticated)) return;
       try {
         await component.api().users.delete(username);
         component.setState({ gmStatus: 'Usuario removido' });
         await component.loadUsers();
-      } catch (_) {
-        component.setState({ gmStatus: 'Falha ao remover usuario' });
+      } catch (err) {
+        component.setState({ gmStatus: 'Falha ao remover usuario: ' + (err.message || '') });
       }
     },
   };

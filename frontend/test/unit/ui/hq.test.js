@@ -49,11 +49,31 @@ describe('ui/views/hq hqRenderVals', () => {
   it('builds userRows with role labels and wires onEdit/onDelete through deps', () => {
     const users = [{ username: 'rook', role: 'player' }];
     const vals = hqRenderVals({ users }, deps);
-    expect(vals.userRows[0]).toMatchObject({ username: 'rook', roleLabel: 'PLAYER' });
+    expect(vals.userRows[0]).toMatchObject({ username: 'rook', roleLabel: 'PLAYER', canManage: true });
     vals.userRows[0].onEdit();
     expect(deps.editUserDraft).toHaveBeenCalledWith(users[0]);
     vals.userRows[0].onDelete();
     expect(deps.deleteUser).toHaveBeenCalledWith('rook');
+  });
+
+  it('marks staff rows as unmanageable for a non-admin GM session', () => {
+    const users = [{ username: 'rook', role: 'player' }, { username: 'vesper', role: 'gm' }];
+    const vals = hqRenderVals({ users, authUser: { role: 'gm' } }, deps);
+    expect(vals.userRows.find(u => u.username === 'rook').canManage).toBe(true);
+    expect(vals.userRows.find(u => u.username === 'vesper').canManage).toBe(false);
+    expect(vals.canManageStaffRoles).toBe(false);
+  });
+
+  it('exposes canManageUsers from gmAuthenticated and canManageStaffRoles from admin role', () => {
+    const gm = hqRenderVals({ gmAuthenticated: true, authUser: { role: 'gm' } }, deps);
+    expect(gm.canManageUsers).toBe(true);
+    expect(gm.canManageStaffRoles).toBe(false);
+
+    const admin = hqRenderVals({ gmAuthenticated: true, authUser: { role: 'admin' } }, deps);
+    expect(admin.canManageStaffRoles).toBe(true);
+
+    const player = hqRenderVals({}, deps);
+    expect(player.canManageUsers).toBe(false);
   });
 
   it('reflects the user draft role selection flags', () => {
@@ -77,13 +97,12 @@ function fakeComponent(overrides = {}) {
     users: { upsert: vi.fn().mockResolvedValue(undefined), delete: vi.fn().mockResolvedValue(undefined) },
   };
   return {
-    state: { ipAward: {}, hqIp: { ip: 0, log: [] }, userDraft: {}, ...overrides.state },
+    state: { ipAward: {}, hqIp: { ip: 0, log: [] }, userDraft: {}, gmAuthenticated: true, ...overrides.state },
     setState: vi.fn(function (patch) {
       const next = typeof patch === 'function' ? patch(this.state) : patch;
       this.state = { ...this.state, ...next };
     }),
     ensureGm: overrides.ensureGm || vi.fn(() => true),
-    isAdmin: overrides.isAdmin || vi.fn(() => true),
     asNumber: (value, fallback, min, max) => {
       const n = Number(value);
       if (!Number.isFinite(n)) return fallback;
@@ -141,27 +160,27 @@ describe('ui/views/hq hqHandlers', () => {
     expect(hqSet).not.toHaveBeenCalled();
   });
 
-  it('saveUserDraft requires admin + a users api, then reloads the list', async () => {
-    const component = fakeComponent({ state: { userDraft: { username: 'new', password: 'x', role: 'player' } } });
+  it('saveUserDraft requires staff auth + a users api, then reloads the list', async () => {
+    const component = fakeComponent({ state: { userDraft: { username: 'new', password: 'x', role: 'player', email: 'new@example.com' } } });
     await hqHandlers(component).saveUserDraft();
-    expect(component.api().users.upsert).toHaveBeenCalledWith({ username: 'new', password: 'x', role: 'player' });
+    expect(component.api().users.upsert).toHaveBeenCalledWith({ username: 'new', password: 'x', role: 'player', email: 'new@example.com' });
     expect(component.loadUsers).toHaveBeenCalledTimes(1);
-    expect(component.state.userDraft).toEqual({ username: '', password: '', role: 'player' });
+    expect(component.state.userDraft).toEqual({ username: '', password: '', role: 'player', email: '' });
   });
 
-  it('saveUserDraft is a no-op for a non-admin session', async () => {
-    const component = fakeComponent({ isAdmin: vi.fn(() => false) });
+  it('saveUserDraft is a no-op for a non-staff session', async () => {
+    const component = fakeComponent({ state: { gmAuthenticated: false } });
     await hqHandlers(component).saveUserDraft();
     expect(component.loadUsers).not.toHaveBeenCalled();
   });
 
   it('editUserDraft loads a user into the draft (password always blank)', () => {
     const component = fakeComponent();
-    hqHandlers(component).editUserDraft({ username: 'vesper', role: 'gm' });
-    expect(component.state.userDraft).toEqual({ username: 'vesper', password: '', role: 'gm' });
+    hqHandlers(component).editUserDraft({ username: 'vesper', role: 'gm', email: 'vesper@example.com' });
+    expect(component.state.userDraft).toEqual({ username: 'vesper', password: '', role: 'gm', email: 'vesper@example.com' });
   });
 
-  it('deleteUser requires admin, then reloads the list', async () => {
+  it('deleteUser requires staff auth, then reloads the list', async () => {
     const component = fakeComponent();
     await hqHandlers(component).deleteUser('vesper');
     expect(component.api().users.delete).toHaveBeenCalledWith('vesper');

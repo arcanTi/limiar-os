@@ -4,6 +4,7 @@ from http import HTTPStatus
 
 from ..config import _CHAT_RATE
 from ..domain.validation import ValidationError, validate_chat
+from ..repositories import campaign_sync
 from ..repositories.chat import append_chat, list_chat
 from ..security import _chat_timestamps, check_rate
 
@@ -29,4 +30,6 @@ class CommsRoutes:
             return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
         session = self.current_session()
         role = "gm" if session and session.get("role") == "gm" else "player"
-        return self.write_json(append_chat(payload, role), HTTPStatus.CREATED)
+        entry = append_chat(payload, role)
+        campaign_sync.bump_all("chat")
+        return self.write_json(entry, HTTPStatus.CREATED)

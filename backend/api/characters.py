@@ -3,6 +3,7 @@
 from http import HTTPStatus
 
 from ..domain.validation import ValidationError, validate_character
+from ..repositories import campaign_sync
 from ..repositories.records import get_record, list_records, upsert_record
 
 
@@ -44,7 +45,9 @@ class CharacterRoutes:
             return self.write_error(HTTPStatus.FORBIDDEN, "Character access denied")
         payload["ownerUsername"] = session["username"]
         payload["createdBy"] = current.get("createdBy") if current else session["username"]
-        return self.write_json(upsert_record("characters", payload), HTTPStatus.CREATED)
+        record = upsert_record("characters", payload)
+        campaign_sync.bump_all("roster")
+        return self.write_json(record, HTTPStatus.CREATED)
 
     def _post_characters(self, session: dict[str, str]) -> None:
         try:
@@ -55,7 +58,9 @@ class CharacterRoutes:
         payload["createdBy"] = session["username"]  # stamp server-side
         if not payload.get("ownerUsername"):
             payload["ownerUsername"] = session["username"]
-        return self.write_json(upsert_record("characters", payload))
+        record = upsert_record("characters", payload)
+        campaign_sync.bump_all("roster")
+        return self.write_json(record)
 
     # Free-text fields a player fills in about their own character — same
     # trust level as clearing your own status effect, so no GM login gate.
@@ -74,4 +79,6 @@ class CharacterRoutes:
             return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
         patch = {k: payload[k] for k in self._NOTES_FIELDS if k in payload}
         merged = {**current, **patch}
-        return self.write_json(upsert_record("characters", merged))
+        record = upsert_record("characters", merged)
+        campaign_sync.bump_all("roster")
+        return self.write_json(record)

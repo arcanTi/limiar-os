@@ -695,7 +695,7 @@ export function sheetHandlers(component) {
 
   function editSheet() {
     if (!component.state.gmAuthenticated && !component.canManageOwnSheet(component.activeCharacter().id)) {
-      component.setState({ gmLoginOpen: true, gmLoginStatus: 'Login necessario para editar sua ficha' });
+      component.redirectToLogin();
       return;
     }
     component.setState({ sheetEditing: true, sheetCreating: false, sheetDraft: sheetDraftFrom(component.activeCharacter()), sheetTab: 'core' });
@@ -703,7 +703,7 @@ export function sheetHandlers(component) {
 
   function createPlayerCharacter() {
     if (!component.state.authAuthenticated) {
-      component.setState({ gmLoginOpen: true, gmLoginStatus: 'Login necessario para criar ficha' });
+      component.redirectToLogin();
       return;
     }
     component.setState({ sheetOpen: true, sheetExpanded: true, sheetEditing: true, sheetCreating: true, sheetDraft: newSheetDraft(), gm: false, sheetTab: 'core' });

@@ -31,6 +31,9 @@
       <sc-if value="{{ notDesktop }}"><button onClick="{{ nav.home }}" style="display:flex;align-items:center;gap:6px;background:rgba(214,170,78,0.06);border:1px solid rgba(214,170,78,0.25);cursor:pointer;color:#d6aa4e;font:600 10px 'Share Tech Mono',monospace;letter-spacing:1.5px;padding:7px 12px;clip-path:polygon(0 0,calc(100% - 6px) 0,100% 6px,100% 100%,6px 100%,0 calc(100% - 6px));" style-hover="background:rgba(214,170,78,0.14);border-color:#d6aa4e;"><span style="font-size:13px;line-height:1;">&#8592;</span> {{ tx.desktop }}</button></sc-if>
       <button onClick="{{ nav.home }}" style="display:flex;align-items:center;gap:9px;background:transparent;border:none;cursor:pointer;padding:0;color:#f0ead8;font:600 16px 'Chakra Petch',sans-serif;letter-spacing:2px;"><span style="color:#d6aa4e;font-size:13px;">&#9670;</span>LIMIAR<span style="color:#d6aa4e;">OS</span></button>
       <span style="font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;border-left:1px solid rgba(214,170,78,0.2);padding-left:12px;">{{ viewTitle }}</span>
+      <sc-if value="{{ hasActiveCampaign }}">
+        <button onClick="{{ switchCampaign }}" style="display:flex;align-items:center;gap:6px;background:transparent;border:1px solid rgba(63,224,208,0.25);cursor:pointer;color:#3fe0d0;font:600 10px 'Share Tech Mono',monospace;letter-spacing:1px;padding:5px 10px;">{{ activeCampaignName }} <span style="font-size:11px;">&#8646;</span></button>
+      </sc-if>
     </div>
     <div style="display:flex;align-items:center;gap:7px;font:12px 'Share Tech Mono',monospace;letter-spacing:1px;color:#9a9883;">
       <span data-limiar-clock="true" style="color:#3fe0d0;">{{ clock }}</span><span style="color:#6f7a64;">// NEO-SP S7</span>
@@ -54,75 +57,6 @@
 
   <sc-if value="{{ gm }}">
     <div style="background:rgba(63,224,208,0.08);border-bottom:1px solid rgba(63,224,208,0.25);padding:7px 20px;font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0;display:flex;align-items:center;gap:8px;"><span style="animation:blink 1.2s step-end infinite;">&#9608;</span> {{ tx.gmBanner }}</div>
-  </sc-if>
-
-  <sc-if value="{{ gmLoginOpen }}">
-    <div class="lm-login-overlay">
-      <div class="lm-login-shell">
-        <div class="lm-login-inner">
-        <div class="lm-login-head">
-          <div class="lm-login-title-wrap">
-            <span class="lm-login-kicker">ACCESS GATE</span>
-            <div class="lm-login-title">LIMIAR OS<span class="lm-login-cursor"></span></div>
-            <sc-if value="{{ userLoginMode }}">
-              <p class="lm-login-copy">Entre com seu usuario para continuar sua sessao.</p>
-            </sc-if>
-            <sc-if value="{{ userRegisterMode }}">
-              <p class="lm-login-copy">Crie um acesso de jogador e entre direto no sistema.</p>
-            </sc-if>
-          </div>
-          <button onClick="{{ closeGmLogin }}" class="lm-login-close" aria-label="Fechar">&#10005;</button>
-        </div>
-
-        <div class="lm-login-status-strip">
-          <span>CONNECTION READY</span>
-          <strong>PLAYER / GM</strong>
-        </div>
-
-        <sc-if value="{{ userLoginMode }}">
-          <div class="lm-login-form">
-            <label class="lm-auth-field">
-              <span>Usuario</span>
-              <input value="{{ gmLoginUser }}" onInput="{{ onGmLoginUser }}" placeholder="mestre ou jogador" class="lm-ui-input lm-ui-input--teal lm-ui-input--mono lm-ui-input--full" />
-            </label>
-            <label class="lm-auth-field">
-              <span>Senha</span>
-              <input type="password" value="{{ gmLoginPassword }}" onInput="{{ onGmLoginPassword }}" placeholder="senha" class="lm-ui-input lm-ui-input--teal lm-ui-input--mono lm-ui-input--full" />
-            </label>
-            <div class="lm-login-actions">
-              <button onClick="{{ loginGm }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--cut lm-ui-btn--full">ENTRAR</button>
-              <button onClick="{{ showRegisterMode }}" class="lm-login-secondary">CRIAR USUARIO</button>
-            </div>
-          </div>
-        </sc-if>
-        <sc-if value="{{ userRegisterMode }}">
-          <div class="lm-login-form">
-            <label class="lm-auth-field">
-              <span>Novo usuario</span>
-              <input value="{{ userRegisterUsername }}" onInput="{{ onUserRegisterUsername }}" placeholder="nome de acesso" class="lm-ui-input lm-ui-input--teal lm-ui-input--mono lm-ui-input--full" />
-            </label>
-            <label class="lm-auth-field">
-              <span>Senha</span>
-              <input type="password" value="{{ userRegisterPassword }}" onInput="{{ onUserRegisterPassword }}" placeholder="minimo 8 caracteres" class="lm-ui-input lm-ui-input--teal lm-ui-input--mono lm-ui-input--full" />
-            </label>
-            <label class="lm-auth-field">
-              <span>Confirmar senha</span>
-              <input type="password" value="{{ userRegisterConfirm }}" onInput="{{ onUserRegisterConfirm }}" placeholder="repita a senha" class="lm-ui-input lm-ui-input--teal lm-ui-input--mono lm-ui-input--full" />
-            </label>
-            <div class="lm-auth-rules">
-              <span class="{{ registerPasswordHintStyle }}">8+ caracteres</span>
-              <span class="{{ registerConfirmHintStyle }}">{{ registerConfirmHint }}</span>
-            </div>
-            <div class="lm-login-actions">
-              <button onClick="{{ registerPlayerUser }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--cut lm-ui-btn--full">CRIAR USUARIO</button>
-              <button onClick="{{ showLoginMode }}" class="lm-login-secondary">ENTRAR</button>
-            </div>
-          </div>
-        </sc-if>
-        <div class="lm-login-status">{{ gmLoginStatus }}</div>
-        </div>
-      </div>
-    </div>
   </sc-if>
 
   <!-- ============ DESKTOP ============ -->
@@ -677,6 +611,7 @@
             <button onClick="{{ prevTurn }}" class="lm-ui-btn lm-ui-btn--ghost-gold">{{ tx.prevTurn }}</button>
             <button onClick="{{ nextTurn }}" class="lm-ui-btn lm-ui-btn--teal">{{ tx.nextTurn }}</button>
             <sc-if value="{{ combatBattleMode }}"><button onClick="{{ toggleReinforceDrawer }}" class="lm-ui-btn lm-ui-btn--ghost-teal">REFORCOS</button></sc-if>
+            <button onClick="{{ resetLuckForSession }}" class="lm-ui-btn lm-ui-btn--ghost-gold" title="Restaura LUCK de todos os PCs para o valor do atributo">RESET LUCK</button>
             <sc-if value="{{ combatActive }}"><button onClick="{{ endCombat }}" class="lm-ui-btn lm-ui-btn--ghost-danger">{{ tx.endCombat }}</button></sc-if>
           </div>
         </sc-if>
@@ -883,15 +818,26 @@
                       </sc-for>
                     </div>
                   </sc-if>
+                  <div class="lm-combat-toggle-row" style="align-items:center;">
+                    <button onClick="{{ combatFocusCard.luck.dec }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">-</button>
+                    <span class="lm-chip">{{ combatFocusCard.luck.label }}</span>
+                    <button onClick="{{ combatFocusCard.luck.inc }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">+</button>
+                    <button onClick="{{ combatFocusCard.adHocMod.dec }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">-</button>
+                    <span class="lm-chip">{{ combatFocusCard.adHocMod.label }}</span>
+                    <button onClick="{{ combatFocusCard.adHocMod.inc }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">+</button>
+                  </div>
                   <sc-if value="{{ combatFocusCard.hasWeapons }}">
                     <div class="lm-combat-subtitle lm-combat-subtitle--danger">{{ tx.weapons }}</div>
+                    <sc-if value="{{ combatFocusCard.hasEvasionStatus }}"><div class="lm-combat-row-meta" style="margin-bottom:6px;">{{ combatFocusCard.evasionStatus.label }}</div></sc-if>
                     <div class="lm-combat-kit-list">
                       <sc-for list="{{ combatFocusCard.weaponRows }}" as="w" hint-placeholder-count="2">
                         <div class="lm-combat-row lm-combat-row--weapon">
-                          <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}</div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
+                          <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}<sc-if value="{{ w.hasAmmo }}"> // {{ w.ammoLabel }}</sc-if></div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
+                          <sc-if value="{{ w.isMelee }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
                           <button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
                           <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                           <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
+                          <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RECARREGAR</button></sc-if>
                         </div>
                       </sc-for>
                     </div>
@@ -977,15 +923,26 @@
                         </sc-for>
                       </div>
                     </sc-if>
+                    <div class="lm-combat-toggle-row" style="align-items:center;">
+                      <button onClick="{{ c.luck.dec }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">-</button>
+                      <span class="lm-chip">{{ c.luck.label }}</span>
+                      <button onClick="{{ c.luck.inc }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">+</button>
+                      <button onClick="{{ c.adHocMod.dec }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">-</button>
+                      <span class="lm-chip">{{ c.adHocMod.label }}</span>
+                      <button onClick="{{ c.adHocMod.inc }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">+</button>
+                    </div>
                     <sc-if value="{{ c.hasWeapons }}">
                       <div class="lm-combat-subtitle lm-combat-subtitle--danger">{{ tx.weapons }}</div>
+                      <sc-if value="{{ c.hasEvasionStatus }}"><div class="lm-combat-row-meta" style="margin-bottom:6px;">{{ c.evasionStatus.label }}</div></sc-if>
                       <div class="lm-combat-kit-list">
                         <sc-for list="{{ c.weaponRows }}" as="w" hint-placeholder-count="2">
                           <div class="lm-combat-row lm-combat-row--weapon">
-                            <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}</div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
+                            <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}<sc-if value="{{ w.hasAmmo }}"> // {{ w.ammoLabel }}</sc-if></div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
+                            <sc-if value="{{ w.isMelee }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
                             <button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
                             <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                             <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
+                            <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RECARREGAR</button></sc-if>
                           </div>
                         </sc-for>
                       </div>
@@ -1534,32 +1491,38 @@
         <sc-if value="{{ gm }}">
           <div style="border:1px solid rgba(63,224,208,0.24);background:#09110f;padding:16px 18px;">
             <div style="font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0;margin-bottom:12px;">GM DATA OPS</div>
-            <sc-if value="{{ isAdmin }}">
+            <sc-if value="{{ canManageUsers }}">
               <div style="border:1px solid rgba(214,170,78,0.2);background:#0b0e0a;padding:12px;margin-bottom:16px;">
-                <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:10px;">ADMIN // USUARIOS</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 110px;gap:8px;">
+                <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:10px;">CRIAR / RESETAR ACESSO DE JOGADOR</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                   <input value="{{ userDraftUsername }}" onInput="{{ onUserDraftUsername }}" placeholder="usuario" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
-                  <input type="password" value="{{ userDraftPassword }}" onInput="{{ onUserDraftPassword }}" placeholder="senha nova / inicial" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
-                  <select value="{{ userDraftRole }}" onChange="{{ onUserDraftRole }}" class="lm-ui-select lm-ui-select--full">
-                    <sc-if value="{{ userRoleAdminSelected }}"><option value="admin" selected>ADMIN</option></sc-if>
-                    <sc-if value="{{ userRoleGmSelected }}"><option value="admin">ADMIN</option></sc-if>
-                    <sc-if value="{{ userRolePlayerSelected }}"><option value="admin">ADMIN</option></sc-if>
-                    <sc-if value="{{ userRoleAdminSelected }}"><option value="gm">MESTRE</option></sc-if>
-                    <sc-if value="{{ userRoleGmSelected }}"><option value="gm" selected>MESTRE</option></sc-if>
-                    <sc-if value="{{ userRolePlayerSelected }}"><option value="gm">MESTRE</option></sc-if>
-                    <sc-if value="{{ userRoleAdminSelected }}"><option value="player">PLAYER</option></sc-if>
-                    <sc-if value="{{ userRoleGmSelected }}"><option value="player">PLAYER</option></sc-if>
-                    <sc-if value="{{ userRolePlayerSelected }}"><option value="player" selected>PLAYER</option></sc-if>
-                  </select>
+                  <input value="{{ userDraftEmail }}" onInput="{{ onUserDraftEmail }}" placeholder="email" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
                 </div>
+                <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:8px;">
+                  <input type="password" value="{{ userDraftPassword }}" onInput="{{ onUserDraftPassword }}" placeholder="senha nova / reset" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+                  <sc-if value="{{ canManageStaffRoles }}">
+                    <select value="{{ userDraftRole }}" onChange="{{ onUserDraftRole }}" class="lm-ui-select lm-ui-select--full">
+                      <sc-if value="{{ userRoleAdminSelected }}"><option value="admin" selected>ADMIN</option></sc-if>
+                      <sc-if value="{{ userRoleGmSelected }}"><option value="admin">ADMIN</option></sc-if>
+                      <sc-if value="{{ userRolePlayerSelected }}"><option value="admin">ADMIN</option></sc-if>
+                      <sc-if value="{{ userRoleAdminSelected }}"><option value="gm">MESTRE</option></sc-if>
+                      <sc-if value="{{ userRoleGmSelected }}"><option value="gm" selected>MESTRE</option></sc-if>
+                      <sc-if value="{{ userRolePlayerSelected }}"><option value="gm">MESTRE</option></sc-if>
+                      <sc-if value="{{ userRoleAdminSelected }}"><option value="player">PLAYER</option></sc-if>
+                      <sc-if value="{{ userRoleGmSelected }}"><option value="player">PLAYER</option></sc-if>
+                      <sc-if value="{{ userRolePlayerSelected }}"><option value="player" selected>PLAYER</option></sc-if>
+                    </select>
+                  </sc-if>
+                </div>
+                <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">Sem envio de email — repasse a senha ao jogador diretamente.</div>
                 <button onClick="{{ saveUserDraft }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact" style="margin-top:8px;">SALVAR USUARIO</button>
                 <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;">
                   <sc-for list="{{ userRows }}" as="u" hint-placeholder-count="3">
                     <div style="display:grid;grid-template-columns:1fr 74px auto auto;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(214,170,78,.12);padding:7px;">
                       <div style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ u.username }}</div>
                       <div style="font:9px 'Share Tech Mono',monospace;color:#3fe0d0;">{{ u.roleLabel }}</div>
-                      <button onClick="{{ u.onEdit }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">EDIT</button>
-                      <button onClick="{{ u.onDelete }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">DEL</button>
+                      <sc-if value="{{ u.canManage }}"><button onClick="{{ u.onEdit }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RESET</button></sc-if>
+                      <sc-if value="{{ u.canManage }}"><button onClick="{{ u.onDelete }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">DEL</button></sc-if>
                     </div>
                   </sc-for>
                 </div>

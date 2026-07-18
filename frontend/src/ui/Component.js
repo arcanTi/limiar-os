@@ -105,6 +105,7 @@ import { tarotHandlers, tarotRenderVals } from './views/tarot.js';
 import { sheetHandlers, sheetRenderVals } from './views/sheet.js';
 import { combatHandlers, combatRenderVals } from './views/combat.js';
 import { clearMapAttackIntent, loadMapAttackIntent, mapTokenVisibleNow } from '../domain/map/mapAttackIntent.ts';
+import { clearMapFocusIntent, loadMapFocusIntent } from '../domain/map/mapFocusIntent.ts';
 import { desktopHandlers, desktopRenderVals } from './views/desktop.js';
 import {
   chipStyle as viewChipStyle,
@@ -148,7 +149,7 @@ const LimiarSeed = {
 
 class Component extends DCLogic {
   state = {
-    view: 'desktop', sheetOpen: false, sheetExpanded: false, railOpen: (typeof window !== 'undefined' && window.innerWidth >= 1100), gm: false, gmAuthenticated: false, authAuthenticated: false, authUser: null, gmLoginOpen: false, gmLoginUser: '', gmLoginPassword: '', gmLoginStatus: '', userRegisterMode: false, userRegisterUsername: '', userRegisterPassword: '', userRegisterConfirm: '', playerReady: false, lang: 'en',
+    view: 'desktop', sheetOpen: false, sheetExpanded: false, railOpen: (typeof window !== 'undefined' && window.innerWidth >= 1100), gm: false, gmAuthenticated: false, authAuthenticated: false, authUser: null, activeCampaignId: this.props.activeCampaignId || '', activeCampaignName: '', playerReady: false, lang: 'en',
     now: new Date(),
     characters: [],
     activeCharacterId: LimiarSeed.activeCharacterId,
@@ -202,6 +203,12 @@ class Component extends DCLogic {
     // picking a target just labels the attack/damage rolls and pre-fills the
     // Critical Injury flow's victim, matching how the rest of combat works.
     combatTargets: {},
+    // CM2: evasion-as-prompt (G7). pendingEvasion tracks the attacker's own
+    // outstanding request (cleared on answer or lazily treated as expired
+    // past expiresAt); evasionResults holds the captured reply until the next
+    // attack roll against that same target consumes it (one-shot).
+    pendingEvasion: {},
+    evasionResults: {},
     tarotResolution: null,
     tarotApplySnapshot: null,
     gmDraft: '', reply: '', readCount: 0, commsOpen: false, commsFilter: 'all',
@@ -230,7 +237,7 @@ class Component extends DCLogic {
     gmItemDraft: { code: '', name: '', cat: 'NEURAL', price: '', desc: '', imageUrl: '' },
     gmMapDraft: { name: '', threat: 'MED', imageUrl: '' },
     users: [],
-    userDraft: { username: '', password: '', role: 'player' },
+    userDraft: { username: '', password: '', role: 'player', email: '' },
     gmStatus: 'Backend aguardando conexao',
   };
 
@@ -244,17 +251,66 @@ class Component extends DCLogic {
     this.bootstrapBackend();
     this.tarotHandlers().preloadTarotAssets();
     this.refreshChat();
-    this._chat = setInterval(() => this.refreshChat(), 3500);
-    this._roster = setInterval(() => this.refreshRoster(), 5000);
+    // M3 unified sync: a single long-poll per active campaign covers chat/
+    // combat/roster, so the only interval left is a 15s safety net for when
+    // there's no active campaign yet or the long-poll degrades (matches the
+    // F7 map channel's own fallback poll).
+    this.startCampaignSync();
+    this._safety = setInterval(() => { this.refreshChat(); this.refreshRoster(); }, 15000);
     // Silent handshake: keep an authenticated GM session alive across long game
     // nights by refreshing it well within the server's idle window.
     this._hb = setInterval(() => this.sessionHeartbeat(), 5 * 60 * 1000);
     this._turnTimer = setInterval(() => this.combatHandlers().tickTurnTimer(), 1000);
   }
   componentWillUnmount() {
-    clearInterval(this._clock); clearInterval(this._ri); clearInterval(this._gi); clearInterval(this._chat); clearInterval(this._roster); clearInterval(this._hb); clearInterval(this._turnTimer); clearTimeout(this._tt); clearTimeout(this._diceKick);
+    clearInterval(this._clock); clearInterval(this._ri); clearInterval(this._gi); clearInterval(this._safety); clearInterval(this._hb); clearInterval(this._turnTimer); clearTimeout(this._tt); clearTimeout(this._diceKick);
+    this.stopCampaignSync();
     if (this._diceBox && this._diceBox.clear) this._diceBox.clear();
     this.tarotHandlers().stopTarotFx();
+  }
+  // M3: long-poll `/campaigns/:id/updates` while there's an active campaign,
+  // refetching only the topics (chat/combat/roster) the server reports dirty.
+  // No active campaign yet -> idle-wait and recheck, so switching into one
+  // later (e.g. after loadActiveCampaignName resolves) picks the loop up.
+  async startCampaignSync() {
+    if (this._syncRunning) return;
+    this._syncRunning = true;
+    this._syncStopped = false;
+    this._syncCampaignId = '';
+    this._syncVersion = 0;
+    while (!this._syncStopped) {
+      const campaignId = this.state.activeCampaignId;
+      const waitForUpdate = this.api() && this.api().campaigns && this.api().campaigns.waitForUpdate;
+      if (!campaignId || !waitForUpdate) { await this._syncDelay(2000); continue; }
+      if (campaignId !== this._syncCampaignId) { this._syncCampaignId = campaignId; this._syncVersion = 0; }
+      const controller = new AbortController();
+      this._syncAbort = controller;
+      try {
+        const update = await waitForUpdate(campaignId, this._syncVersion, controller.signal);
+        if (this._syncStopped) break;
+        const version = Number(update && update.version) || this._syncVersion;
+        if (update && update.changed) {
+          this._syncVersion = version;
+          await this.applyCampaignSyncTopics(Array.isArray(update.topics) ? update.topics : []);
+        } else {
+          this._syncVersion = Math.max(this._syncVersion, version);
+        }
+      } catch (_) {
+        if (!this._syncStopped) await this._syncDelay(1000);
+      } finally {
+        if (this._syncAbort === controller) this._syncAbort = null;
+      }
+    }
+    this._syncRunning = false;
+  }
+  stopCampaignSync() {
+    this._syncStopped = true;
+    if (this._syncAbort) this._syncAbort.abort();
+  }
+  _syncDelay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+  async applyCampaignSyncTopics(topics) {
+    if (topics.includes('chat')) await this.refreshChat();
+    if (topics.includes('roster') || topics.includes('combat')) await this.refreshRoster();
   }
 
   get products() {
@@ -276,7 +332,8 @@ class Component extends DCLogic {
         const staff = !!(user && ['admin', 'gm'].includes(user.role));
         this.setState({ authAuthenticated: true, authUser: user, gmAuthenticated: staff, gm: staff, gmStatus: staff ? 'Acesso mestre autenticado' : 'Player autenticado' });
       } else {
-        this.setState({ authAuthenticated: false, authUser: null, gmAuthenticated: false, gm: false, gmLoginOpen: true, gmStatus: 'Login necessario' });
+        this.setState({ authAuthenticated: false, authUser: null, gmAuthenticated: false, gm: false, gmStatus: 'Login necessario' });
+        return this.redirectToLogin();
       }
     } catch (_) {
       this.setState({ gmStatus: 'Backend offline' });
@@ -285,8 +342,23 @@ class Component extends DCLogic {
     if (authenticated) {
       await this.reloadRemoteData();
       const user = this.state.authUser;
-      if (user && user.role === 'admin') await this.loadUsers();
+      if (user && ['admin', 'gm'].includes(user.role)) await this.loadUsers();
+      if (this.state.activeCampaignId) await this.loadActiveCampaignName();
     }
+  }
+
+  async loadActiveCampaignName() {
+    const api = this.api();
+    if (!api?.campaigns?.list) return;
+    try {
+      const campaigns = await api.campaigns.list();
+      const campaign = (Array.isArray(campaigns) ? campaigns : []).find((entry) => entry && entry.id === this.state.activeCampaignId);
+      if (campaign) this.setState({ activeCampaignName: campaign.name || '' });
+    } catch (_) { /* keep whatever name we had, non-critical */ }
+  }
+
+  redirectToLogin() {
+    if (typeof window !== 'undefined') window.location.assign('/login.html');
   }
 
   async loadReferenceData() {
@@ -322,13 +394,14 @@ class Component extends DCLogic {
       const user = live ? session.user : null;
       const staff = !!(user && ['admin', 'gm'].includes(user.role));
       if (live !== this.state.authAuthenticated || staff !== this.state.gmAuthenticated) {
-        this.setState({ authAuthenticated: live, authUser: user, gmAuthenticated: staff, gm: staff && this.state.gm, gmLoginOpen: !live, gmStatus: live ? (staff ? 'Acesso mestre autenticado' : 'Player autenticado') : 'Sessao expirada' });
+        this.setState({ authAuthenticated: live, authUser: user, gmAuthenticated: staff, gm: staff && this.state.gm, gmStatus: live ? (staff ? 'Acesso mestre autenticado' : 'Player autenticado') : 'Sessao expirada' });
+        if (!live) this.redirectToLogin();
       }
     } catch (_) { /* backend offline - keep current session state */ }
   }
 
   async loadUsers() {
-    if (!(this.api() && this.api().users && this.isAdmin())) return;
+    if (!(this.api() && this.api().users && this.state.gmAuthenticated)) return;
     try {
       const users = await this.api().users.list();
       this.setState({ users: Array.isArray(users) ? users : [] });
@@ -382,6 +455,7 @@ class Component extends DCLogic {
         gmStatus: this.state.gmAuthenticated ? this.state.gmStatus : 'Backend conectado',
       });
       await this.consumeMapAttackIntent();
+      await this.consumeMapFocusIntent();
     } catch (err) {
       this.setState({ gmStatus: 'Falha ao carregar backend: ' + err.message });
     }
@@ -467,6 +541,17 @@ class Component extends DCLogic {
       lastUsedAt: src.lastUsedAt || '',
     };
     normalized.dmg = src.dmg || this.gearDamageText(normalized);
+    // Ammo tracking only applies to gear with a numeric magazine (catalog
+    // data, not per-instance) — melee/bows/exotics without one are left
+    // alone rather than fabricating a fake "1 round" mag. Unset instance
+    // ammo defaults to a full magazine so a never-fired weapon reads loaded.
+    // `weaponProfile()` names this field `mag` (RuntimeWeaponProfile); alias
+    // it to `magazine` here since that's the name combatAmmoEngine/the combat
+    // view expect (WeaponCombatProfile.magazine in domain/combat/combatTypes).
+    normalized.magazine = profile.mag ?? null;
+    normalized.currentAmmo = normalized.magazine == null
+      ? null
+      : (src.currentAmmo == null ? normalized.magazine : this.asNumber(src.currentAmmo, normalized.magazine, 0, normalized.magazine));
     return normalized;
   }
   normalizeGearList(gear) {
@@ -626,6 +711,10 @@ class Component extends DCLogic {
       base,
       armor,
       health: { cur: healthCur, max: healthMax },
+      // CPR RAW: Luck is a pool spent 1:1 on any single roll, refreshed by
+      // the GM at the start of a session (resetLuckForSession). Defaults to
+      // a full pool so a character never starts a fresh session at 0.
+      luckCurrent: this.asNumber(c.luckCurrent, base.LUCK, 0, base.LUCK),
       humanityLoss: this.asNumber(c.humanityLoss, 0, 0, 100),
       reputation: this.asNumber(c.reputation, 0, 0, 10),
       ip: this.asNumber(c.ip, 0, 0, 999999),
@@ -694,6 +783,10 @@ class Component extends DCLogic {
       this.flash('Login necessario para abrir o mapa da campanha');
       return;
     }
+    if (this.state.activeCampaignId) {
+      window.location.assign('/campaign-map.html?campaign=' + encodeURIComponent(this.state.activeCampaignId));
+      return;
+    }
     try {
       const campaigns = await api.campaigns.list();
       const user = this.state.authUser || {};
@@ -750,17 +843,36 @@ class Component extends DCLogic {
     }
   }
 
+  // CM1: "abrir ficha" / "abrir cockpit" from the map's token context menu.
+  // No range/turn validation to carry like the attack intent above — just an
+  // identity handoff — but same one-shot sessionStorage discipline and the
+  // same second guard on hydration (a GM-only menu action reaching here for
+  // a player who lost GM mode mid-flight must not silently succeed).
+  async consumeMapFocusIntent() {
+    if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('mapFocus')) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mapFocus');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    const intent = loadMapFocusIntent(window.sessionStorage);
+    if (!intent) return this.flash('Foco de personagem expirado');
+    clearMapFocusIntent(window.sessionStorage);
+    const character = (this.state.characters || []).find(c => c.id === intent.characterId);
+    const username = this.state.authUser && this.state.authUser.username;
+    const owns = !!character && (character.ownerUsername === username || character.createdBy === username);
+    if (!character || (!this.state.gm && !owns)) return this.flash('Personagem indisponivel ou sem permissao');
+    if (intent.mode === 'combat') {
+      this.setState({ view: 'combat', sheetOpen: false, selected: null, combatFocusId: intent.characterId });
+      return;
+    }
+    this.sheetHandlers().selectCharacter(intent.characterId);
+    this.setState({ sheetOpen: true, sheetExpanded: true, sheetEditing: false, sheetCreating: false, sheetDraft: null, sheetTab: 'core' });
+  }
+
   // Switch Player/GM. If we are sitting on the Breach tab, remount so the
   // correct mode (setup form vs. locked challenge) takes effect immediately.
   toggleRole(gm) {
-    if (!this.state.authAuthenticated) {
-      this.setState({ gmLoginOpen: true, gmLoginStatus: '', gmLoginPassword: '' });
-      return;
-    }
-    if (gm && !this.state.gmAuthenticated) {
-      this.setState({ gmLoginOpen: true, gmLoginStatus: '', gmLoginPassword: '' });
-      return;
-    }
+    if (!this.state.authAuthenticated) return this.redirectToLogin();
+    if (gm && !this.state.gmAuthenticated) return this.redirectToLogin();
     this.setState({ gm });
     if (this.state.view === 'games' && this.state.gameTab === 'nexus') {
       this.nexusHandlers().teardownNexus();
@@ -768,59 +880,15 @@ class Component extends DCLogic {
     }
   }
 
-  async loginGm() {
-    if (!(this.api() && this.api().auth)) return this.setState({ gmLoginStatus: 'Backend indisponivel' });
-    try {
-      const session = await this.api().auth.login(this.state.gmLoginUser, this.state.gmLoginPassword);
-      const user = session && session.user;
-      const staff = !!(user && ['admin', 'gm'].includes(user.role));
-      this.setState({ authAuthenticated: true, authUser: user || null, gmAuthenticated: staff, gm: staff, gmLoginOpen: false, gmLoginPassword: '', gmLoginStatus: '', gmStatus: staff ? 'Acesso mestre autenticado' : 'Player autenticado' });
-      await this.reloadRemoteData();
-      if (user && user.role === 'admin' && this.api().users) {
-        try {
-          const users = await this.api().users.list();
-          this.setState({ users: Array.isArray(users) ? users : [] });
-        } catch (_) {}
-      }
-      if (this.state.view === 'games' && this.state.gameTab === 'nexus') {
-        this.nexusHandlers().teardownNexus();
-        this.nexusHandlers().mountNexus();
-      }
-    } catch (_) {
-      this.setState({ gmLoginStatus: 'Credenciais invalidas' });
-    }
-  }
-
-  async registerPlayerUser() {
-    if (!(this.api() && this.api().auth && this.api().auth.register)) return this.setState({ gmLoginStatus: 'Backend indisponivel' });
-    const username = String(this.state.userRegisterUsername || '').trim();
-    const password = String(this.state.userRegisterPassword || '');
-    const confirm = String(this.state.userRegisterConfirm || '');
-    if (!username) return this.setState({ gmLoginStatus: 'Informe um usuario' });
-    if (password.length < 8) return this.setState({ gmLoginStatus: 'Senha precisa ter 8+ caracteres' });
-    if (password !== confirm) return this.setState({ gmLoginStatus: 'Senhas nao conferem' });
-    try {
-      const session = await this.api().auth.register(username, password);
-      const user = session && session.user;
-      this.setState({ authAuthenticated: true, authUser: user || null, gmAuthenticated: false, gm: false, gmLoginOpen: false, gmLoginUser: '', gmLoginPassword: '', gmLoginStatus: '', userRegisterMode: false, userRegisterUsername: '', userRegisterPassword: '', userRegisterConfirm: '', gmStatus: 'Player autenticado' });
-      await this.reloadRemoteData();
-    } catch (_) {
-      this.setState({ gmLoginStatus: 'Nao foi possivel criar usuario' });
-    }
-  }
-
   async logoutGm() {
     if (this.api() && this.api().auth) await this.api().auth.logout();
-    this.setState({ authAuthenticated: false, authUser: null, gmAuthenticated: false, gm: false, gmLoginOpen: true, sheetEditing: false, sheetCreating: false, sheetDraft: null, characters: [], activeCharacterId: null, users: [], gmStatus: 'Sessao encerrada' });
-    if (this.state.view === 'games' && this.state.gameTab === 'nexus') {
-      this.nexusHandlers().teardownNexus();
-      this.nexusHandlers().mountNexus();
-    }
+    this.setState({ authAuthenticated: false, authUser: null, gmAuthenticated: false, gm: false, sheetEditing: false, sheetCreating: false, sheetDraft: null, characters: [], activeCharacterId: null, users: [], gmStatus: 'Sessao encerrada' });
+    this.redirectToLogin();
   }
 
-  ensureGm(message) {
+  ensureGm() {
     if (this.state.gmAuthenticated) return true;
-    this.setState({ gmLoginOpen: true, gmLoginStatus: message || 'Login do mestre necessario' });
+    this.redirectToLogin();
     return false;
   }
 
@@ -1236,6 +1304,9 @@ class Component extends DCLogic {
       // Tag initiative rolls so the GM client can fold the result into the
       // shared combat state (only the GM may persist combat state).
       if (opts.initiative && opts.combatantId) rollPayload.initiativeFor = opts.combatantId;
+      // CM2: tag evasion-prompt replies so the attacker's client can consume
+      // this specific roll as the melee attack's DV (see combat.js applyEvasionRolls).
+      if (opts.evasionFor) { rollPayload.evasionFor = opts.evasionFor; rollPayload.evasionRequestId = opts.requestId; }
       this.postChat({ kind: 'roll', text: '', roll: rollPayload });
     }
 	    if (typeof opts.onResolved === 'function') {
@@ -1311,6 +1382,7 @@ class Component extends DCLogic {
       this.setState({ comms: list });
       this.combatHandlers().applyInitiativeRolls(list);
       this.combatHandlers().applyEndTurnRequests(list);
+      this.combatHandlers().applyEvasionRolls(list);
       if (list.length > prevLen && wasAtBottom) this.scrollCommsToBottom();
     } catch (_) { /* backend offline - keep current */ }
   }
@@ -1347,8 +1419,12 @@ class Component extends DCLogic {
     this.roll({
       label: opts.label, sides: opts.sides, count: opts.count || 1, mod: opts.mod || 0, check: !!opts.check,
       ...(opts.dv != null ? { dv: opts.dv } : {}),
+      ...(opts.deathSaveTarget != null ? { deathSaveTarget: opts.deathSaveTarget } : {}),
       ...(opts.combatantId ? { combatantId: opts.combatantId } : {}),
       ...(opts.initiative ? { initiative: true } : {}),
+      // CM2: evasion-prompt roll requests carry evasionFor/requestId so the
+      // attacker's client can match this specific reply (see commitRoll).
+      ...(opts.evasionFor ? { evasionFor: opts.evasionFor, requestId: opts.requestId } : {}),
     });
   }
 
@@ -1551,8 +1627,6 @@ class Component extends DCLogic {
       go: (v) => this.go(v),
       openCampaignMap: () => this.openCampaignMap(),
       toggleRole: (gm) => this.toggleRole(gm),
-      loginGm: () => this.loginGm(),
-      registerPlayerUser: () => this.registerPlayerUser(),
       logoutGm: () => this.logoutGm(),
       closeRoll: () => this.closeRoll(),
       rollAgain: () => this.rollAgain(),

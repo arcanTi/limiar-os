@@ -9,6 +9,7 @@ import re
 # this strips anything that could corrupt logs, terminals, or downstream
 # tooling that isn't as careful as the renderer.
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class ValidationError(Exception):
@@ -94,6 +95,17 @@ def validate_user(payload: dict[str, object], *, password_optional: bool = False
     if not isinstance(password, str) or len(password) < 8:
         raise ValidationError(["'password' must be at least 8 characters"])
     return username, password, role
+
+
+def validate_email(payload: dict[str, object], *, required: bool = False) -> str | None:
+    email = payload.get("email")
+    if email is None or email == "":
+        if required:
+            raise ValidationError(["'email' is required"])
+        return None
+    if not isinstance(email, str) or not _EMAIL_RE.match(email.strip()):
+        raise ValidationError(["'email' must be a valid email address"])
+    return email.strip().lower()
 
 
 def validate_character(payload: dict[str, object]) -> None:

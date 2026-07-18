@@ -183,6 +183,7 @@ function campaignDetail(vals) {
         </div>
         <div class="lm-campaign-actions">
           <span class="lm-campaign-chip">${campaign.isMember ? 'VINCULADA' : campaign.canJoin ? 'ABERTA' : 'INFO'}</span>
+          ${campaign.isMember || vals.staff ? `<button data-campaign-map="${esc(campaign.id)}">MESA</button>` : ''}
         </div>
       </div>
       <div class="lm-campaign-desc">${esc(campaign.description || 'Sem briefing.')}</div>
@@ -292,7 +293,7 @@ export function renderCampaignsOverlay(state, deps = {}) {
   `;
 }
 
-function createOverlayController(root, api) {
+function createOverlayController(root, api, initialCampaignId = '') {
   const controller = {
     state: {
       open: false,
@@ -304,7 +305,7 @@ function createOverlayController(root, api) {
       draft: { ...defaultDraft },
       inviteQuery: '',
       characterByCampaign: {},
-      selectedCampaignId: '',
+      selectedCampaignId: initialCampaignId,
       status: '',
     },
     setState(next, options = {}) {
@@ -337,7 +338,7 @@ function filterCandidateButtons(root, query) {
   });
 }
 
-export function mountCampaignsOverlay({ api, documentRef = globalThis.document } = {}) {
+export function mountCampaignsOverlay({ api, documentRef = globalThis.document, activeCampaignId = '' } = {}) {
   if (!api || !documentRef?.body) return null;
   let root = documentRef.getElementById('limiar-campaign-widget');
   if (!root) {
@@ -348,7 +349,7 @@ export function mountCampaignsOverlay({ api, documentRef = globalThis.document }
   if (root.dataset.mounted === 'true') return root;
   root.dataset.mounted = 'true';
 
-  const { controller, handlers } = createOverlayController(root, api);
+  const { controller, handlers } = createOverlayController(root, api, activeCampaignId);
   root.addEventListener('click', (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
@@ -359,6 +360,8 @@ export function mountCampaignsOverlay({ api, documentRef = globalThis.document }
     if (selectedNode) handlers.selectCampaign(selectedNode.getAttribute('data-campaign-select'));
     const joinNode = target.closest('[data-campaign-join]');
     if (joinNode) handlers.join(joinNode.getAttribute('data-campaign-join'));
+    const mapNode = target.closest('[data-campaign-map]');
+    if (mapNode) globalThis.location.assign(`/campaign-map.html?campaign=${encodeURIComponent(mapNode.getAttribute('data-campaign-map'))}`);
     const inviteNode = target.closest('[data-campaign-invite]');
     if (inviteNode) handlers.invite(inviteNode.getAttribute('data-campaign-invite'), inviteNode.getAttribute('data-campaign-user'));
   });

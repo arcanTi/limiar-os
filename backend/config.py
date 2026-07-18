@@ -13,6 +13,7 @@ INDEX_FILE = "Limiar OS.dc-2.html"
 
 DEFAULT_GM_USER = os.environ.get("LIMIAR_GM_USER", "mestre")
 DEFAULT_GM_PASSWORD = os.environ.get("LIMIAR_GM_PASSWORD", "limiar-master-2077")
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 CHAT_LIMIT = 200
 _MAX_BODY_BYTES = 256 * 1024  # 256 KB — hard cap on JSON request bodies
 _MAX_UPLOAD_BYTES = int(os.environ.get("LIMIAR_MAX_UPLOAD_MB", "64")) * 1024 * 1024

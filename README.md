@@ -31,7 +31,7 @@ Limiar OS has role-based access:
 
 Campaigns can be public or private. Public campaigns can be joined by players with one of their sheets. Private campaigns require an invite from an admin/GM. The campaign drawer shows available campaigns, notifications, pending invites, linked sheets, and player search for invitations.
 
-An experimental campaign map/table implementation exists in the codebase (`campaign-map.html` and `/api/campaign-maps/*`), but the visible **Mesa** entry was removed from the UI while the interaction model is being reconsidered.
+The **Mesa** (campaign map/table) is a live feature (`campaign-map.html` and `/api/campaign-maps/*`), opened from the campaigns drawer's MESA button on a specific campaign, or from the desktop MAP icon. It is a canvas-based tactical map per campaign: scenes with a background image and grid, tokens (optionally linked to a character sheet), shared or per-player fog of war with dynamic vision, walls and doors with line-of-sight raycasting, ambient/token lighting and scene darkness, area-of-effect templates (circle/cone/rectangle/ray), a ruler that turns a measured range directly into an attack roll in the combat cockpit (`RANGE // banda // DV`), and real-time sync across open tabs via long-poll. Combat state (round, active turn) is projected onto the map, and the token context menu can open a linked character's sheet or cockpit, measure-and-attack, or manage initiative/defeated status without leaving the map.
 
 ## How rules are applied
 
@@ -125,7 +125,11 @@ The important integration rule is that Nexus Breach is mounted inside the existi
 
 ```text
 Limiar OS.dc-2.html             # App shell served by the Python server
+login.html                      # Login/campaign-picker page, loads dist/login.js
+campaign-map.html               # Mesa (campaign map) page, loads dist/campaign-map.js
 limiar-styles.css               # Main app styling
+login.css                       # Login page styling
+styles/map/                     # Mesa (campaign map) styling, theme-able per system
 dist/limiar-app.js              # Versioned frontend build loaded by the shell
 
 frontend/src/
@@ -134,6 +138,9 @@ frontend/src/
   infrastructure/api/           # Client API modules
   infrastructure/store.js       # Client-side store/bootstrap helpers
   domain/                       # Pure rule/math modules
+  domain/map/                   # Mesa geometry/vision/template/attack-intent modules (pure, vitest-covered)
+  pages/campaign-map.js         # Mesa page controller (canvas render + interaction)
+  pages/login.js                # Login page controller
   ui/Component.js               # Main app UI orchestration
   ui/view/                      # View helpers/styles
 

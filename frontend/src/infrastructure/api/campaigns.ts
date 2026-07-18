@@ -17,5 +17,9 @@ export function createCampaignsApi(request: HttpRequest) {
       const payload = typeof characterIdOrPayload === 'string' ? { characterId: characterIdOrPayload } : characterIdOrPayload;
       return request(campaignPath(campaignId, '/join'), { method: 'POST', body: JSON.stringify(payload || {}) });
     },
+    // M3 unified sync: one long-poll per campaign covering map/chat/combat/roster,
+    // replacing the app's fixed-interval chat/roster polling.
+    waitForUpdate: async (campaignId: string, since: number, signal?: AbortSignal): Promise<unknown> =>
+      request(campaignPath(campaignId, '/updates?since=' + encodeURIComponent(String(since))), { signal }),
   };
 }

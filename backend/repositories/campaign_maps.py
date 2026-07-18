@@ -2,38 +2,27 @@
 
 import json
 import secrets
-import threading
 from typing import Any
 
 from ..db import db
 from ..domain.validation import sanitize_text
 from ..util import slug
+from . import campaign_sync
 from .campaigns import is_campaign_member
-from .records import get_record
-
-
-_map_update_lock = threading.Condition()
-_map_update_versions: dict[str, int] = {}
+from .records import get_record, get_setting
 
 
 def map_update_version(campaign_id: str) -> int:
-    with _map_update_lock:
-        return _map_update_versions.get(campaign_id, 0)
+    return campaign_sync.current_version(campaign_id)
 
 
 def touch_map_update(campaign_id: str) -> int:
-    with _map_update_lock:
-        version = _map_update_versions.get(campaign_id, 0) + 1
-        _map_update_versions[campaign_id] = version
-        _map_update_lock.notify_all()
-        return version
+    return campaign_sync.bump_campaign(campaign_id, "map")
 
 
 def wait_for_map_update(campaign_id: str, since: int, timeout: float = 25.0) -> int:
-    with _map_update_lock:
-        if _map_update_versions.get(campaign_id, 0) == since:
-            _map_update_lock.wait(timeout=max(0.1, min(float(timeout), 25.0)))
-        return _map_update_versions.get(campaign_id, 0)
+    result = campaign_sync.wait_for_campaign_update(campaign_id, since, timeout)
+    return int(result["version"])
 
 
 def row_dict(row) -> dict[str, Any]:
@@ -758,6 +747,29 @@ def active_scene(campaign_id: str) -> dict[str, Any]:
     return ensure_default_scene(campaign_id)
 
 
+# CM1 (PLANO-COMBATE-MAPA.md): minimal combat summary so the map can
+# highlight whose turn it is without a parallel fetch. Combat state is a
+# single global setting (not scoped per campaign — matches the existing
+# combat tracker, backend/api/state.py), so there's nothing to filter by
+# campaign_id here. turnCharacterId is already non-secret: the shared combat
+# page's own GET route (`_get_combat_state`) has no staff/session gate at
+# all, so any authenticated session can already read the full order —
+# exposing it here again introduces no new leak, GM-secret or otherwise.
+def _combat_summary() -> dict[str, Any]:
+    state = get_setting("combat-state") or {}
+    order = state.get("order") if isinstance(state.get("order"), list) else []
+    combatants = state.get("combatants") if isinstance(state.get("combatants"), dict) else {}
+    turn_index = state.get("turnIndex") if isinstance(state.get("turnIndex"), int) else -1
+    current_id = order[turn_index] if 0 <= turn_index < len(order) else None
+    entry = combatants.get(current_id) if isinstance(combatants, dict) else None
+    turn_character_id = current_id if isinstance(entry, dict) and not entry.get("defeated") else None
+    return {
+        "active": bool(state.get("active")),
+        "roundNumber": max(0, int(state.get("round") or 0)),
+        "turnCharacterId": turn_character_id,
+    }
+
+
 def map_state(campaign_id: str, session: dict[str, str]) -> dict[str, Any]:
     scene = active_scene(campaign_id)
     scene_id = str(scene["id"])
@@ -808,6 +820,7 @@ def map_state(campaign_id: str, session: dict[str, str]) -> dict[str, Any]:
         "canEdit": staff,
         "username": session["username"],
         "mapVersion": map_update_version(campaign_id),
+        "combat": _combat_summary(),
     }
 
 
@@ -932,6 +945,7 @@ def upsert_token(campaign_id: str, payload: dict[str, Any]) -> dict[str, Any]:
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
+              character_id = excluded.character_id,
               name = excluded.name,
               kind = excluded.kind,
               owner_username = excluded.owner_username,
@@ -1056,11 +1070,24 @@ def move_tokens(campaign_id: str, moves: Any, session: dict[str, str]) -> bool:
 
 
 def delete_token(campaign_id: str, token_id: str) -> bool:
+    # A reveal is exploration owned by the token that earned it — once the
+    # token is gone nothing can ever see or clear it again, so it just sits
+    # in the DB forever clearing fog nobody asked for (README-MAPA B5). GC it
+    # alongside the token rather than leaving it as a silent leak.
     with db() as conn:
         cur = conn.execute(
             "DELETE FROM campaign_map_tokens WHERE campaign_id = ? AND id = ?",
             (campaign_id, token_id),
         )
+        if cur.rowcount:
+            conn.execute(
+                "DELETE FROM campaign_map_reveals WHERE campaign_id = ? AND token_id = ?",
+                (campaign_id, token_id),
+            )
+            conn.execute(
+                "DELETE FROM campaign_map_reveals_personal WHERE campaign_id = ? AND token_id = ?",
+                (campaign_id, token_id),
+            )
     if cur.rowcount:
         touch_map_update(campaign_id)
     return cur.rowcount > 0

@@ -559,6 +559,20 @@ def init_db() -> None:
         if "elevation" not in token_cols:
             conn.execute("ALTER TABLE campaign_map_tokens ADD COLUMN elevation REAL NOT NULL DEFAULT 0")
 
+        # Migration: Google Sign-In support — users may now be linked to a
+        # Google account instead of (or in addition to) a password.
+        user_cols = {
+            row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()
+        }
+        if "google_sub" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+        if "email" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub"
+            " ON users(google_sub) WHERE google_sub IS NOT NULL",
+        )
+
         user = conn.execute(
             "SELECT username FROM users WHERE username = ?",
             (DEFAULT_GM_USER,),

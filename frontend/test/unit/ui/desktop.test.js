@@ -55,7 +55,6 @@ function renderDeps(overrides = {}) {
     go: vi.fn(),
     openCampaignMap: vi.fn(),
     toggleRole: vi.fn(),
-    loginGm: vi.fn(),
     logoutGm: vi.fn(),
     closeRoll: vi.fn(),
     rollAgain: vi.fn(),
@@ -156,23 +155,17 @@ describe('ui/views/desktop desktopRenderVals', () => {
     expect(setState).toHaveBeenCalledWith({ scanOn: false });
   });
 
-  it('exposes player self-registration controls in the login modal', () => {
-    const registerPlayerUser = vi.fn();
-    const setState = vi.fn();
-    const vals = desktopRenderVals(
-      baseState({ gmLoginOpen: true, userRegisterMode: true, userRegisterUsername: 'newbie', userRegisterPassword: 'password-123', userRegisterConfirm: 'password-123' }),
-      renderDeps({ registerPlayerUser, setState }),
-    );
+  it('exposes the active campaign switch affordance when a campaign is set', () => {
+    const vals = desktopRenderVals(baseState({ activeCampaignId: 'camp-1', activeCampaignName: 'Night City Blues' }), renderDeps());
 
-    expect(vals.userRegisterMode).toBe(true);
-    expect(vals.userLoginMode).toBe(false);
-    expect(vals.userRegisterUsername).toBe('newbie');
-    expect(vals.registerPasswordHintStyle).toContain('lm-auth-rule--ok');
-    expect(vals.registerConfirmHint).toBe('senhas conferem');
-    vals.registerPlayerUser();
-    expect(registerPlayerUser).toHaveBeenCalled();
-    vals.showLoginMode();
-    expect(setState).toHaveBeenCalledWith({ userRegisterMode: false, gmLoginStatus: '' });
+    expect(vals.hasActiveCampaign).toBe(true);
+    expect(vals.activeCampaignName).toBe('Night City Blues');
+  });
+
+  it('hides the campaign switch affordance when no campaign is active', () => {
+    const vals = desktopRenderVals(baseState({ activeCampaignId: '' }), renderDeps());
+
+    expect(vals.hasActiveCampaign).toBe(false);
   });
 
   it('renders bodymap asset and wires clickable chrome descriptions', () => {

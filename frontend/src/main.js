@@ -9,6 +9,7 @@ import { createApplication } from './application/createApplication.ts';
 // Defaults previously declared via the script tag's data-props attribute.
 const api = createLimiarAPI();
 const app = createApplication({ api });
+const activeCampaignId = new URLSearchParams(location.search).get('campaign') || '';
 
 mountComponent(Component, {
   scanlines: true,
@@ -16,6 +17,7 @@ mountComponent(Component, {
   api,
   app,
   store: LimiarStore,
+  activeCampaignId,
 });
 
-mountCampaignsOverlay({ api });
+mountCampaignsOverlay({ api, activeCampaignId });

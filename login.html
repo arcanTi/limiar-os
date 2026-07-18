@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Limiar OS - Entrar</title>
+  <link rel="stylesheet" href="./login.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="card">
+      <h1>Entrar</h1>
+
+      <section id="stepCredentials">
+        <div id="googleButton"></div>
+        <div class="divider" id="googleDivider" hidden><span>ou</span></div>
+
+        <form id="loginForm">
+          <label>Usuario
+            <input id="loginUsername" type="text" autocomplete="username" required>
+          </label>
+          <label>Senha
+            <input id="loginPassword" type="password" autocomplete="current-password" required>
+          </label>
+          <button type="submit">Entrar</button>
+        </form>
+
+        <form id="registerForm" hidden>
+          <label>Novo usuario
+            <input id="registerUsername" type="text" autocomplete="username" required>
+          </label>
+          <label>Senha
+            <input id="registerPassword" type="password" autocomplete="new-password" required>
+          </label>
+          <label>Confirmar senha
+            <input id="registerConfirm" type="password" autocomplete="new-password" required>
+          </label>
+          <button type="submit">Criar conta</button>
+        </form>
+
+        <button type="button" id="toggleMode" class="link-btn">Criar uma conta</button>
+        <p id="credentialsStatus" class="status" role="status"></p>
+      </section>
+
+      <section id="stepCampaign" hidden>
+        <h2>Selecione uma campanha</h2>
+        <div id="campaignList" class="campaign-list"></div>
+        <p id="campaignEmpty" class="hint" hidden>Voce ainda nao participa de nenhuma campanha. Entre no sistema para criar ou participar de uma campanha existente.</p>
+        <button type="button" id="continueWithoutCampaign" class="ghost-btn">Continuar sem campanha</button>
+        <p id="campaignStatus" class="status" role="status"></p>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/dist/login.js"></script>
+</body>
+</html>

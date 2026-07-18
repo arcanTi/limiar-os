@@ -379,10 +379,6 @@ export function desktopRenderVals(state = {}, deps = {}) {
 
   // mini-games tab shell (SYS.05: Tarot / Nexus Breach switcher)
   const gameTab = S.gameTab;
-  const registerPassword = S.userRegisterPassword || '';
-  const registerConfirm = S.userRegisterConfirm || '';
-  const registerPasswordOk = registerPassword.length >= 8;
-  const registerConfirmOk = !!registerConfirm && registerPassword === registerConfirm;
 
   return {
     scanlines: scanOn,
@@ -399,30 +395,11 @@ export function desktopRenderVals(state = {}, deps = {}) {
     activeFile: ((activeCharacter.name || 'operative').toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'operative') + '.chr',
     activeNotes: activeCharacter.notes || '',
     isAdmin,
-    gmLoginOpen: S.gmLoginOpen,
-    userRegisterMode: !!S.userRegisterMode,
-    userLoginMode: !S.userRegisterMode,
-    gmLoginUser: S.gmLoginUser,
-    gmLoginPassword: S.gmLoginPassword,
-    gmLoginStatus: S.gmLoginStatus,
-    userRegisterUsername: S.userRegisterUsername || '',
-    userRegisterPassword: registerPassword,
-    userRegisterConfirm: registerConfirm,
-    registerPasswordHintStyle: 'lm-auth-rule' + (registerPasswordOk ? ' lm-auth-rule--ok' : ''),
-    registerConfirmHintStyle: 'lm-auth-rule' + (registerConfirmOk ? ' lm-auth-rule--ok' : (registerConfirm ? ' lm-auth-rule--bad' : '')),
-    registerConfirmHint: registerConfirmOk ? 'senhas conferem' : 'confirmar senha',
+    activeCampaignName: S.activeCampaignName || '',
+    hasActiveCampaign: !!S.activeCampaignId,
+    switchCampaign: () => window.location.assign('/login.html'),
     gmButtonLabel: S.authAuthenticated ? (S.gmAuthenticated && S.gm ? 'SAIR' : tx.gm) : 'LOGIN',
     setPlayer: () => deps.toggleRole(false), setGm: () => (S.gmAuthenticated && S.gm ? deps.logoutGm() : deps.toggleRole(true)),
-    loginGm: () => deps.loginGm(),
-    registerPlayerUser: () => deps.registerPlayerUser(),
-    closeGmLogin: () => deps.setState({ gmLoginOpen: false, gmLoginStatus: '', gmLoginPassword: '', userRegisterPassword: '', userRegisterConfirm: '' }),
-    showLoginMode: () => deps.setState({ userRegisterMode: false, gmLoginStatus: '' }),
-    showRegisterMode: () => deps.setState({ userRegisterMode: true, gmLoginStatus: '' }),
-    onGmLoginUser: (e) => deps.setState({ gmLoginUser: e.target.value }),
-    onGmLoginPassword: (e) => deps.setState({ gmLoginPassword: e.target.value }),
-    onUserRegisterUsername: (e) => deps.setState({ userRegisterUsername: e.target.value }),
-    onUserRegisterPassword: (e) => deps.setState({ userRegisterPassword: e.target.value }),
-    onUserRegisterConfirm: (e) => deps.setState({ userRegisterConfirm: e.target.value }),
     setLangEn: () => deps.setState({ lang: 'en' }), setLangPt: () => deps.setState({ lang: 'pt' }),
     langEnBtnStyle: deps.langBtnStyle(S.lang === 'en', false),
     langPtBtnStyle: deps.langBtnStyle(S.lang === 'pt', true),
