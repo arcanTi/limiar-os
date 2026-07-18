@@ -19,11 +19,25 @@ export interface TokenBadge {
   detail?: string;
 }
 
+export interface TokenAmmo {
+  weaponId?: string;
+  weaponName?: string;
+  currentAmmo?: number | null;
+  magazine?: number | null;
+}
+
 export interface TokenVitals {
   hp?: number | null;
   hpMax?: number | null;
   criticalInjuries?: unknown;
   statusEffects?: unknown;
+  ammo?: TokenAmmo | null;
+}
+
+export interface AmmoBadge {
+  weaponId: string;
+  label: string;
+  needsReload: boolean;
 }
 
 export interface WoundVisual {
@@ -96,4 +110,17 @@ export function cprTokenBadges(token: TokenVitals): TokenBadge[] {
     badges.push({ kind: 'status', id: status.instanceId, label: status.label_pt });
   }
   return badges;
+}
+
+// Fase MUNICAO-NO-MAPA (G4): the token HUD ammo badge. The numbers already
+// arrive resolved from map_state (backend cross-references the linked
+// character's primary ammo-tracked weapon, same denormalization pattern as
+// hp/criticalInjuries above) — this only formats them and derives the
+// advisory needsReload flag, it doesn't pick the weapon or spend ammo.
+export function cprAmmoBadge(token: TokenVitals): AmmoBadge | null {
+  const ammo = token.ammo;
+  if (!ammo || !ammo.weaponId || ammo.magazine == null) return null;
+  const current = Number(ammo.currentAmmo ?? ammo.magazine);
+  const magazine = Number(ammo.magazine);
+  return { weaponId: ammo.weaponId, label: `${current}/${magazine}`, needsReload: current <= 0 };
 }

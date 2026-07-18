@@ -134,6 +134,35 @@ def _resource_visible_to(out: dict[str, Any], session: dict[str, str] | None) ->
     return False
 
 
+# Fase MUNICAO-NO-MAPA (G4): the token HUD shows ammo for one "primary"
+# weapon so the GM doesn't have to open the cockpit to see who's dry. Gear
+# items only carry `magazine`/`currentAmmo` once normalizeGearItem has run
+# client-side (CM0) and the character was saved since — untouched/legacy
+# gear has no `magazine`, so it's simply skipped here (advisory, same as
+# combat.js's own `hasAmmo = item.magazine != null` check). Equipped wins
+# ties so a holstered spare mag pistol doesn't shadow the weapon in hand.
+def _primary_ammo_weapon(character: dict[str, Any] | None) -> dict[str, Any] | None:
+    gear = (character or {}).get("gear") or []
+    candidates = [row for row in gear if isinstance(row, dict) and row.get("magazine") is not None]
+    if not candidates:
+        return None
+    return next((row for row in candidates if row.get("equipped")), candidates[0])
+
+
+def _token_ammo(character: dict[str, Any] | None) -> dict[str, Any] | None:
+    weapon = _primary_ammo_weapon(character)
+    if not weapon:
+        return None
+    magazine = weapon.get("magazine")
+    current = weapon.get("currentAmmo")
+    return {
+        "weaponId": weapon.get("id"),
+        "weaponName": weapon.get("name") or "Arma",
+        "currentAmmo": current if current is not None else magazine,
+        "magazine": magazine,
+    }
+
+
 def normalize_token(
     token: dict[str, Any],
     session: dict[str, str] | None = None,
@@ -163,12 +192,14 @@ def normalize_token(
         "resourceVisibility": token.get("resource_visibility") or default_resource_visibility(token.get("kind") or "npc"),
         "criticalInjuries": (character or {}).get("criticalInjuries") or [],
         "statusEffects": (character or {}).get("statusEffects") or [],
+        "ammo": _token_ammo(character),
     }
     if not _resource_visible_to(out, session):
         out["hp"] = None
         out["hpMax"] = None
         out["criticalInjuries"] = []
         out["statusEffects"] = []
+        out["ammo"] = None
     return out
 
 
