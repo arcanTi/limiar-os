@@ -106,6 +106,9 @@ import { sheetHandlers, sheetRenderVals } from './views/sheet.js';
 import { combatHandlers, combatRenderVals } from './views/combat.js';
 import { clearMapAttackIntent, loadMapAttackIntent, mapTokenVisibleNow } from '../domain/map/mapAttackIntent.ts';
 import { clearMapFocusIntent, loadMapFocusIntent } from '../domain/map/mapFocusIntent.ts';
+import { clearMapAoeIntent, loadMapAoeIntent } from '../domain/map/mapAoeIntent.ts';
+import { computeSituationalChips } from '../domain/map/situationalMods.ts';
+import { propsToWalls } from '../domain/map/visionEngine.ts';
 import { desktopHandlers, desktopRenderVals } from './views/desktop.js';
 import {
   chipStyle as viewChipStyle,
@@ -182,6 +185,10 @@ class Component extends DCLogic {
     // A one-shot handoff from campaign-map.exe. It is keyed by attacker so a
     // GM's focused card cannot accidentally consume another combatant's range.
     mapAttackContexts: {},
+    // Fase AREA: the RESOLVER->cockpit handoff for a resolved AoE template
+    // (grenade). Single active context (unlike mapAttackContexts, which is
+    // per-attacker) — only one RESOLVER round-trip is in flight at a time.
+    mapAoeContext: null,
     combatNpcDraft: { name: '', body: '5', ref: '5', hpMax: '35', headSp: '11', bodySp: '11', qty: '1', templateId: '', attackRows: [{ name: '', dice: '2d6', skill: 'Handgun' }] },
     tarotDeck: [],
     tarotState: null,
@@ -456,6 +463,7 @@ class Component extends DCLogic {
       });
       await this.consumeMapAttackIntent();
       await this.consumeMapFocusIntent();
+      await this.consumeMapAoeIntent();
     } catch (err) {
       this.setState({ gmStatus: 'Falha ao carregar backend: ' + err.message });
     }
@@ -831,11 +839,24 @@ class Component extends DCLogic {
         return this.flash('Medida de ataque nao e mais valida');
       }
       clearMapAttackIntent(window.sessionStorage);
+      // G8: the map already knows darkness (scene.darkness) and LOS (walls) —
+      // compute the situational chips once, here, at the same map fetch this
+      // handoff already does, instead of the cockpit re-fetching the map on
+      // its own. Best-effort: a prop-only, wall-only, or missing-geometry
+      // scene just yields fewer/no chips, never blocks the handoff.
+      const walls = Array.isArray(mapState && mapState.walls) ? mapState.walls : [];
+      const propWalls = propsToWalls(Array.isArray(mapState && mapState.props) ? mapState.props : []);
+      const situationalChips = computeSituationalChips({
+        darkness: mapState && mapState.scene && Number(mapState.scene.darkness) || 0,
+        walls: walls.concat(propWalls),
+        attacker: { x: Number(attacker.x), y: Number(attacker.y) },
+        target: { x: Number(target.x), y: Number(target.y) },
+      });
       this.setState(s => ({
         view: 'combat', sheetOpen: false, selected: null,
         combatFocusId: intent.attackerCharacterId,
         combatTargets: { ...(s.combatTargets || {}), [intent.attackerCharacterId]: intent.targetCharacterId },
-        mapAttackContexts: { ...(s.mapAttackContexts || {}), [intent.attackerCharacterId]: intent },
+        mapAttackContexts: { ...(s.mapAttackContexts || {}), [intent.attackerCharacterId]: { ...intent, situationalChips } },
       }));
     } catch (_) {
       clearMapAttackIntent(window.sessionStorage);
@@ -866,6 +887,35 @@ class Component extends DCLogic {
     }
     this.sheetHandlers().selectCharacter(intent.characterId);
     this.setState({ sheetOpen: true, sheetExpanded: true, sheetEditing: false, sheetCreating: false, sheetDraft: null, sheetTab: 'core' });
+  }
+
+  // Fase AREA: second half of the RESOLVER handoff — hydrate the intent the
+  // map created (systemAdapter.cprOnResolveTemplate) into a confirmation
+  // card in the combat cockpit (combat.js's mapAoeContext render), never an
+  // auto-apply. Same guard discipline as consumeMapAttackIntent: combat
+  // must be active and every target must still resolve to a real character
+  // on this client (one dropped out between RESOLVER and page load? just
+  // drop it from the pre-selected list rather than failing the whole
+  // resolve). Gated to the GM: applying damage to potentially several other
+  // players'/NPCs' characters at once is the same trust level as
+  // useCombatUtility/autoApplyCombatDamage elsewhere in this file.
+  async consumeMapAoeIntent() {
+    if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('mapAoe')) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mapAoe');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    const intent = loadMapAoeIntent(window.sessionStorage);
+    if (!intent) return this.flash('Resolucao de area expirada');
+    clearMapAoeIntent(window.sessionStorage);
+    if (!this.state.gm) return this.flash('Resolucao de area requer o mestre');
+    const combat = this.combatHandlers().normalizeCombatState(this.state.combatState, this.state.characters);
+    if (!combat.active) return this.flash('Resolucao de area exige combate ativo');
+    const targetCharacterIds = intent.targetCharacterIds.filter(id => (this.state.characters || []).some(c => c.id === id));
+    if (!targetCharacterIds.length) return this.flash('Nenhum alvo valido para resolver');
+    this.setState({
+      view: 'combat', sheetOpen: false, selected: null,
+      mapAoeContext: { ...intent, targetCharacterIds },
+    });
   }
 
   // Switch Player/GM. If we are sitting on the Breach tab, remount so the
