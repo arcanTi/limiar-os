@@ -1,5 +1,5 @@
 from backend.repositories import campaign_maps as maps
-from backend.repositories.records import set_setting
+from backend.repositories.records import set_setting, upsert_record
 
 
 def test_upsert_token_can_link_an_existing_token_to_a_character(db_path):
@@ -79,3 +79,81 @@ def test_delete_token_gcs_its_reveals(db_path):
 
 def test_delete_token_returns_false_when_nothing_deleted(db_path):
     assert maps.delete_token("camp-1", "tok-does-not-exist") is False
+
+
+# Fase MUNICAO-NO-MAPA (G4): token HUD ammo cross-reference — CM0 already
+# persists `magazine`/`currentAmmo` on gear once the sheet/cockpit has
+# normalized+saved it (see frontend Component.js normalizeGearItem). These
+# tests exercise the read side that surfaces that state on the token payload
+# the map already fetches, same pattern as hp/criticalInjuries/statusEffects.
+def test_map_state_token_exposes_primary_weapon_ammo(db_path):
+    campaign_id = "camp-1"
+    upsert_record("characters", {
+        "id": "mira",
+        "name": "Mira",
+        "ownerUsername": "mira-player",
+        "gear": [
+            {"id": "knife", "name": "Knife", "melee": True},
+            {"id": "pistol", "name": "Medium Pistol", "magazine": 12, "currentAmmo": 5},
+        ],
+    })
+    token = maps.upsert_token(campaign_id, {"name": "Mira", "kind": "player", "characterId": "mira", "ownerUsername": "mira-player", "x": 1, "y": 1})
+
+    state = maps.map_state(campaign_id, {"username": "mira-player", "role": "player"})
+    out = next(t for t in state["tokens"] if t["id"] == token["id"])
+    assert out["ammo"] == {"weaponId": "pistol", "weaponName": "Medium Pistol", "currentAmmo": 5, "magazine": 12}
+
+
+def test_map_state_token_ammo_prefers_equipped_weapon(db_path):
+    campaign_id = "camp-1"
+    upsert_record("characters", {
+        "id": "rook",
+        "name": "Rook",
+        "ownerUsername": "rook-player",
+        "gear": [
+            {"id": "spare", "name": "Spare Pistol", "magazine": 8, "currentAmmo": 8, "equipped": False},
+            {"id": "smg", "name": "SMG", "magazine": 30, "currentAmmo": 0, "equipped": True},
+        ],
+    })
+    token = maps.upsert_token(campaign_id, {"name": "Rook", "kind": "player", "characterId": "rook", "ownerUsername": "rook-player", "x": 1, "y": 1})
+
+    state = maps.map_state(campaign_id, {"username": "rook-player", "role": "player"})
+    out = next(t for t in state["tokens"] if t["id"] == token["id"])
+    assert out["ammo"]["weaponId"] == "smg"
+    assert out["ammo"]["currentAmmo"] == 0
+
+
+def test_map_state_token_ammo_none_when_no_ammo_tracked_gear(db_path):
+    campaign_id = "camp-1"
+    upsert_record("characters", {
+        "id": "ghost",
+        "name": "Ghost",
+        "ownerUsername": "ghost-player",
+        "gear": [{"id": "katana", "name": "Katana", "melee": True}],
+    })
+    token = maps.upsert_token(campaign_id, {"name": "Ghost", "kind": "player", "characterId": "ghost", "ownerUsername": "ghost-player", "x": 1, "y": 1})
+
+    state = maps.map_state(campaign_id, {"username": "ghost-player", "role": "player"})
+    out = next(t for t in state["tokens"] if t["id"] == token["id"])
+    assert out["ammo"] is None
+
+
+def test_map_state_token_ammo_suppressed_for_gm_only_visibility(db_path):
+    """NPC tokens default to gm-only resourceVisibility — a non-owner,
+    non-staff viewer must not learn an enemy's ammo any more than their HP
+    (same _resource_visible_to gate as hp/criticalInjuries)."""
+    campaign_id = "camp-1"
+    upsert_record("characters", {
+        "id": "ganger",
+        "name": "Ganger",
+        "gear": [{"id": "pistol", "name": "Pistol", "magazine": 12, "currentAmmo": 12}],
+    })
+    token = maps.upsert_token(campaign_id, {"name": "Ganger", "kind": "npc", "characterId": "ganger", "x": 1, "y": 1})
+
+    state = maps.map_state(campaign_id, {"username": "some-player", "role": "player"})
+    out = next(t for t in state["tokens"] if t["id"] == token["id"])
+    assert out["ammo"] is None
+
+    gm_state = maps.map_state(campaign_id, {"username": "gm", "role": "gm"})
+    gm_out = next(t for t in gm_state["tokens"] if t["id"] == token["id"])
+    assert gm_out["ammo"]["weaponId"] == "pistol"

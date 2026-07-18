@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cprOnMeasureBetweenTokens, cprTokenBadges, cprWoundVisual } from '../../../src/domain/map/systemAdapter.ts';
+import { cprAmmoBadge, cprOnMeasureBetweenTokens, cprTokenBadges, cprWoundVisual } from '../../../src/domain/map/systemAdapter.ts';
 
 describe('map systemAdapter (CPR): cprWoundVisual', () => {
   it('returns null when the token has no HP tracked (nothing to color)', () => {
@@ -64,6 +64,23 @@ describe('map systemAdapter (CPR): cprTokenBadges', () => {
       statusEffects: [{ instanceId: 'se-1', id: 'onFire', label_pt: 'Em chamas' }],
     });
     expect(badges.map(b => b.kind)).toEqual(['injury', 'status']);
+  });
+});
+
+describe('map systemAdapter (CPR): cprAmmoBadge', () => {
+  it('returns null when the token has no ammo-tracked weapon', () => {
+    expect(cprAmmoBadge({})).toBeNull();
+    expect(cprAmmoBadge({ ammo: null })).toBeNull();
+    expect(cprAmmoBadge({ ammo: { weaponId: 'knife', magazine: null } })).toBeNull();
+  });
+
+  it('formats current/magazine and flags needsReload only at zero', () => {
+    expect(cprAmmoBadge({ ammo: { weaponId: 'pistol', currentAmmo: 5, magazine: 12 } })).toEqual({ weaponId: 'pistol', label: '5/12', needsReload: false });
+    expect(cprAmmoBadge({ ammo: { weaponId: 'pistol', currentAmmo: 0, magazine: 12 } })).toEqual({ weaponId: 'pistol', label: '0/12', needsReload: true });
+  });
+
+  it('defaults currentAmmo to a full magazine when unset (never-fired weapon)', () => {
+    expect(cprAmmoBadge({ ammo: { weaponId: 'pistol', currentAmmo: null, magazine: 12 } })).toEqual({ weaponId: 'pistol', label: '12/12', needsReload: false });
   });
 });
 
