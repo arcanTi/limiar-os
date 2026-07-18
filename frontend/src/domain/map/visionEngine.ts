@@ -50,3 +50,28 @@ export function visionContainsPoint(origin: Point, radius: number, walls: Wall[]
   if (Math.hypot(point.x - origin.x, point.y - origin.y) > radius) return false;
   return pointInPolygon(point, visionPolygon(origin, radius, walls));
 }
+
+export interface Prop { id?: string; x: number; y: number; w: number; h: number; hp: number }
+
+// G2 (destructible cover): a prop blocks LOS while hp > 0 — modeled as its
+// rectangle's four edges fed into the same wall-segment raycasting used for
+// real walls, rather than teaching visionPolygon/visionContainsPoint a
+// second shape type. Callers concat this onto the scene's wall list before
+// any vision call; a destroyed prop (hp <= 0) contributes no segments, so it
+// stops blocking LOS the instant it's rubble with no extra branching at the
+// call site.
+export function propsToWalls(props: Prop[] = []): Wall[] {
+  const walls: Wall[] = [];
+  for (const prop of props) {
+    if (!(Number(prop.hp) > 0)) continue;
+    const x1 = prop.x, y1 = prop.y, x2 = prop.x + prop.w, y2 = prop.y + prop.h;
+    const id = prop.id || '';
+    walls.push(
+      { id: id && `${id}-n`, x1, y1, x2, y2: y1, kind: 'wall' },
+      { id: id && `${id}-s`, x1, y1: y2, x2, y2, kind: 'wall' },
+      { id: id && `${id}-w`, x1, y1, x2: x1, y2, kind: 'wall' },
+      { id: id && `${id}-e`, x1: x2, y1, x2, y2, kind: 'wall' },
+    );
+  }
+  return walls;
+}

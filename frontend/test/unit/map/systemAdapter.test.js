@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cprOnMeasureBetweenTokens, cprTokenBadges, cprWoundVisual } from '../../../src/domain/map/systemAdapter.ts';
+import { cprOnMeasureBetweenTokens, cprOnResolveTemplate, cprTokenBadges, cprWoundVisual } from '../../../src/domain/map/systemAdapter.ts';
 
 describe('map systemAdapter (CPR): cprWoundVisual', () => {
   it('returns null when the token has no HP tracked (nothing to color)', () => {
@@ -75,5 +75,28 @@ describe('map systemAdapter (CPR): cprOnMeasureBetweenTokens', () => {
     expect(cprOnMeasureBetweenTokens({
       attackerToken: { id: 'a-token' }, targetToken: { id: 't-token', characterId: 't' }, cells: 3, rangeMeters: 6,
     })).toBeNull();
+  });
+});
+
+describe('map systemAdapter (CPR): cprOnResolveTemplate', () => {
+  it('extracts distinct target character ids and area metadata from the affected token list', () => {
+    const command = cprOnResolveTemplate({
+      template: { kind: 'circle', label: 'granada' },
+      tokens: [{ id: 't1', characterId: 'mira' }, { id: 't2', characterId: 'rook' }],
+    });
+    expect(command).toEqual({ kind: 'aoe', targetCharacterIds: ['mira', 'rook'], areaKind: 'circle', areaLabel: 'granada' });
+  });
+
+  it('de-duplicates tokens sharing the same character', () => {
+    const command = cprOnResolveTemplate({
+      template: { kind: 'cone' },
+      tokens: [{ id: 't1', characterId: 'mira' }, { id: 't2', characterId: 'mira' }],
+    });
+    expect(command.targetCharacterIds).toEqual(['mira']);
+  });
+
+  it('returns null when no affected token is linked to a character', () => {
+    expect(cprOnResolveTemplate({ template: { kind: 'circle' }, tokens: [{ id: 't1' }, { id: 't2', characterId: '' }] })).toBeNull();
+    expect(cprOnResolveTemplate({ template: { kind: 'circle' }, tokens: [] })).toBeNull();
   });
 });
