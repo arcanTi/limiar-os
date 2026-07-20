@@ -35,3 +35,5 @@ _CHAT_RATE = (30, 60)  # 30 chat messages per minute per IP (anti spam)
 # session - never gets logged out, while a forgotten/abandoned token still dies
 # after this much inactivity. Override with LIMIAR_SESSION_TTL (seconds).
 SESSION_TTL_SECONDS = int(os.environ.get("LIMIAR_SESSION_TTL", str(8 * 3600)))
+# "Lembrar-me" at login trades the 8h idle window above for this much longer one.
+REMEMBER_SESSION_TTL_SECONDS = int(os.environ.get("LIMIAR_REMEMBER_SESSION_TTL", str(30 * 24 * 3600)))

@@ -1,6 +1,7 @@
 import {
   campaignInviteCount,
   canJoinCampaign,
+  canManageCampaign,
   isLoggedInSession,
   isStaffSession,
   normalizeCampaign,
@@ -11,7 +12,7 @@ import {
 } from '../../domain/campaigns/index.ts';
 import { patchRoot } from '../../framework/index.js';
 
-const defaultDraft = { name: '', description: '', visibility: 'public', status: 'active' };
+const defaultDraft = { id: '', name: '', description: '', visibility: 'public', status: 'active', bannerUrl: '' };
 
 function esc(value) {
   return String(value == null ? '' : value)
@@ -38,9 +39,12 @@ export function campaignsRenderVals(state = {}, deps = {}) {
   const current = selected ? {
     ...selected,
     canJoin: canJoinCampaign(selected, session),
+    canManage: canManageCampaign(selected, session),
     selectedCharacterId: selectedCharacterForCampaign(selected.id, state.characterByCampaign || {}, characters),
     pendingInviteCount: selected.invites.filter(invite => invite.status === 'pending').length,
   } : null;
+  const draft = normalizeCampaignDraft(state.draft || deps.defaultDraft || defaultDraft);
+  const bannerFile = state.bannerFile || null;
 
   return {
     open: Boolean(state.open),
@@ -50,6 +54,7 @@ export function campaignsRenderVals(state = {}, deps = {}) {
     campaigns: campaigns.map(campaign => ({
       ...campaign,
       active: Boolean(selected && selected.id === campaign.id),
+      canManage: canManageCampaign(campaign, session),
       pendingInviteCount: campaign.invites.filter(invite => invite.status === 'pending').length,
     })),
     notifications,
@@ -59,7 +64,10 @@ export function campaignsRenderVals(state = {}, deps = {}) {
     query,
     selected: current,
     status: String(state.status || ''),
-    draft: normalizeCampaignDraft(state.draft || deps.defaultDraft || defaultDraft),
+    draft,
+    editing: Boolean(draft.id),
+    bannerFileName: bannerFile ? bannerFile.name : '',
+    bannerPreviewUrl: state.bannerPreviewUrl || '',
   };
 }
 
@@ -120,13 +128,46 @@ export function campaignsHandlers(component, api) {
     updateCharacter: (campaignId, characterId) => patch({
       characterByCampaign: { ...component.state.characterByCampaign, [campaignId]: characterId },
     }, { render: false }),
+    editCampaign: (campaign) => {
+      patch({
+        draft: normalizeCampaignDraft(campaign),
+        bannerFile: null,
+        bannerPreviewUrl: '',
+        status: '',
+      });
+    },
+    cancelEdit: () => patch({ draft: { ...defaultDraft }, bannerFile: null, bannerPreviewUrl: '' }),
+    setBannerFile: (file) => {
+      patch({ bannerFile: file || null, bannerPreviewUrl: file ? URL.createObjectURL(file) : '' });
+    },
     saveCampaign: async () => {
+      const draft = normalizeCampaignDraft(component.state.draft);
+      const bannerFile = component.state.bannerFile || null;
       try {
-        await api.campaigns.create(normalizeCampaignDraft(component.state.draft));
-        patch({ draft: { ...defaultDraft }, status: 'Campanha salva' });
+        let saved = await api.campaigns.create(draft);
+        if (bannerFile && saved && saved.id) {
+          try {
+            const asset = await api.uploads.image(bannerFile, { scope: 'campaign-banner', ownerId: saved.id });
+            if (asset && asset.url) {
+              saved = await api.campaigns.create({ ...draft, id: saved.id, bannerUrl: asset.url });
+            }
+          } catch (_) {
+            patch({ status: 'Campanha salva; falha ao enviar capa' });
+          }
+        }
+        patch({ draft: { ...defaultDraft }, bannerFile: null, bannerPreviewUrl: '', status: 'Campanha salva' });
         await refresh();
       } catch (_) {
         patch({ status: 'Falha ao salvar campanha' });
+      }
+    },
+    clearBanner: async (campaign) => {
+      try {
+        await api.campaigns.create({ id: campaign.id, name: campaign.name, clearBanner: true });
+        patch({ status: 'Capa removida' });
+        await refresh();
+      } catch (_) {
+        patch({ status: 'Falha ao remover capa' });
       }
     },
     invite: async (campaignId, username) => {
@@ -136,6 +177,24 @@ export function campaignsHandlers(component, api) {
         await refresh();
       } catch (_) {
         patch({ status: 'Falha ao enviar convite' });
+      }
+    },
+    cancelInvite: async (campaignId, username) => {
+      try {
+        await api.campaigns.cancelInvite(campaignId, username);
+        patch({ status: 'Convite cancelado' });
+        await refresh();
+      } catch (_) {
+        patch({ status: 'Falha ao cancelar convite' });
+      }
+    },
+    removeMember: async (campaignId, username) => {
+      try {
+        await api.campaigns.removeMember(campaignId, username);
+        patch({ status: 'Player removido da campanha' });
+        await refresh();
+      } catch (_) {
+        patch({ status: 'Falha ao remover player' });
       }
     },
     join: async (campaignId) => {
@@ -183,9 +242,11 @@ function campaignDetail(vals) {
         </div>
         <div class="lm-campaign-actions">
           <span class="lm-campaign-chip">${campaign.isMember ? 'VINCULADA' : campaign.canJoin ? 'ABERTA' : 'INFO'}</span>
+          ${campaign.canManage ? `<button data-campaign-edit="${esc(campaign.id)}">EDITAR</button>` : ''}
           ${campaign.isMember || vals.staff ? `<button data-campaign-map="${esc(campaign.id)}">MESA</button>` : ''}
         </div>
       </div>
+      ${campaign.bannerUrl ? `<div class="lm-campaign-banner" style="background-image:url(${esc(campaign.bannerUrl)})"></div>` : ''}
       <div class="lm-campaign-desc">${esc(campaign.description || 'Sem briefing.')}</div>
       ${campaign.isMember ? `<div class="lm-campaign-note">Sua ficha nesta campanha: ${esc(campaign.members[0]?.characterId || 'registrada')}</div>` : ''}
       ${campaign.canJoin ? `
@@ -194,7 +255,7 @@ function campaignDetail(vals) {
           <button data-campaign-join="${esc(campaign.id)}">${campaign.myInviteId ? 'ACEITAR CONVITE' : 'ENTRAR'}</button>
         </div>
       ` : ''}
-      ${vals.staff ? `
+      ${campaign.canManage ? `
         <div class="lm-campaign-master-grid">
           <div class="lm-campaign-roster">
             <div class="lm-campaign-staff-title">FICHAS NA CAMPANHA</div>
@@ -202,6 +263,7 @@ function campaignDetail(vals) {
               <div class="lm-campaign-roster-row">
                 <span>${esc(member.username)}</span>
                 <strong>${esc(member.characterId)}</strong>
+                <button data-campaign-remove-member="${esc(campaign.id)}" data-campaign-user="${esc(member.username)}">REMOVER</button>
               </div>
             `).join('') || '<div class="lm-campaign-empty">Nenhum player vinculado.</div>'}
             <div class="lm-campaign-staff-title lm-campaign-subtitle">CONVITES</div>
@@ -209,6 +271,7 @@ function campaignDetail(vals) {
               <div class="lm-campaign-roster-row">
                 <span>${esc(invite.username)}</span>
                 <strong>${esc(invite.status)}</strong>
+                ${invite.status === 'pending' ? `<button data-campaign-cancel-invite="${esc(campaign.id)}" data-campaign-user="${esc(invite.username)}">CANCELAR</button>` : ''}
               </div>
             `).join('') || '<div class="lm-campaign-empty">Nenhum convite enviado.</div>'}
           </div>
@@ -259,7 +322,7 @@ export function renderCampaignsOverlay(state, deps = {}) {
           <main class="lm-campaign-main">
             ${vals.staff ? `
               <div class="lm-campaign-create">
-                <div class="lm-campaign-title">CRIAR CAMPANHA</div>
+                <div class="lm-campaign-title">${vals.editing ? 'EDITAR CAMPANHA' : 'CRIAR CAMPANHA'}</div>
                 <input data-campaign-draft="name" value="${esc(vals.draft.name)}" placeholder="nome da campanha" />
                 <textarea data-campaign-draft="description" placeholder="briefing">${esc(vals.draft.description)}</textarea>
                 <div class="lm-campaign-row">
@@ -272,6 +335,15 @@ export function renderCampaignsOverlay(state, deps = {}) {
                     <option value="paused" ${vals.draft.status === 'paused' ? 'selected' : ''}>PAUSADA</option>
                     <option value="archived" ${vals.draft.status === 'archived' ? 'selected' : ''}>ARQUIVADA</option>
                   </select>
+                </div>
+                <div class="lm-campaign-banner-picker">
+                  ${vals.bannerPreviewUrl || vals.draft.bannerUrl ? `<div class="lm-campaign-banner-preview" style="background-image:url(${esc(vals.bannerPreviewUrl || vals.draft.bannerUrl)})"></div>` : ''}
+                  <input id="lm-campaign-banner-input" type="file" accept="image/*" data-campaign-banner-file style="display:none;" />
+                  <button type="button" data-campaign-banner-trigger>${vals.bannerFileName || vals.draft.bannerUrl ? 'TROCAR CAPA' : 'ESCOLHER CAPA'}</button>
+                  ${vals.editing && vals.draft.bannerUrl ? `<button type="button" data-campaign-clear-banner>REMOVER CAPA</button>` : ''}
+                </div>
+                <div class="lm-campaign-form-actions">
+                  ${vals.editing ? `<button type="button" data-campaign-cancel-edit>CANCELAR</button>` : ''}
                   <button class="lm-campaign-primary" data-campaign-save>SALVAR</button>
                 </div>
               </div>
@@ -284,13 +356,7 @@ export function renderCampaignsOverlay(state, deps = {}) {
     </div>
   ` : '';
 
-  return `
-    <button class="lm-campaign-launcher" data-campaign-toggle>
-      <span class="lm-campaign-pull-tab-mark">${vals.notifyCount || '0'}</span>
-      <span>CAMPANHAS</span>
-    </button>
-    ${panel}
-  `;
+  return panel;
 }
 
 function createOverlayController(root, api, initialCampaignId = '') {
@@ -353,7 +419,6 @@ export function mountCampaignsOverlay({ api, documentRef = globalThis.document, 
   root.addEventListener('click', (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target.closest('[data-campaign-toggle]')) handlers.toggle();
     if (target.closest('[data-campaign-close]')) handlers.close();
     if (target.closest('[data-campaign-save]')) handlers.saveCampaign();
     const selectedNode = target.closest('[data-campaign-select]');
@@ -364,6 +429,26 @@ export function mountCampaignsOverlay({ api, documentRef = globalThis.document, 
     if (mapNode) globalThis.location.assign(`/campaign-map.html?campaign=${encodeURIComponent(mapNode.getAttribute('data-campaign-map'))}`);
     const inviteNode = target.closest('[data-campaign-invite]');
     if (inviteNode) handlers.invite(inviteNode.getAttribute('data-campaign-invite'), inviteNode.getAttribute('data-campaign-user'));
+    const editNode = target.closest('[data-campaign-edit]');
+    if (editNode) {
+      const campaign = (controller.state.campaigns || []).find(c => c.id === editNode.getAttribute('data-campaign-edit'));
+      if (campaign) handlers.editCampaign(campaign);
+    }
+    if (target.closest('[data-campaign-cancel-edit]')) handlers.cancelEdit();
+    if (target.closest('[data-campaign-banner-trigger]')) root.querySelector('#lm-campaign-banner-input')?.click();
+    if (target.closest('[data-campaign-clear-banner]')) {
+      const draft = controller.state.draft || {};
+      if (draft.id && globalThis.confirm('Remover a capa desta campanha?')) handlers.clearBanner(draft);
+    }
+    const cancelInviteNode = target.closest('[data-campaign-cancel-invite]');
+    if (cancelInviteNode) handlers.cancelInvite(cancelInviteNode.getAttribute('data-campaign-cancel-invite'), cancelInviteNode.getAttribute('data-campaign-user'));
+    const removeMemberNode = target.closest('[data-campaign-remove-member]');
+    if (removeMemberNode) {
+      const username = removeMemberNode.getAttribute('data-campaign-user');
+      if (globalThis.confirm(`Remover ${username} desta campanha?`)) {
+        handlers.removeMember(removeMemberNode.getAttribute('data-campaign-remove-member'), username);
+      }
+    }
   });
   root.addEventListener('input', (event) => {
     const target = event.target;
@@ -377,9 +462,19 @@ export function mountCampaignsOverlay({ api, documentRef = globalThis.document, 
     const campaignId = target.getAttribute('data-campaign-character');
     if (campaignId) handlers.updateCharacter(campaignId, target.value);
   });
+  root.addEventListener('change', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.matches('[data-campaign-banner-file]')) {
+      handlers.setBannerFile(target.files && target.files[0]);
+    }
+  });
 
   controller.render();
   handlers.refresh();
   setInterval(handlers.refresh, 10000);
+  // The overlay is a standalone widget outside the main template/component
+  // tree, so SYS.08's "CAMPANHAS" button (a plain template onClick) reaches
+  // it through this global instead of prop-drilling handlers across trees.
+  globalThis.limiarCampaigns = { toggle: handlers.toggle };
   return root;
 }

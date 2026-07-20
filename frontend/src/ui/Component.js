@@ -244,6 +244,7 @@ class Component extends DCLogic {
     gmItemDraft: { code: '', name: '', cat: 'NEURAL', price: '', desc: '', imageUrl: '' },
     gmMapDraft: { name: '', threat: 'MED', imageUrl: '' },
     users: [],
+    passwordResetRequests: [],
     userDraft: { username: '', password: '', role: 'player', email: '' },
     gmStatus: 'Backend aguardando conexao',
   };
@@ -349,7 +350,10 @@ class Component extends DCLogic {
     if (authenticated) {
       await this.reloadRemoteData();
       const user = this.state.authUser;
-      if (user && ['admin', 'gm'].includes(user.role)) await this.loadUsers();
+      if (user && ['admin', 'gm'].includes(user.role)) {
+        await this.loadUsers();
+        await this.loadPasswordResetRequests();
+      }
       if (this.state.activeCampaignId) await this.loadActiveCampaignName();
     }
   }
@@ -412,6 +416,14 @@ class Component extends DCLogic {
     try {
       const users = await this.api().users.list();
       this.setState({ users: Array.isArray(users) ? users : [] });
+    } catch (_) {}
+  }
+
+  async loadPasswordResetRequests() {
+    if (!(this.api() && this.api().users && this.state.gmAuthenticated)) return;
+    try {
+      const requests = await this.api().users.passwordResetRequests();
+      this.setState({ passwordResetRequests: Array.isArray(requests) ? requests : [] });
     } catch (_) {}
   }
 
@@ -932,7 +944,7 @@ class Component extends DCLogic {
 
   async logoutGm() {
     if (this.api() && this.api().auth) await this.api().auth.logout();
-    this.setState({ authAuthenticated: false, authUser: null, gmAuthenticated: false, gm: false, sheetEditing: false, sheetCreating: false, sheetDraft: null, characters: [], activeCharacterId: null, users: [], gmStatus: 'Sessao encerrada' });
+    this.setState({ authAuthenticated: false, authUser: null, gmAuthenticated: false, gm: false, sheetEditing: false, sheetCreating: false, sheetDraft: null, characters: [], activeCharacterId: null, users: [], passwordResetRequests: [], gmStatus: 'Sessao encerrada' });
     this.redirectToLogin();
   }
 

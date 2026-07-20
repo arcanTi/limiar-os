@@ -89,6 +89,11 @@ export interface Campaign {
   [extra: string]: unknown;
 }
 
+export function campaignOwnerUsername(campaign: unknown): string {
+  const c = (campaign && typeof campaign === 'object' ? campaign : {}) as Record<string, unknown>;
+  return cleanText(c.created_by ?? c.createdBy);
+}
+
 export function normalizeCampaign(input: Record<string, unknown> = {}): Campaign {
   const campaign = input && typeof input === 'object' ? input : {};
   return {
@@ -98,6 +103,7 @@ export function normalizeCampaign(input: Record<string, unknown> = {}): Campaign
     description: cleanText(campaign.description),
     visibility: cleanEnum(campaign.visibility, VISIBILITIES, 'public'),
     status: cleanEnum(campaign.status, STATUSES, 'active'),
+    bannerUrl: cleanText(campaign.bannerUrl ?? campaign.banner_url),
     members: normalizeList(campaign.members, (item) => normalizeCampaignMember(item as Record<string, unknown>)),
     invites: normalizeList(campaign.invites, (item) => normalizeCampaignInvite(item as Record<string, unknown>)),
     isMember: Boolean(campaign.isMember),
@@ -107,19 +113,23 @@ export function normalizeCampaign(input: Record<string, unknown> = {}): Campaign
 }
 
 export interface CampaignDraft {
+  id: string;
   name: string;
   description: string;
   visibility: 'public' | 'private';
   status: 'active' | 'paused' | 'archived';
+  bannerUrl: string;
 }
 
 export function normalizeCampaignDraft(input: Record<string, unknown> = {}): CampaignDraft {
   const campaign = normalizeCampaign(input);
   return {
+    id: campaign.id,
     name: campaign.name,
     description: campaign.description,
     visibility: campaign.visibility,
     status: campaign.status,
+    bannerUrl: campaign.bannerUrl as string,
   };
 }
 
@@ -137,8 +147,11 @@ export function campaignInviteFor(campaign: unknown, session: SessionLike = {}):
   return normalized.invites.find(invite => invite.username === username && invite.status === 'pending') || null;
 }
 
-export function canManageCampaign(_campaign: unknown, session: SessionLike = {}): boolean {
-  return isStaffSession(session);
+export function canManageCampaign(campaign: unknown, session: SessionLike = {}): boolean {
+  if (!isStaffSession(session)) return false;
+  if (cleanText(sessionUser(session).role).toLowerCase() === 'admin') return true;
+  const owner = campaignOwnerUsername(campaign);
+  return !owner || owner === sessionUsername(session);
 }
 
 export function canViewCampaign(campaign: unknown, session: SessionLike = {}): boolean {

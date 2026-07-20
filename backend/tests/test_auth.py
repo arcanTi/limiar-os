@@ -294,3 +294,97 @@ def test_missing_and_expired_tokens_are_treated_as_logged_out(auth_handler, make
 
     assert handler.current_session() is None
     assert session_count() == 0
+
+
+def test_self_service_profile_update_changes_email(auth_handler, make_session):
+    player = make_session("alice", role="player")
+
+    handler = auth_handler({"email": "alice@example.com"}, token=player["token"])
+    handler._post_users_me(player)
+
+    assert handler.status == HTTPStatus.OK
+    assert handler.payload["email"] == "alice@example.com"
+
+
+def test_self_service_avatar_update_persists_and_shows_in_session(auth_handler, make_session):
+    player = make_session("alice", role="player")
+
+    handler = auth_handler({"avatarUrl": "/uploads/avatar-alice.png"}, token=player["token"])
+    handler._post_users_me(player)
+
+    assert handler.status == HTTPStatus.OK
+    assert handler.payload["avatarUrl"] == "/uploads/avatar-alice.png"
+
+    # Persisted at the users table, not just echoed back — a fresh session
+    # lookup (e.g. GET /api/session on reload) must see it too.
+    session_handler = auth_handler(token=player["token"])
+    session = session_handler.current_session()
+    assert session["avatarUrl"] == "/uploads/avatar-alice.png"
+
+
+def test_self_service_password_change_requires_correct_current_password(auth_handler, make_session):
+    player = make_session("alice", role="player", password="old-password-1")
+
+    wrong = auth_handler(
+        {"currentPassword": "not-it", "newPassword": "new-password-1"}, token=player["token"],
+    )
+    wrong._post_users_me(player)
+    assert wrong.status == HTTPStatus.UNAUTHORIZED
+
+    right = auth_handler(
+        {"currentPassword": "old-password-1", "newPassword": "new-password-1"}, token=player["token"],
+    )
+    right._post_users_me(player)
+    assert right.status == HTTPStatus.OK
+
+    relogin = auth_handler({"username": "alice", "password": "new-password-1"})
+    _login_timestamps.clear()
+    relogin._post_login()
+    assert relogin.status == HTTPStatus.OK
+
+
+def test_player_can_self_promote_to_gm_and_session_updates_immediately(auth_handler, make_session):
+    player = make_session("alice", role="player")
+
+    handler = auth_handler({"role": "gm"}, token=player["token"])
+    handler._post_users_me(player)
+
+    assert handler.status == HTTPStatus.OK
+    assert handler.payload["role"] == "gm"
+    with db_module.db() as conn:
+        session_role = conn.execute(
+            "SELECT role FROM sessions WHERE token = ?", (player["token"],),
+        ).fetchone()["role"]
+        user_role = conn.execute(
+            "SELECT role FROM users WHERE username = ?", ("alice",),
+        ).fetchone()["role"]
+    assert session_role == "gm"
+    assert user_role == "gm"
+
+
+def test_self_service_role_change_rejects_admin_target(auth_handler, make_session):
+    player = make_session("alice", role="player")
+
+    handler = auth_handler({"role": "admin"}, token=player["token"])
+    handler._post_users_me(player)
+
+    assert handler.status == HTTPStatus.BAD_REQUEST
+    with db_module.db() as conn:
+        user_role = conn.execute(
+            "SELECT role FROM users WHERE username = ?", ("alice",),
+        ).fetchone()["role"]
+    assert user_role == "player"
+
+
+def test_admin_role_cannot_be_changed_via_self_service(auth_handler, make_session):
+    admin = make_session("root", role="admin")
+
+    handler = auth_handler({"role": "gm"}, token=admin["token"])
+    handler._post_users_me(admin)
+
+    assert handler.status == HTTPStatus.BAD_REQUEST
+    with db_module.db() as conn:
+        user_role = conn.execute(
+            "SELECT role FROM users WHERE username = ?", ("root",),
+        ).fetchone()["role"]
+    assert user_role == "admin"

@@ -13,6 +13,10 @@ export function createCampaignsApi(request: HttpRequest) {
       const payload = typeof usernameOrPayload === 'string' ? { username: usernameOrPayload } : usernameOrPayload;
       return request(campaignPath(campaignId, '/invite'), { method: 'POST', body: JSON.stringify(payload || {}) });
     },
+    cancelInvite: async (campaignId: string, username: string): Promise<unknown> =>
+      request(campaignPath(campaignId, '/invites/' + encodeURIComponent(username)), { method: 'DELETE' }),
+    removeMember: async (campaignId: string, username: string): Promise<unknown> =>
+      request(campaignPath(campaignId, '/members/' + encodeURIComponent(username)), { method: 'DELETE' }),
     join: async (campaignId: string, characterIdOrPayload: string | Record<string, unknown>): Promise<unknown> => {
       const payload = typeof characterIdOrPayload === 'string' ? { characterId: characterIdOrPayload } : characterIdOrPayload;
       return request(campaignPath(campaignId, '/join'), { method: 'POST', body: JSON.stringify(payload || {}) });

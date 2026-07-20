@@ -4,53 +4,178 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Limiar OS - Entrar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&family=Chakra+Petch:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./login.css">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-  <main class="wrap">
-    <div class="card">
-      <h1>Entrar</h1>
+  <main class="stage">
+    <section class="stage-visual">
+      <div class="stage-brand">
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7L12 1.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 1.5v7.2M2.5 7l9.5 1.7L21.5 7M12 22.5l-4.7-6.9L2.5 17M12 22.5l4.7-6.9L21.5 17M7.3 15.6h9.4L12 8.7l-4.7 6.9z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        <span>Limiar <b>OS</b></span>
+      </div>
+      <div class="stage-art" id="stageArt"></div>
+    </section>
 
-      <section id="stepCredentials">
-        <div id="googleButton"></div>
-        <div class="divider" id="googleDivider" hidden><span>ou</span></div>
+    <section class="stage-panel">
+      <div class="panel-inner">
+        <div class="panel-brand">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7L12 1.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 1.5v7.2M2.5 7l9.5 1.7L21.5 7M12 22.5l-4.7-6.9L2.5 17M12 22.5l4.7-6.9L21.5 17M7.3 15.6h9.4L12 8.7l-4.7 6.9z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+          <span>Limiar <b>OS</b></span>
+        </div>
 
-        <form id="loginForm">
-          <label>Usuario
-            <input id="loginUsername" type="text" autocomplete="username" required>
-          </label>
-          <label>Senha
-            <input id="loginPassword" type="password" autocomplete="current-password" required>
-          </label>
-          <button type="submit">Entrar</button>
-        </form>
+        <div class="step step-credentials" id="stepCredentials">
+          <span class="campaign-eyebrow">ACESSO // CREDENCIAIS</span>
+          <h1>Entrar</h1>
+          <p class="step-sub">Entre com sua conta para acessar suas campanhas e fichas.</p>
 
-        <form id="registerForm" hidden>
-          <label>Novo usuario
-            <input id="registerUsername" type="text" autocomplete="username" required>
-          </label>
-          <label>Senha
-            <input id="registerPassword" type="password" autocomplete="new-password" required>
-          </label>
-          <label>Confirmar senha
-            <input id="registerConfirm" type="password" autocomplete="new-password" required>
-          </label>
-          <button type="submit">Criar conta</button>
-        </form>
+          <div class="form-swap" id="formSwap">
+            <form id="loginForm" class="form-face">
+              <label>Usuario
+                <span class="field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 19.5c1.2-3.4 4-5 7.2-5s6 1.6 7.2 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  <input id="loginUsername" type="text" autocomplete="username" required>
+                </span>
+              </label>
+              <label>Senha
+                <span class="field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.2" width="14" height="9.3" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 10.2V7.8a3.8 3.8 0 0 1 7.6 0v2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="14.8" r="1.4" fill="currentColor"/></svg>
+                  <input id="loginPassword" type="password" autocomplete="current-password" required>
+                </span>
+              </label>
+              <div class="login-row">
+                <label class="checkbox-row">
+                  <input id="loginRemember" type="checkbox">
+                  <span>Lembrar-me</span>
+                </label>
+                <button type="button" id="forgotPasswordLink" class="link-inline">Esqueci minha senha</button>
+              </div>
+              <button type="submit" class="btn-primary">
+                <span class="btn-label">Entrar</span>
+                <span class="btn-spinner" hidden></span>
+              </button>
+            </form>
 
-        <button type="button" id="toggleMode" class="link-btn">Criar uma conta</button>
-        <p id="credentialsStatus" class="status" role="status"></p>
-      </section>
+            <form id="resetRequestForm" class="form-face" hidden>
+              <label>Usuario
+                <span class="field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 19.5c1.2-3.4 4-5 7.2-5s6 1.6 7.2 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  <input id="resetUsername" type="text" autocomplete="username" required>
+                </span>
+              </label>
+              <p class="step-sub">Um mestre ou administrador vai liberar uma nova senha para voce em breve.</p>
+              <button type="submit" class="btn-primary">
+                <span class="btn-label">Solicitar redefinicao</span>
+                <span class="btn-spinner" hidden></span>
+              </button>
+              <button type="button" id="resetCancel" class="btn-ghost">Voltar para o login</button>
+            </form>
 
-      <section id="stepCampaign" hidden>
-        <h2>Selecione uma campanha</h2>
-        <div id="campaignList" class="campaign-list"></div>
-        <p id="campaignEmpty" class="hint" hidden>Voce ainda nao participa de nenhuma campanha. Entre no sistema para criar ou participar de uma campanha existente.</p>
-        <button type="button" id="continueWithoutCampaign" class="ghost-btn">Continuar sem campanha</button>
-        <p id="campaignStatus" class="status" role="status"></p>
-      </section>
-    </div>
+            <form id="registerForm" class="form-face" hidden>
+              <label>Novo usuario
+                <span class="field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 19.5c1.2-3.4 4-5 7.2-5s6 1.6 7.2 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  <input id="registerUsername" type="text" autocomplete="username" required>
+                </span>
+              </label>
+              <label>Senha
+                <span class="field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.2" width="14" height="9.3" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 10.2V7.8a3.8 3.8 0 0 1 7.6 0v2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="14.8" r="1.4" fill="currentColor"/></svg>
+                  <input id="registerPassword" type="password" autocomplete="new-password" required>
+                </span>
+              </label>
+              <label>Confirmar senha
+                <span class="field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.2" width="14" height="9.3" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 10.2V7.8a3.8 3.8 0 0 1 7.6 0v2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m9.6 14.9 1.7 1.7 3.1-3.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <input id="registerConfirm" type="password" autocomplete="new-password" required>
+                </span>
+              </label>
+              <button type="submit" class="btn-primary">
+                <span class="btn-label">Criar conta</span>
+                <span class="btn-spinner" hidden></span>
+              </button>
+            </form>
+          </div>
+
+          <button type="button" id="toggleMode" class="btn-ghost">Criar uma conta</button>
+
+          <div class="divider" id="googleDivider"><span>ou entre com</span></div>
+          <div class="google-row">
+            <div id="googleButton"></div>
+            <button type="button" id="googleFallback" class="btn-google">
+              <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+              <span>Entrar com Google</span>
+            </button>
+          </div>
+
+          <p id="credentialsStatus" class="status" role="status"></p>
+        </div>
+
+        <div class="step step-campaign" id="stepCampaign" hidden>
+          <div class="campaign-head">
+            <div>
+              <span class="campaign-eyebrow">ACESSO // MESAS</span>
+              <h1>Suas campanhas</h1>
+              <p class="step-sub">Escolha uma mesa para continuar.</p>
+            </div>
+            <button type="button" id="newCampaignToggle" class="btn-neo" hidden><span>+ Nova campanha</span></button>
+          </div>
+          <form id="newCampaignForm" class="new-campaign-form" hidden>
+            <label>Nome da campanha
+              <span class="field no-icon">
+                <input id="newCampaignName" type="text" required maxlength="120">
+              </span>
+            </label>
+            <label>Sistema
+              <span class="field no-icon">
+                <select id="newCampaignSystem">
+                  <option value="cyberpunk-red">Cyberpunk RED</option>
+                  <option value="dnd5e">D&amp;D 5a Edicao</option>
+                  <option value="cthulhu">Call of Cthulhu</option>
+                  <option value="other">Outro sistema</option>
+                </select>
+              </span>
+            </label>
+            <label>Visibilidade
+              <span class="field no-icon">
+                <select id="newCampaignVisibility">
+                  <option value="public">Publica</option>
+                  <option value="private">Privada</option>
+                </select>
+              </span>
+            </label>
+            <label>Imagem de capa <span class="label-hint">(opcional)</span>
+              <span class="banner-picker" id="bannerPicker">
+                <span class="banner-picker-preview" id="bannerPreview" hidden></span>
+                <span class="banner-picker-placeholder" id="bannerPlaceholder">Escolher imagem</span>
+                <input id="newCampaignBanner" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              </span>
+            </label>
+            <div class="new-campaign-actions">
+              <button type="submit" class="btn-neo small">
+                <span class="btn-label">Criar</span>
+                <span class="btn-spinner" hidden></span>
+              </button>
+              <button type="button" id="newCampaignCancel" class="btn-neo-ghost small">Cancelar</button>
+            </div>
+          </form>
+
+          <div id="campaignList" class="campaign-list"></div>
+          <p id="campaignEmpty" class="hint" hidden>Voce ainda nao participa de nenhuma campanha. Crie uma ou aguarde um convite.</p>
+
+          <div id="joinableSection" class="joinable-section" hidden>
+            <span class="joinable-eyebrow">CONVITES // MESAS ABERTAS</span>
+            <div id="joinableList" class="campaign-list joinable-list"></div>
+          </div>
+
+          <p class="campaign-tip"><b>Dica:</b> voce pode criar ou entrar em uma campanha a qualquer momento.</p>
+          <p id="campaignStatus" class="status" role="status"></p>
+          <button type="button" id="continueWithoutCampaign" class="continue-link">Continuar sem campanha</button>
+        </div>
+      </div>
+    </section>
   </main>
   <script type="module" src="/dist/login.js"></script>
 </body>

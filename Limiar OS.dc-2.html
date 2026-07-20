@@ -29,11 +29,17 @@
   <div style="position:sticky;top:0;z-index:60;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 20px;background:rgba(8,10,7,0.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(214,170,78,0.2);">
     <div style="display:flex;align-items:center;gap:12px;min-width:0;">
       <sc-if value="{{ notDesktop }}"><button onClick="{{ nav.home }}" style="display:flex;align-items:center;gap:6px;background:rgba(214,170,78,0.06);border:1px solid rgba(214,170,78,0.25);cursor:pointer;color:#d6aa4e;font:600 10px 'Share Tech Mono',monospace;letter-spacing:1.5px;padding:7px 12px;clip-path:polygon(0 0,calc(100% - 6px) 0,100% 6px,100% 100%,6px 100%,0 calc(100% - 6px));" style-hover="background:rgba(214,170,78,0.14);border-color:#d6aa4e;"><span style="font-size:13px;line-height:1;">&#8592;</span> {{ tx.desktop }}</button></sc-if>
-      <button onClick="{{ nav.home }}" style="display:flex;align-items:center;gap:9px;background:transparent;border:none;cursor:pointer;padding:0;color:#f0ead8;font:600 16px 'Chakra Petch',sans-serif;letter-spacing:2px;"><span style="color:#d6aa4e;font-size:13px;">&#9670;</span>LIMIAR<span style="color:#d6aa4e;">OS</span></button>
+      <div style="position:relative;">
+        <button onClick="{{ toggleTopMenu }}" style="display:flex;align-items:center;gap:9px;background:transparent;border:none;cursor:pointer;padding:0;color:#f0ead8;font:600 16px 'Chakra Petch',sans-serif;letter-spacing:2px;"><span style="color:#d6aa4e;font-size:13px;">&#9670;</span>LIMIAR<span style="color:#d6aa4e;">OS</span><span style="color:#6f7a64;font-size:9px;margin-left:2px;">&#9662;</span></button>
+        <sc-if value="{{ topMenuOpen }}">
+          <div onClick="{{ closeTopMenu }}" style="position:fixed;inset:0;z-index:59;"></div>
+          <div style="position:absolute;top:calc(100% + 8px);left:0;z-index:61;min-width:220px;background:rgba(10,12,9,0.98);backdrop-filter:blur(10px);border:1px solid rgba(214,170,78,0.25);box-shadow:0 12px 28px rgba(0,0,0,0.5);clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));">
+            <button onClick="{{ backToCampaigns }}" style="display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(214,170,78,0.14);cursor:pointer;color:#3fe0d0;font:600 11px 'Share Tech Mono',monospace;letter-spacing:1px;padding:11px 14px;text-align:left;" style-hover="background:rgba(63,224,208,0.08);"><span style="font-size:12px;">&#8646;</span> {{ tx.backToCampaigns }}</button>
+            <button onClick="{{ openTopMenuSettings }}" style="display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;cursor:pointer;color:#d6aa4e;font:600 11px 'Share Tech Mono',monospace;letter-spacing:1px;padding:11px 14px;text-align:left;" style-hover="background:rgba(214,170,78,0.08);"><span style="font-size:12px;">&#9881;</span> {{ tx.settings }}</button>
+          </div>
+        </sc-if>
+      </div>
       <span style="font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;border-left:1px solid rgba(214,170,78,0.2);padding-left:12px;">{{ viewTitle }}</span>
-      <sc-if value="{{ hasActiveCampaign }}">
-        <button onClick="{{ switchCampaign }}" style="display:flex;align-items:center;gap:6px;background:transparent;border:1px solid rgba(63,224,208,0.25);cursor:pointer;color:#3fe0d0;font:600 10px 'Share Tech Mono',monospace;letter-spacing:1px;padding:5px 10px;">{{ activeCampaignName }} <span style="font-size:11px;">&#8646;</span></button>
-      </sc-if>
     </div>
     <div style="display:flex;align-items:center;gap:7px;font:12px 'Share Tech Mono',monospace;letter-spacing:1px;color:#9a9883;">
       <span data-limiar-clock="true" style="color:#3fe0d0;">{{ clock }}</span><span style="color:#6f7a64;">// NEO-SP S7</span>
@@ -1536,13 +1542,61 @@
       <h1 style="font:600 44px 'Chakra Petch',sans-serif;letter-spacing:3px;color:#f0ead8;margin:12px 0 26px;">{{ tx.system }}</h1>
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div style="border:1px solid rgba(63,224,208,0.18);background:#0b0e0a;padding:12px 14px;font:11px 'Share Tech Mono',monospace;letter-spacing:1.5px;color:#6f7a64;">USUARIO // <span style="color:#3fe0d0;">{{ authUserLabel }}</span></div>
+        <button onClick="{{ openCampaigns }}" class="lm-ui-btn lm-ui-btn--gold" style="width:100%;text-align:center;">CAMPANHAS</button>
         <button onClick="{{ toggleScan }}" class="{{ scanRowStyle }}"><span style="font:14px 'Chakra Petch',sans-serif;letter-spacing:1px;">{{ tx.crtScanlines }}</span><span style="font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:{{ scanColor }};">{{ scanState }}</span></button>
         <button onClick="{{ toggleAura }}" class="{{ auraRowStyle }}"><span style="font:14px 'Chakra Petch',sans-serif;letter-spacing:1px;">{{ tx.holoAura }}</span><span style="font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:{{ auraColor }};">{{ auraState }}</span></button>
         <div style="border:1px solid rgba(214,170,78,0.18);background:#0b0e0a;padding:16px 18px;font:300 13px/1.6 'Chakra Petch',sans-serif;color:#9a9883;">{{ tx.systemIntroBefore }} <span style="color:#3fe0d0;">{{ tx.humanity }}</span>. {{ tx.systemIntroAfter }}</div>
+
+        <div style="border:1px solid rgba(214,170,78,0.2);background:#0b0e0a;padding:16px 18px;">
+          <div style="font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:12px;">MEU PERFIL // {{ profileUsername }}</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div style="width:56px;height:56px;border:1px solid rgba(214,170,78,0.3);background:#080a07 center/cover no-repeat url('{{ profileAvatarUrl }}');flex:none;"></div>
+            <input id="profile-avatar-upload" type="file" accept="image/*" onChange="{{ onProfileAvatarUpload }}" style="display:none;" />
+            <label for="profile-avatar-upload" class="lm-ui-btn lm-ui-btn--compact lm-ui-btn--ghost-gold" style="cursor:pointer;">TROCAR FOTO</label>
+          </div>
+          <input value="{{ profileEmail }}" onInput="{{ onProfileEmail }}" placeholder="email" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <input type="password" value="{{ profileCurrentPassword }}" onInput="{{ onProfileCurrentPassword }}" placeholder="senha atual" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+            <input type="password" value="{{ profileNewPassword }}" onInput="{{ onProfileNewPassword }}" placeholder="nova senha" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+          </div>
+          <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">Preencha senha atual + nova senha para trocar. Deixe em branco para nao alterar.</div>
+
+          <sc-if value="{{ profileIsAdmin }}">
+            <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin-top:14px;">FUNCAO // <span style="color:#3fe0d0;">ADMIN</span></div>
+          </sc-if>
+          <sc-if value="{{ profileRoleTogglable }}">
+            <div style="margin-top:14px;">
+              <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin-bottom:8px;">FUNCAO</div>
+              <div style="display:flex;gap:8px;">
+                <button onClick="{{ setProfileRolePlayer }}" class="{{ profilePlayerBtnStyle }}">JOGADOR</button>
+                <button onClick="{{ setProfileRoleGm }}" class="{{ profileGmBtnStyle }}">MESTRE</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <button onClick="{{ saveProfile }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact" style="margin-top:14px;">SALVAR PERFIL</button>
+          <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:#3fe0d0;margin-top:8px;">{{ profileStatus }}</div>
+        </div>
+
         <sc-if value="{{ gm }}">
           <div style="border:1px solid rgba(63,224,208,0.24);background:#09110f;padding:16px 18px;">
             <div style="font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0;margin-bottom:12px;">GM DATA OPS</div>
             <sc-if value="{{ canManageUsers }}">
+              <sc-if value="{{ hasPasswordResetRows }}">
+                <div style="border:1px solid rgba(230,140,80,0.35);background:#120c0a;padding:12px;margin-bottom:16px;">
+                  <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#e68c50;margin-bottom:10px;">SOLICITACOES DE SENHA PENDENTES</div>
+                  <div style="display:flex;flex-direction:column;gap:6px;">
+                    <sc-for list="{{ passwordResetRows }}" as="r" hint-placeholder-count="2">
+                      <div style="display:grid;grid-template-columns:1fr 74px auto auto;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(230,140,80,.2);padding:7px;">
+                        <div style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.username }}</div>
+                        <div style="font:9px 'Share Tech Mono',monospace;color:#3fe0d0;">{{ r.roleLabel }}</div>
+                        <button onClick="{{ r.onResolve }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RESETAR</button>
+                        <button onClick="{{ r.onDismiss }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">IGNORAR</button>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
               <div style="border:1px solid rgba(214,170,78,0.2);background:#0b0e0a;padding:12px;margin-bottom:16px;">
                 <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:10px;">CRIAR / RESETAR ACESSO DE JOGADOR</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">

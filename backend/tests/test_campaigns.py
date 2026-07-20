@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from backend.repositories import campaign_maps, campaigns, records
 
 ADMIN = {"username": "admin", "role": "admin"}
@@ -41,6 +43,70 @@ def test_campaign_invite_and_membership_make_private_campaign_visible(db_conn):
     assert joined["isMember"] is True
     assert joined["canJoin"] is False
     assert campaigns.notifications_for(PLAYER)[0]["kind"] == "campaign"
+
+
+def test_campaign_ownership_gate_and_banner_and_invite_cancel_and_member_removal(db_conn):
+    other_gm = {"username": "gm2", "role": "gm"}
+    campaign = campaigns.upsert_campaign(
+        {"name": "Owned Run", "visibility": "public", "bannerUrl": "/uploads/banner-1.png"}, GM,
+    )
+
+    # Ownership: the creating GM and admin manage it; a different GM does not.
+    assert campaigns.is_campaign_owner(campaign["id"], GM) is True
+    assert campaigns.is_campaign_owner(campaign["id"], ADMIN) is True
+    assert campaigns.is_campaign_owner(campaign["id"], other_gm) is False
+
+    # Editing without bannerUrl keeps the existing banner...
+    kept = campaigns.upsert_campaign({"id": campaign["id"], "name": "Owned Run"}, GM)
+    assert kept["banner_url"] == "/uploads/banner-1.png"
+    # ...but an explicit clearBanner wipes it even though bannerUrl is absent.
+    cleared = campaigns.upsert_campaign({"id": campaign["id"], "name": "Owned Run", "clearBanner": True}, GM)
+    assert cleared["banner_url"] in (None, "")
+
+    invite = campaigns.invite_player(campaign["id"], PLAYER["username"], GM)
+    assert invite["status"] == "pending"
+    assert campaigns.cancel_invite(campaign["id"], PLAYER["username"]) is True
+    assert campaigns.cancel_invite(campaign["id"], PLAYER["username"]) is False
+    assert campaigns.list_campaigns_for(GM)[0]["invites"] == []
+
+    records.upsert_record("characters", {"id": "member-op", "name": "Member Op", "ownerUsername": PLAYER["username"]})
+    campaigns.join_campaign(campaign["id"], "member-op", PLAYER)
+    assert campaigns.remove_member(campaign["id"], PLAYER["username"]) is True
+    assert campaigns.remove_member(campaign["id"], PLAYER["username"]) is False
+    joined = next(row for row in campaigns.list_campaigns_for(GM) if row["id"] == campaign["id"])
+    assert joined["members"] == []
+
+
+def test_campaign_api_invite_edit_and_delete_routes_are_owner_gated(campaign_handler, make_session):
+    owner = make_session("gm-owner", role="gm")
+    other = make_session("gm-other", role="gm")
+
+    create = campaign_handler({"name": "API Run", "visibility": "public"}, token=owner["token"])
+    create._post_campaigns()
+    assert create.status == HTTPStatus.CREATED
+    campaign_id = create.payload["id"]
+
+    # A GM who doesn't own this campaign can't invite, edit, or delete on it.
+    bad_invite = campaign_handler({"username": "someone"}, token=other["token"])
+    bad_invite._post_campaign_invite(campaign_id)
+    assert bad_invite.status == HTTPStatus.FORBIDDEN
+
+    bad_edit = campaign_handler({"id": campaign_id, "name": "Hijacked"}, token=other["token"])
+    assert bad_edit.route_campaign_post("/api/campaigns") is True
+    assert bad_edit.status == HTTPStatus.FORBIDDEN
+
+    good_invite = campaign_handler({"username": "someone"}, token=owner["token"])
+    good_invite._post_campaign_invite(campaign_id)
+    assert good_invite.status == HTTPStatus.CREATED
+
+    bad_cancel = campaign_handler(token=other["token"])
+    assert bad_cancel.route_campaign_delete(f"/api/campaigns/{campaign_id}/invites/someone") is True
+    assert bad_cancel.status == HTTPStatus.FORBIDDEN
+
+    good_cancel = campaign_handler(token=owner["token"])
+    assert good_cancel.route_campaign_delete(f"/api/campaigns/{campaign_id}/invites/someone") is True
+    assert good_cancel.status == HTTPStatus.OK
+    assert good_cancel.payload == {"cancelled": True}
 
 
 def test_campaign_map_crud_and_campaign_association(db_conn):

@@ -1,192 +1,204 @@
 # Limiar OS
 
-> A local campaign operating system for running a Cyberpunk RED table: login, roles, character sheets, campaigns, GM state, combat, cyberware, Night City Tarot, chat, and a Netrunner breach minigame in one browser app.
+> A local campaign operating system for running a Cyberpunk RED table:
+> sheets, combat, map, campaigns, chat, cyberware, Night City Tarot and
+> Nexus Breach in the same app.
 
-Local Cyberpunk RED campaign OS with persistent sheets, access control, campaign membership, combat state, cyberware rules, Night City Tarot resolution, chat, and GM/player API flows.
+Limiar OS is not a generic VTT. It is a tool focused on Cyberpunk RED, built
+to keep rules, mechanical state, and GM controls in the same place during a
+session. The server runs locally, persists data in SQLite, and serves the
+interface through the browser.
 
-Limiar OS is not a generic virtual tabletop. It is a focused table tool for a Cyberpunk RED campaign, built to keep the mechanical state of play in the same place as the GM-facing controls. The app runs locally, stores campaign data in SQLite, and serves a browser interface from a small Python HTTP server.
+The technical roadmap and acceptance criteria live in [`README-PLANO.md`](./README-PLANO.md).
 
-## What it does
+## What the system does
 
-- Manages character sheets with stats, skills, armor, HP, SP damage, IP, notes, Trauma Team plan, gear, and installed cyberware.
-- Gives the GM a persistent campaign workspace for characters, items, HQ/IP state, combat state, chat, tarot deck state, and campaign rosters.
-- Uses login/session auth with three access levels: admin, GM, and player.
-- Lets admins create, edit, and delete users.
-- Lets GMs create public/private campaigns, invite players, and inspect campaign rosters.
-- Lets players create/edit their own sheets, accept campaign invites, join public campaigns, and link one sheet per campaign.
-- Lets players use player-facing flows for chat, character selection, notes, and ending their own active combat turn.
-- Resolves Cyberpunk RED-style dice, skill checks, weapon damage, armor interaction, critical injuries, conditions, healing, and IP costs through dedicated rule modules.
-- Applies cyberware effects to stats, skills, passive immunities, attack modifiers, weapon modes, damage, armor ablation, and healing transparency.
-- Supports Night City Tarot as a persisted deck/session system with card effects resolved into damage, SP ablation, critical injuries, status effects, and GM-readable breakdowns.
-- Embeds Nexus Breach, a compact Netrunner breach minigame, inside the same app surface.
-- Includes a Vitest harness for domain rules, with coverage checks for dice, economy, character, and conditions modules.
+- Manages sheets with attributes, skills, HP, armor, SP damage, IP,
+  reputation, notes, Trauma Team, gear and installed cyberware.
+- Maintains public or private campaigns, members, invites and one linked
+  sheet per player.
+- Offers `admin`, `gm` and `player` profiles, with write routes scoped by
+  role and ownership.
+- Resolves rolls, attacks, damage, armor, critical injuries, conditions,
+  healing, IP, LUCK and ammo through dedicated rule modules.
+- Applies structured cyberware effects to attributes, skills, attacks,
+  damage, armor, healing, immunities and weapon modes.
+- Keeps Night City Tarot as a persistent deck and session, with effects
+  translated into damage, ablation, criticals and auditable status.
+- Embeds Nexus Breach as a Netrunner minigame inside the same surface.
+- Includes chat, shared GM state, HQ/IP and the combat cockpit.
+- Includes the **Mesa**, a per-campaign tactical map tied to combat and
+  sheets.
+
+## Product scope
+
+Limiar OS supports **Cyberpunk RED**. The map, catalog, calculations and
+interface are built for that system.
+
+The project is local-first:
+
+- local user/password login works without an external provider;
+- the Python server and SQLite are enough to run the table;
+- Google Login is an optional integration;
+- absence of Google configuration does not block local login.
 
 ## Access and campaigns
 
-Limiar OS has role-based access:
+Access control has three roles:
 
-- `admin`: all GM permissions plus user management.
-- `gm`: campaign and table-master permissions.
-- `player`: owns their own sheets and can join campaigns with one sheet per campaign.
+- `admin`: all GM permissions plus user management;
+- `gm`: campaigns, Mesa and table-master controls;
+- `player`: their own sheets, linked campaigns and authorized player
+  actions.
 
-Campaigns can be public or private. Public campaigns can be joined by players with one of their sheets. Private campaigns require an invite from an admin/GM. The campaign drawer shows available campaigns, notifications, pending invites, linked sheets, and player search for invitations.
+Public campaigns can be discovered and joined with a player sheet. Private
+campaigns require an invite. The campaigns drawer shows notifications,
+invites, roster, linked sheet and the **MESA** entry.
 
-The **Mesa** (campaign map/table) is a live feature (`campaign-map.html` and `/api/campaign-maps/*`), opened from the campaigns drawer's MESA button on a specific campaign, or from the desktop MAP icon. It is a canvas-based tactical map per campaign: scenes with a background image and grid, tokens (optionally linked to a character sheet), shared or per-player fog of war with dynamic vision, walls and doors with line-of-sight raycasting, ambient/token lighting and scene darkness, area-of-effect templates (circle/cone/rectangle/ray), a ruler that turns a measured range directly into an attack roll in the combat cockpit (`RANGE // banda // DV`), and real-time sync across open tabs via long-poll. Combat state (round, active turn) is projected onto the map, and the token context menu can open a linked character's sheet or cockpit, measure-and-attack, or manage initiative/defeated status without leaving the map.
+## Tactical Mesa
+
+The Mesa lives in `campaign-map.html` and the `/api/campaign-maps/*`
+routes. It can be opened from a campaign's **MESA** button or from the
+desktop MAP icon.
+
+Current features:
+
+- scenes with image, grid, dimensions, scale and darkness;
+- tokens with image, ownership, linked sheet, HP, conditions and ammo;
+- shared or per-player fog, reveals and dynamic vision;
+- walls, doors, line of sight and ambient or token-linked lights;
+- difficult terrain, drawings, pins and pings;
+- area templates for circle, cone, rectangle and ray;
+- destructible props/cover with HP and LOS blocking;
+- a ruler that sends distance, band and DV to the combat cockpit;
+- round/turn state projected onto the map;
+- token context menu for sheet, cockpit, measurement, initiative and
+  defeated status;
+- area resolution with pre-selected targets in the cockpit;
+- per-campaign sync via long-poll.
+
+The map collects geometry and context. CPR rules live in the domain
+modules and the `systemAdapter`; the canvas does not decide mechanical
+outcomes on its own.
 
 ## How rules are applied
 
-The rule logic is split into pure frontend domain modules and narrow backend persistence routes. The UI collects the current character, weapon, target, cyberware, tarot, and combat context, then calls the relevant domain helpers before saving the resulting state through the API.
+The UI collects character, weapon, target, map context, cyberware, tarot
+and combat state. Pure modules compute the result, the application layer
+prepares the mutation, and the API persists the state.
 
-### Character and sheet rules
+### Character and progression
 
-Character normalization lives in `frontend/src/domain/character/`. It clamps stats, normalizes armor, parses gear damage notation, canonicalizes skills, computes skill totals, and tracks skill/IP spend. Most character data is persisted as structured JSON through the `characters` API, so new sheet fields can be saved without a database migration.
+`frontend/src/domain/character/` normalizes attributes, armor, skills,
+gear and derived values. `frontend/src/domain/economy/` computes costs and
+records IP history:
 
-Character progression uses `frontend/src/domain/economy/`:
+- skill: `next level * 10`;
+- difficult skill: doubled cost;
+- Role ability: `next rank * 30`.
 
-- Skill IP cost is `nextLevel * 10`.
-- Difficult skills double that skill cost.
-- Role ability IP cost is `nextRank * 30`.
-- IP changes are written as ledger entries so the sheet can show history, not just the final balance.
+### Dice and rolls
 
-### Dice and roll rules
+`frontend/src/domain/dice/` parses `NdM` notation, organizes contributions
+and generates breakdowns. The UI controls animation and timing; the domain
+controls the math. The 3D renderer lives in `vendor/sarah-dice/`.
 
-Roll math lives in `frontend/src/domain/dice/`. Rolls are represented as contribution rows, not just one text string. That lets the app show where each die or modifier came from, such as base weapon damage, cyberware, critical context, or a situational roll toggle.
+### Combat
 
-The dice domain:
+`frontend/src/domain/combat/` covers initiative, turns, checks, attacks,
+damage, armor, autofire, ammo, stabilization, facedown and related rules.
+Shared state uses `/api/combat-state`.
 
-- Parses and formats `NdM` notation.
-- Expands `d100` into the pair expected by the vendored 3D dice engine.
-- Caps physical dice contributions for the renderer.
-- Builds readable breakdowns for the chat/combat log.
+Players can end their own turn through the narrow
+`/api/combat-state/end-turn` route; broad combat changes stay under GM
+control.
 
-The UI owns animation and commit timing; the domain module owns the math.
+### Injuries and conditions
 
-### Combat rules
+`frontend/src/domain/conditions/` normalizes critical injuries and status
+effects, including duration, stacks, penalties, wound state and
+treatment. The origin and reason for changes stay visible on the sheet and
+in the logs.
 
-Combat state and combat calculations live in `frontend/src/domain/combat/` and are persisted through `/api/combat-state`.
+### Cyberware
 
-The combat layer:
+`frontend/src/domain/cyberware/` resolves typed bonuses, enhancements,
+immunities, cyberweapon modes, modifiers, damage, ablation and healing.
+Installed cyberware is the source of truth; the catalog supplies the
+structured rules.
 
-- Normalizes combatants, sides, initiative, turn order, defeated state, rounds, and active turn.
-- Sorts initiative by rolled initiative, then REF as a tie breaker, then stable table order.
-- Computes attack modifiers from effective stat + relevant skill + cyberware skill/stat bonuses + weapon modifiers.
-- Computes generic check modifiers from effective stat + skill + cyberware bonuses.
-- Treats Autofire as fixed `2d6` damage regardless of the weapon's listed damage dice.
-- Builds weapon damage as contribution rows, including runtime scaling such as cyberweapon profiles and enhancement effects.
-- Keeps player self end-turn narrow: players can call `/api/combat-state/end-turn`, while broad combat-state writes stay GM-only.
+### Night City Tarot
 
-### Armor, wounds, and conditions
+`frontend/src/domain/tarot/` maintains the 22 cards, deck order, history
+and session. Effects produce a breakdown of damage, SP, multipliers,
+ablation, criticals and status before persisting to `/api/tarot-state`.
 
-Conditions and critical injuries live in `frontend/src/domain/conditions/`. The module aggregates active penalties every time derived character stats are computed.
+### Nexus Breach
 
-It applies:
-
-- Untreated critical injury penalties.
-- Action, death-save, MOVE/stat, evasion, SP ablation, and wound-state modifiers.
-- Timed status effects with round/minute/hour duration conversion.
-- Charge-based statuses, such as guaranteed critical charges, through explicit use actions.
-- Critical injury records with source, location, treated state, and stack behavior.
-
-Cyberware-dependent immunity checks are kept outside the pure conditions module and passed in by the UI/domain caller.
-
-### Cyberware rules
-
-Cyberware effects live in `frontend/src/domain/cyberware/`. Installed cyberware is treated as the source of truth for bonuses; catalog lookup and persistence stay outside the domain module.
-
-The cyberware layer:
-
-- Normalizes typed bonus arrays against `CYBER_BONUS_TYPES`.
-- Applies stat modifiers to effective stats.
-- Aggregates skill bonuses, ranged bonuses, critical damage bonuses, critical-roll effects, armor-ignore rules, armor ablation, weapon modes, cover damage, healing multipliers, nonlethal options, and passive immunities.
-- Links cyberweapon enhancements to installed parent cyberware, then exposes the combined weapon profile to combat rolls.
-- Produces source labels so the sheet and combat log can show why a number changed.
-
-### Night City Tarot rules
-
-Tarot logic lives in `frontend/src/domain/tarot/` and persists through `/api/tarot-state`.
-
-The tarot layer:
-
-- Maintains a normalized 22-card deck order, seen list, current session id, current session draw, and draw history.
-- Resolves card effect trees against combat context flags, such as melee/ranged attack context or target conditions.
-- Computes tarot damage from rolled damage, pre-armor additions, armor bypass, multipliers, target location, SP, and ablation.
-- Expands multi-critical effects into individual critical injury atoms.
-- Generates breakdown text that explains base damage, SP interaction, multipliers, and ablation so the GM can audit the result.
-
-Deck state is stored as one settings-backed singleton, so a table can resume the same tarot deck/session after reloads.
-
-### Nexus Breach rules
-
-`games/nexus-breach/nexus-breach.js` is embedded into Limiar OS through an imperative mount/unmount wrapper. It keeps its own minigame state and exposes a GM-published challenge/result flow through `/api/nexus-challenge` and `/api/nexus-result`.
-
-The important integration rule is that Nexus Breach is mounted inside the existing app surface without letting the main UI renderer wipe its DOM, canvas, timers, or keyboard listeners.
+`games/nexus-breach/` is mounted inside the app and uses
+`/api/nexus-challenge` and `/api/nexus-result`. Its lifecycle preserves
+the minigame's canvas, timers and listeners when the main UI updates.
 
 ## Architecture
 
 ```text
-Limiar OS.dc-2.html             # App shell served by the Python server
-login.html                      # Login/campaign-picker page, loads dist/login.js
-campaign-map.html               # Mesa (campaign map) page, loads dist/campaign-map.js
-limiar-styles.css               # Main app styling
-login.css                       # Login page styling
-styles/map/                     # Mesa (campaign map) styling, theme-able per system
-dist/limiar-app.js              # Versioned frontend build loaded by the shell
+Limiar OS.dc-2.html             # main shell
+login.html                      # login and campaign picker
+campaign-map.html               # Mesa page
+limiar-styles.css               # app styles
+login.css                       # login styles
+styles/map/                     # Cyberpunk RED Mesa styles
+dist/                           # bundles served by the backend
 
 frontend/src/
-  main.js                       # Composition root
-  framework/index.js            # Small component mounting layer
-  infrastructure/api/           # Client API modules
-  infrastructure/store.js       # Client-side store/bootstrap helpers
-  domain/                       # Pure rule/math modules
-  domain/map/                   # Mesa geometry/vision/template/attack-intent modules (pure, vitest-covered)
-  pages/campaign-map.js         # Mesa page controller (canvas render + interaction)
-  pages/login.js                # Login page controller
-  ui/Component.js               # Main app UI orchestration
-  ui/view/                      # View helpers/styles
+  main.js                       # app composition root
+  application/                  # orchestrated use cases and mutations
+  domain/                       # pure rules and math
+  domain/map/                   # geometry, vision, templates and intents
+  infrastructure/api/           # backend route clients
+  infrastructure/session.ts     # client-side session
+  pages/campaign-map.js         # Mesa controller
+  pages/login.js                # login controller
+  ui/Component.js               # main UI orchestration
+  ui/views/                     # per-surface views and handlers
 
 backend/
-  app.py                        # HTTP route dispatch and static serving
-  api/                          # Auth, users, campaigns, characters, catalog, state, chat, uploads
-  db.py                         # SQLite setup and seed insertion
-  repositories/                 # Record/chat/campaign persistence
-  security.py                   # Password hashing and session helpers
+  app.py                        # HTTP dispatch and static files
+  api/                          # auth, campaigns, map, chat and state
+  repositories/                 # SQLite persistence
+  domain/                       # backend validation
+  db.py                         # schema, migrations and seed
 
-data/seed/
-  limiar-seed.json              # Declarative seed data
-  tarot.json, trauma-plans.json, skills.json, critical-injuries.json, i18n.json
-                                 # Reference-data source of truth, imported directly by frontend/src via the @seed alias
-
-games/nexus-breach/             # Embedded Netrunner breach minigame
-vendor/sarah-dice/              # Vendored 3D dice renderer
-frontend/test/                  # Vitest unit/rule tests
+data/seed/                      # declarative catalog and references
+games/nexus-breach/             # Netrunner minigame
+vendor/sarah-dice/              # vendored 3D dice
+frontend/test/                  # Vitest tests
+backend/tests/                  # pytest tests
 ```
 
-## Runtime model
+The frontend uses Vite and ES modules. The served HTML loads files from
+`dist/`; changes in `frontend/src/` only show up on the real server after
+a build.
 
-The backend is Python stdlib `http.server` plus SQLite. It serves the static app and owns persistence, auth, campaign access, and API boundaries.
+## Requirements
 
-Broad write routes are admin/GM-only. Player routes are deliberately narrow and ownership-checked.
+- Python 3.10 or newer;
+- Node.js/npm to develop, test or rebuild the frontend;
+- a modern browser with ES modules support.
 
-- `/api/login` and `/api/logout`
-- `/api/session`
-- `/api/users` (admin write; admin/GM list)
-- `/api/campaigns`, `/api/campaigns/:id/invite`, `/api/campaigns/:id/join`
-- `/api/notifications`
-- `/api/player-characters`
-- `/api/chat`
-- `/api/combat-state/end-turn`
-- `/api/nexus-result`
-- `/api/characters/:id/notes`
+## Running locally
 
-The frontend is built with Vite/ES modules. The served HTML loads `dist/limiar-app.js`, so source edits under `frontend/src/` are not visible in the local app until the bundle is rebuilt.
-
-## Run locally
-
-Requires Python 3.10+ (the codebase uses `X | None` union syntax without a
-`__future__` import, which needs native PEP 604 support).
+Single command (builds the frontend and starts the backend, which serves
+everything on one port):
 
 ```bash
-cd limiar-os
+./run.sh
+```
+
+Or manually, in two steps — useful when the frontend is already built:
+
+```bash
+cd frontend && npm run build && cd ..
 python3 server.py
 ```
 
@@ -196,82 +208,112 @@ Open:
 http://127.0.0.1:8765/Limiar%20OS.dc-2.html
 ```
 
-For reverse proxy / Cloudflare / LAN access, bind remains `0.0.0.0` by default.
+The real server serves the UI, `/api/*` and SQLite. A static server can
+show HTML/CSS but proves nothing about auth, persistence or API-backed
+rules.
 
-## Rebuild the frontend
+## Local login
 
-Run this after changing anything under `frontend/src/`:
+On a fresh database, the initial admin user is controlled by:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LIMIAR_GM_USER` | `mestre` | initial admin user |
+| `LIMIAR_GM_PASSWORD` | `limiar-master-2077` | initial admin password |
+
+Set your own password before exposing the server to the network:
+
+```bash
+LIMIAR_GM_USER=mestre LIMIAR_GM_PASSWORD='change-this-password' python3 server.py
+```
+
+## Optional Google Login
+
+Google Login is optional. To enable it, create an OAuth Client ID for Web
+and start the server with:
+
+```bash
+GOOGLE_CLIENT_ID='your-client-id.apps.googleusercontent.com' python3 server.py
+```
+
+The backend validates the `id_token`, `aud`, issuer and verified email.
+Without `GOOGLE_CLIENT_ID`, username/password login remains the supported
+flow and the Google integration stays unavailable.
+
+## Other environment variables
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8765` | HTTP port |
+| `HOST` | `0.0.0.0` | bind address |
+| `LIMIAR_SESSION_TTL` | `28800` | inactivity expiration, in seconds |
+| `LIMIAR_MAX_UPLOAD_MB` | `64` | image upload limit |
+
+Example:
+
+```bash
+HOST=127.0.0.1 PORT=9000 LIMIAR_SESSION_TTL=14400 python3 server.py
+```
+
+## Rebuilding the frontend
+
+After changing `frontend/src/`:
 
 ```bash
 cd frontend
 npm run build
 ```
 
-`npm run dev` starts Vite for frontend iteration, but `server.py` serves the committed `dist/limiar-app.js` build.
+`npm run dev` serves it for Vite iteration. `python3 server.py` uses the
+bundles generated in `dist/`.
 
-## Run tests
+## Tests
 
-```bash
-cd frontend
-npm test
-npm run test:coverage
-```
-
-The current harness covers the pure domain modules in `frontend/src/domain/dice`, `economy`, `character`, and `conditions`. Golden-master fixtures from `data/audit/snapshots/` are planned, but that snapshot directory is not present in the current tree.
-
-Backend checks use pytest with an isolated SQLite test database:
+Backend:
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
 python3 -m pytest backend/tests -q
 ```
 
-## Environment variables
-
-All variables are optional for local development.
-
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `LIMIAR_GM_USER` | `mestre` | Seeded admin login user for a fresh database. |
-| `LIMIAR_GM_PASSWORD` | `limiar-master-2077` | Seeded admin password for a fresh database. Set this before exposing the server. |
-| `PORT` | `8765` | HTTP server port. |
-| `HOST` | `0.0.0.0` | HTTP bind host. |
-| `LIMIAR_SESSION_TTL` | `28800` | Idle session TTL in seconds. Authenticated requests slide the window forward. |
-| `LIMIAR_MAX_UPLOAD_MB` | `64` | Max image upload size in MB. |
-
-Example:
+Frontend:
 
 ```bash
-LIMIAR_GM_USER=mestre LIMIAR_GM_PASSWORD=change-this PORT=9000 LIMIAR_SESSION_TTL=14400 LIMIAR_MAX_UPLOAD_MB=64 python3 server.py
+cd frontend
+npm test
+npm run typecheck
+npm run test:coverage
 ```
 
-## Development checks
+Build and hygiene:
 
-Git hooks live in `.githooks/`. Enable them once per clone:
+```bash
+cd frontend && npm run build
+git diff --check
+```
+
+In the snapshot verified on 2026-07-18, 77 backend tests and 623 frontend
+tests passed. These counts are dated evidence; the commands above are the
+source of truth for the current checkout.
+
+## Development hooks
+
+Enable hooks once per clone:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-The pre-commit hook runs backend pytest plus `cd frontend && npm test` and
-`npm run typecheck`, blocking commits when either harness fails.
+The pre-commit hook runs backend pytest, frontend Vitest and TypeScript
+typecheck.
 
-Useful validation commands:
+## Port troubleshooting
 
-```bash
-cd frontend && npm run build
-cd frontend && npm test
-cd frontend && npm run test:coverage
-python3 -m py_compile server.py backend/*.py backend/api/*.py backend/domain/*.py backend/repositories/*.py
-python3 -m json.tool data/seed/limiar-seed.json >/dev/null
-```
-
-For UI and API work, validate through the real app server rather than only a static file server. A plain `python3 -m http.server` can render static assets, but it cannot prove `/api/*` behavior or SQLite persistence.
-
-## Port cleanup
-
-If the default port is stuck:
+If the port is in use, identify the process before killing it:
 
 ```bash
-lsof -ti:8765 | xargs kill -9
+lsof -nP -iTCP:8765 -sTCP:LISTEN
+kill <PID>
 ```
+
+Confirm the PID belongs to the server you intend to stop.

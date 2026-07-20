@@ -89,6 +89,13 @@ describe('ui/views/hq hqRenderVals', () => {
     expect(vals.userDraftRole).toBe('player');
     expect(vals.userRolePlayerSelected).toBe(true);
   });
+
+  it('exposes profileAvatarUrl from authUser and wires the upload input through deps', () => {
+    const vals = hqRenderVals({ authUser: { username: 'rook', avatarUrl: '/uploads/avatar-rook.png' } }, { ...deps, uploadAvatar: vi.fn() });
+    expect(vals.profileAvatarUrl).toBe('/uploads/avatar-rook.png');
+    const file = { name: 'pic.png' };
+    vals.onProfileAvatarUpload({ target: { files: [file] } });
+  });
 });
 
 function fakeComponent(overrides = {}) {
@@ -185,5 +192,38 @@ describe('ui/views/hq hqHandlers', () => {
     await hqHandlers(component).deleteUser('vesper');
     expect(component.api().users.delete).toHaveBeenCalledWith('vesper');
     expect(component.loadUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploadAvatar uploads the file then merges the returned avatarUrl into authUser', async () => {
+    const apiInstance = {
+      uploads: { image: vi.fn().mockResolvedValue({ url: '/uploads/avatar-rook.png' }) },
+      users: { updateMe: vi.fn().mockResolvedValue({ avatarUrl: '/uploads/avatar-rook.png' }) },
+    };
+    const component = fakeComponent({ apiInstance, state: { authUser: { username: 'rook', role: 'player' } } });
+    const file = { name: 'pic.png' };
+    await hqHandlers(component).uploadAvatar(file);
+    expect(apiInstance.uploads.image).toHaveBeenCalledWith(file, { scope: 'user-avatar', ownerId: 'rook' });
+    expect(apiInstance.users.updateMe).toHaveBeenCalledWith({ avatarUrl: '/uploads/avatar-rook.png' });
+    expect(component.state.authUser.avatarUrl).toBe('/uploads/avatar-rook.png');
+  });
+
+  it('uploadAvatar is a no-op without a file', async () => {
+    const apiInstance = { uploads: { image: vi.fn() }, users: { updateMe: vi.fn() } };
+    const component = fakeComponent({ apiInstance });
+    await hqHandlers(component).uploadAvatar(null);
+    expect(apiInstance.uploads.image).not.toHaveBeenCalled();
+  });
+
+  it('openCampaigns delegates to the campaigns overlay global, if mounted', () => {
+    const toggle = vi.fn();
+    globalThis.limiarCampaigns = { toggle };
+    hqHandlers(fakeComponent()).openCampaigns();
+    expect(toggle).toHaveBeenCalledTimes(1);
+    delete globalThis.limiarCampaigns;
+  });
+
+  it('openCampaigns is a no-op when the overlay has not mounted', () => {
+    delete globalThis.limiarCampaigns;
+    expect(() => hqHandlers(fakeComponent()).openCampaigns()).not.toThrow();
   });
 });

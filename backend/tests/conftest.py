@@ -7,6 +7,7 @@ import pytest
 from backend import db as db_module
 from backend.api.auth import AuthRoutes
 from backend.api.base import BaseHandler
+from backend.api.campaigns import CampaignRoutes
 from backend.security import password_hash
 
 
@@ -91,5 +92,40 @@ class FakeAuthHandler(AuthRoutes, BaseHandler):
 def auth_handler(db_path):
     def _handler(payload=None, token=None):
         return FakeAuthHandler(payload=payload, token=token)
+
+    return _handler
+
+
+class FakeCampaignHandler(CampaignRoutes, BaseHandler):
+    def __init__(self, payload=None, token=None, path="/api/campaigns"):
+        body = json.dumps(payload or {}).encode("utf-8")
+        self.headers = {"Content-Length": str(len(body))}
+        if token:
+            self.headers["Authorization"] = f"Bearer {token}"
+        self.rfile = io.BytesIO(body)
+        self.client_address = ("127.0.0.1", 12345)
+        self.path = path
+        self.status = None
+        self.response_headers = []
+        self.payload = None
+
+    def send_response(self, status, message=None):
+        self.status = status
+
+    def send_header(self, key, value):
+        self.response_headers.append((key, value))
+
+    def end_headers(self):
+        return None
+
+    def write_json(self, payload, status=HTTPStatus.OK):
+        self.status = status
+        self.payload = payload
+
+
+@pytest.fixture()
+def campaign_handler(db_path):
+    def _handler(payload=None, token=None, path="/api/campaigns"):
+        return FakeCampaignHandler(payload=payload, token=token, path=path)
 
     return _handler

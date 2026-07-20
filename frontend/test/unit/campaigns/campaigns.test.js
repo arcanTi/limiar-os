@@ -41,10 +41,12 @@ describe('domain/campaigns', () => {
     }));
 
     expect(normalizeCampaignDraft({ name: ' A ', visibility: 'private', status: 'paused' })).toEqual({
+      id: '',
       name: 'A',
       description: '',
       visibility: 'private',
       status: 'paused',
+      bannerUrl: '',
     });
   });
 
@@ -64,6 +66,11 @@ describe('domain/campaigns', () => {
     };
 
     expect(canManageCampaign(privateCampaign, { user: { role: 'admin' } })).toBe(true);
+    const ownedCampaign = { ...privateCampaign, created_by: 'gm-owner' };
+    expect(canManageCampaign(ownedCampaign, { user: { username: 'gm-owner', role: 'gm' } })).toBe(true);
+    expect(canManageCampaign(ownedCampaign, { user: { username: 'gm-other', role: 'gm' } })).toBe(false);
+    expect(canManageCampaign(ownedCampaign, { user: { username: 'gm-other', role: 'admin' } })).toBe(true);
+    expect(canManageCampaign(ownedCampaign, { user: { username: 'gm-owner', role: 'player' } })).toBe(false);
     expect(canViewCampaign(privateCampaign, { user: { role: 'gm' } })).toBe(true);
     expect(canViewCampaign(privateCampaign, { user: { username: 'member', role: 'player' } })).toBe(true);
     expect(canViewCampaign(privateCampaign, { user: { username: 'invited', role: 'player' } })).toBe(true);

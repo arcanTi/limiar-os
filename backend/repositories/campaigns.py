@@ -4,10 +4,21 @@ import secrets
 
 from ..db import db
 from ..util import slug
+from .records import get_record
 
 
 def row_dict(row) -> dict[str, object]:
     return dict(row) if row else {}
+
+
+def _roster_entry(username: str, role: str, character_id: str | None) -> dict[str, object]:
+    character = get_record("characters", character_id) if character_id else None
+    return {
+        "username": username,
+        "role": role,
+        "characterId": character_id,
+        "portraitUrl": (character or {}).get("portraitUrl") or None,
+    }
 
 
 def list_campaigns_for(session: dict[str, str]) -> list[dict[str, object]]:
@@ -37,11 +48,21 @@ def list_campaigns_for(session: dict[str, str]) -> list[dict[str, object]]:
             visible = staff or campaign["visibility"] == "public" or my_member or my_invite
             if not visible:
                 continue
+            campaign["memberCount"] = len(members)
             campaign["members"] = members if staff else ([my_member] if my_member else [])
             campaign["invites"] = invites if staff else ([my_invite] if my_invite else [])
             campaign["isMember"] = bool(my_member)
             campaign["myInviteId"] = my_invite["id"] if my_invite else None
             campaign["canJoin"] = (not my_member) and (campaign["visibility"] == "public" or bool(my_invite))
+            # Public-facing roster (username/role/portrait only, no invite or
+            # join-date detail) so any viewer who can see the card at all can
+            # see who's running/playing it - not gated to staff like `members`.
+            roster = [_roster_entry(m["username"], m["role"], m["character_id"]) for m in members]
+            gm_username = campaign.get("created_by")
+            if gm_username and not any(r["username"] == gm_username for r in roster):
+                roster.insert(0, _roster_entry(gm_username, "gm", None))
+            campaign["roster"] = roster
+            campaign["participantCount"] = len(roster)
             out.append(campaign)
     return out
 
@@ -71,6 +92,37 @@ def is_campaign_member(campaign_id: str, session: dict[str, str]) -> bool:
     return row is not None
 
 
+def is_campaign_owner(campaign_id: str, session: dict[str, str]) -> bool:
+    """GM-management gate: admin, or the GM who created this specific
+    campaign. A `gm` role alone is not enough — a GM playing as a member of
+    someone else's campaign must not be able to manage it."""
+    if session.get("role") == "admin":
+        return True
+    campaign = get_campaign(campaign_id)
+    return bool(campaign and campaign.get("created_by") == session.get("username"))
+
+
+def cancel_invite(campaign_id: str, username: str) -> bool:
+    with db() as conn:
+        cur = conn.execute(
+            "DELETE FROM campaign_invites WHERE campaign_id = ? AND username = ?",
+            (campaign_id, username),
+        )
+    return cur.rowcount > 0
+
+
+def remove_member(campaign_id: str, username: str) -> bool:
+    with db() as conn:
+        cur = conn.execute(
+            "DELETE FROM campaign_members WHERE campaign_id = ? AND username = ?",
+            (campaign_id, username),
+        )
+    return cur.rowcount > 0
+
+
+CAMPAIGN_SYSTEMS = ("cyberpunk-red", "dnd5e", "cthulhu", "other")
+
+
 def upsert_campaign(payload: dict[str, object], session: dict[str, str]) -> dict[str, object]:
     name = str(payload.get("name") or "").strip()[:120]
     campaign_id = str(payload.get("id") or slug(name))[:120]
@@ -81,20 +133,40 @@ def upsert_campaign(payload: dict[str, object], session: dict[str, str]) -> dict
     status = str(payload.get("status") or "active")
     if status not in ("active", "paused", "archived"):
         status = "active"
+    system = str(payload.get("system") or "")
+    if system not in CAMPAIGN_SYSTEMS:
+        system = ""
+    banner_url = str(payload.get("bannerUrl") or "").strip()[:500]
+    clear_banner = bool(payload.get("clearBanner"))
     with db() as conn:
-        existing = conn.execute("SELECT created_by FROM campaigns WHERE id = ?", (campaign_id,)).fetchone()
+        existing = conn.execute(
+            "SELECT created_by, system, banner_url FROM campaigns WHERE id = ?", (campaign_id,),
+        ).fetchone()
+        # Callers that don't send a system (e.g. the campaigns drawer) must not
+        # reset an existing campaign's system on edit.
+        if not system:
+            system = str(existing["system"] if existing and existing["system"] else "cyberpunk-red")
+        # Same rule for the banner: an edit call that omits it keeps whatever
+        # was uploaded before instead of blanking the card out. `clearBanner`
+        # is the explicit escape hatch to actually remove it.
+        if clear_banner:
+            banner_url = ""
+        elif not banner_url:
+            banner_url = str(existing["banner_url"] if existing and existing["banner_url"] else "")
         conn.execute(
             """
-            INSERT INTO campaigns(id, name, description, visibility, status, created_by)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO campaigns(id, name, description, visibility, status, system, banner_url, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
               name = excluded.name,
               description = excluded.description,
               visibility = excluded.visibility,
               status = excluded.status,
+              system = excluded.system,
+              banner_url = excluded.banner_url,
               updated_at = CURRENT_TIMESTAMP
             """,
-            (campaign_id, name, description, visibility, status, existing["created_by"] if existing else session["username"]),
+            (campaign_id, name, description, visibility, status, system, banner_url or None, existing["created_by"] if existing else session["username"]),
         )
     return get_campaign(campaign_id) or {}
 

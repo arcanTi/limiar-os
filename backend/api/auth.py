@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from http import HTTPStatus
 
-from ..config import _LOGIN_RATE, GOOGLE_CLIENT_ID, SESSION_TTL_SECONDS
+from ..config import _LOGIN_RATE, GOOGLE_CLIENT_ID, REMEMBER_SESSION_TTL_SECONDS, SESSION_TTL_SECONDS
 from ..db import db
 from ..domain.validation import ValidationError, validate_email, validate_login, validate_user
 from ..security import _login_timestamps, check_rate, password_hash, verify_password
@@ -46,6 +46,7 @@ class AuthRoutes:
             "username": row["username"],
             "role": row["role"],
             "email": row["email"] if "email" in row.keys() else None,
+            "avatarUrl": row["avatar_url"] if "avatar_url" in row.keys() else None,
             "createdAt": row["created_at"],
         }
 
@@ -62,6 +63,7 @@ class AuthRoutes:
             username, password = validate_login(payload)
         except ValidationError as e:
             return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
+        remember = bool(payload.get("remember"))
         with db() as conn:
             user = conn.execute(
                 "SELECT username, password_hash, role FROM users WHERE username = ?",
@@ -76,10 +78,11 @@ class AuthRoutes:
                     (password_hash(password), user["username"]),
                 )
             token = secrets.token_urlsafe(32)
+            ttl = REMEMBER_SESSION_TTL_SECONDS if remember else SESSION_TTL_SECONDS
             conn.execute(
-                "INSERT INTO sessions(token, username, role, expires_at)"
-                " VALUES (?, ?, ?, datetime('now', ?))",
-                (token, user["username"], user["role"], f"+{SESSION_TTL_SECONDS} seconds"),
+                "INSERT INTO sessions(token, username, role, expires_at, remember)"
+                " VALUES (?, ?, ?, datetime('now', ?), ?)",
+                (token, user["username"], user["role"], f"+{ttl} seconds", int(remember)),
             )
             # Opportunistic cleanup of stale tokens on every successful login.
             conn.execute(
@@ -189,12 +192,131 @@ class AuthRoutes:
             )
         return self.write_json({"token": token, "user": {"username": username, "role": role}})
 
+    def _post_password_reset_request(self) -> None:
+        # No SMTP in this deployment — a reset request just queues a flag a
+        # GM/admin sees and resolves with the existing staff-only "set a
+        # player's password" path (POST /api/users). The response is always
+        # the same generic message regardless of whether the username exists,
+        # so this can't be used to enumerate accounts.
+        ip = self.client_address[0]
+        if not check_rate(_login_timestamps, ip, *_LOGIN_RATE):
+            return self.write_error(HTTPStatus.TOO_MANY_REQUESTS, "Too many attempts")
+        try:
+            payload = self.read_json()
+        except ValidationError as e:
+            return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
+        username = str(payload.get("username") or "").strip()
+        if not username:
+            return self.write_error(HTTPStatus.BAD_REQUEST, "'username' is required")
+        with db() as conn:
+            user = conn.execute("SELECT username FROM users WHERE username = ?", (username,)).fetchone()
+            if user:
+                conn.execute(
+                    "INSERT INTO password_reset_requests(username, requested_at) VALUES (?, datetime('now'))"
+                    " ON CONFLICT(username) DO UPDATE SET requested_at = datetime('now')",
+                    (username,),
+                )
+        self.write_json({"ok": True})
+
+    def _get_password_reset_requests(self) -> None:
+        session = self.require_gm()
+        if not session:
+            return None
+        with db() as conn:
+            rows = conn.execute(
+                """
+                SELECT r.username, r.requested_at, u.role, u.email
+                FROM password_reset_requests r JOIN users u ON u.username = r.username
+                ORDER BY r.requested_at ASC
+                """,
+            ).fetchall()
+        self.write_json([
+            {"username": row["username"], "requestedAt": row["requested_at"], "role": row["role"], "email": row["email"]}
+            for row in rows
+        ])
+
+    def _delete_password_reset_request(self, username: str) -> None:
+        session = self.require_gm()
+        if not session:
+            return None
+        with db() as conn:
+            cur = conn.execute("DELETE FROM password_reset_requests WHERE username = ?", (username,))
+        self.write_json({"deleted": cur.rowcount > 0})
+
     def _post_logout(self) -> None:
         session = self.current_session()
         if session:
             with db() as conn:
                 conn.execute("DELETE FROM sessions WHERE token = ?", (session["token"],))
         self.write_json({"ok": True})
+
+    def _post_users_me(self, session: dict[str, str]) -> None:
+        # Self-service account edit: email + password change (requires the
+        # current password) + a player <-> gm role toggle. Deliberately
+        # narrower than the staff-only POST /api/users: no username change,
+        # no touching someone else's account, and never a path to 'admin'
+        # (that stays an admin-assigned promotion via GM DATA OPS).
+        try:
+            payload = self.read_json()
+        except ValidationError as e:
+            return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
+
+        with db() as conn:
+            user = conn.execute(
+                "SELECT username, password_hash, role FROM users WHERE username = ?",
+                (session["username"],),
+            ).fetchone()
+            if not user:
+                return self.write_error(HTTPStatus.NOT_FOUND, "User not found")
+
+            updates: dict[str, object] = {}
+
+            if "email" in payload:
+                try:
+                    email = validate_email(payload, required=False)
+                except ValidationError as e:
+                    return self.write_error(HTTPStatus.BAD_REQUEST, str(e), "VALIDATION_ERROR")
+                updates["email"] = email
+
+            if "avatarUrl" in payload:
+                updates["avatar_url"] = str(payload.get("avatarUrl") or "").strip()[:500] or None
+
+            new_password = payload.get("newPassword")
+            if new_password:
+                current_password = payload.get("currentPassword")
+                if not isinstance(current_password, str) or not verify_password(current_password, user["password_hash"]):
+                    return self.write_error(HTTPStatus.UNAUTHORIZED, "Current password is incorrect")
+                if not isinstance(new_password, str) or len(new_password) < 8:
+                    return self.write_error(HTTPStatus.BAD_REQUEST, "'newPassword' must be at least 8 characters")
+                updates["password_hash"] = password_hash(new_password)
+
+            new_role = payload.get("role")
+            if new_role is not None and new_role != user["role"]:
+                if user["role"] == "admin":
+                    return self.write_error(HTTPStatus.BAD_REQUEST, "Admin role can't be changed here")
+                if new_role not in ("player", "gm"):
+                    return self.write_error(HTTPStatus.BAD_REQUEST, "'role' must be 'player' or 'gm'")
+                updates["role"] = new_role
+
+            if updates:
+                set_clause = ", ".join(f"{col} = ?" for col in updates)
+                conn.execute(
+                    f"UPDATE users SET {set_clause} WHERE username = ?",  # noqa: S608 (column names are our own fixed keys above)
+                    (*updates.values(), user["username"]),
+                )
+                if "role" in updates:
+                    # Sync every live session for this account so the role
+                    # change is effective immediately, no re-login needed.
+                    conn.execute(
+                        "UPDATE sessions SET role = ? WHERE username = ?",
+                        (updates["role"], user["username"]),
+                    )
+
+            row = conn.execute(
+                "SELECT username, role, email, avatar_url, created_at FROM users WHERE username = ?",
+                (user["username"],),
+            ).fetchone()
+        self.write_json(self._public_user(row))
 
     def _get_users(self) -> None:
         session = self.require_gm()
@@ -250,6 +372,8 @@ class AuthRoutes:
                 if email:
                     conn.execute("UPDATE users SET email = ? WHERE username = ?", (email, username))
                 conn.execute("DELETE FROM sessions WHERE username = ?", (username,))
+                if password:
+                    conn.execute("DELETE FROM password_reset_requests WHERE username = ?", (username,))
             else:
                 if not password:
                     return self.write_error(HTTPStatus.BAD_REQUEST, "Password required")

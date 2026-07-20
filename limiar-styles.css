@@ -23,12 +23,9 @@
   @keyframes displayScanLine { 0% { transform:translateY(-130%); opacity:0; } 16% { opacity:.9; } 100% { transform:translateY(720%); opacity:0; } }
   @keyframes displayConnect { 0%,18% { transform:scaleX(0); opacity:0; } 36% { opacity:.95; } 76% { transform:scaleX(1); opacity:.56; } 100% { transform:scaleX(1); opacity:.18; } }
   @keyframes displayConnectAlt { 0%,22% { transform:scaleX(0); opacity:0; } 50% { transform:scaleX(1); opacity:.72; } 72% { transform:scaleX(.34); opacity:.26; } 100% { transform:scaleX(1); opacity:.18; } }
-  @keyframes campaignDrawerIn { from { transform:translateX(-102%); } to { transform:translateX(0); } }
-  .lm-campaign-launcher { position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:55;display:flex;align-items:center;gap:8px;background:linear-gradient(160deg,#0e120d,#0a0c09);border:1px solid #3fe0d0;border-left:none;color:#3fe0d0;font:700 11px 'Share Tech Mono',monospace;letter-spacing:3px;padding:18px 9px;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed;box-shadow:6px 0 24px rgba(0,0,0,.4);clip-path:polygon(0 0,100% 0,calc(100% - 8px) 8px,calc(100% - 8px) calc(100% - 8px),100% 100%,0 100%); }
-  .lm-campaign-launcher:hover { background:rgba(63,224,208,.08);box-shadow:8px 0 28px rgba(63,224,208,.14); }
-  .lm-campaign-pull-tab-mark { min-width:18px;min-height:18px;display:grid;place-items:center;background:#d6aa4e;color:#080a07;font-size:10px;line-height:1;box-shadow:0 0 12px rgba(214,170,78,.4); }
+  @keyframes campaignModalIn { from { opacity:0; transform:translate(-50%,-50%) scale(.96); } to { opacity:1; transform:translate(-50%,-50%) scale(1); } }
   .lm-campaign-scrim { position:fixed;inset:0;z-index:67;background:rgba(4,5,4,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:scrimIn .2s ease; }
-  .lm-campaign-panel { position:fixed;left:0;top:0;bottom:0;z-index:68;width:min(980px,calc(100vw - 34px));display:flex;flex-direction:column;overflow:hidden;background:linear-gradient(165deg,#0e120d,#080a07);border-right:1px solid rgba(63,224,208,.32);box-shadow:24px 0 70px rgba(0,0,0,.62);animation:campaignDrawerIn .2s cubic-bezier(.2,.7,.2,1); }
+  .lm-campaign-panel { position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:68;width:min(980px,calc(100vw - 34px));max-height:calc(100vh - 60px);display:flex;flex-direction:column;overflow:hidden;background:linear-gradient(165deg,#0e120d,#080a07);border:1px solid rgba(63,224,208,.32);box-shadow:0 24px 70px rgba(0,0,0,.62);animation:campaignModalIn .2s cubic-bezier(.2,.7,.2,1); }
   .lm-campaign-panel-head { flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 20px;background:rgba(8,10,7,.96);border-bottom:1px solid rgba(63,224,208,.2); }
   .lm-campaign-panel-head div { min-width:0;display:flex;flex-direction:column;gap:3px; }
   .lm-campaign-panel-head span { font:800 11px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0; }
@@ -64,7 +61,14 @@
   .lm-campaign-staff-title { font:800 8px 'Share Tech Mono',monospace;letter-spacing:1.5px;color:#3fe0d0;margin-bottom:6px; }
   .lm-campaign-subtitle { margin-top:12px; }
   .lm-campaign-roster,.lm-campaign-player-search { min-width:0;background:#080a07;border:1px solid rgba(63,224,208,.14);padding:10px; }
-  .lm-campaign-roster-row { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:8px;align-items:center;border-top:1px solid rgba(214,170,78,.1);padding:8px 0; }
+  .lm-campaign-roster-row { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) auto;gap:8px;align-items:center;border-top:1px solid rgba(214,170,78,.1);padding:8px 0; }
+  .lm-campaign-roster-row button { flex:none;background:transparent;border:1px solid rgba(192,99,91,.4);color:#c0635b;font:800 8px 'Share Tech Mono',monospace;letter-spacing:1px;padding:5px 7px;cursor:pointer; }
+  .lm-campaign-banner { height:96px;background-size:cover;background-position:center;border:1px solid rgba(214,170,78,.16); }
+  .lm-campaign-banner-picker { display:flex;flex-wrap:wrap;align-items:center;gap:8px; }
+  .lm-campaign-banner-preview { width:64px;height:40px;background-size:cover;background-position:center;border:1px solid rgba(214,170,78,.25);flex:none; }
+  .lm-campaign-banner-picker button,.lm-campaign-actions button[data-campaign-edit] { background:transparent;border:1px solid rgba(63,224,208,.3);color:#3fe0d0;font:800 9px 'Share Tech Mono',monospace;letter-spacing:1px;padding:8px 10px;cursor:pointer; }
+  .lm-campaign-form-actions { display:flex;gap:8px;justify-content:flex-end; }
+  .lm-campaign-form-actions button[data-campaign-cancel-edit] { background:transparent;border:1px solid rgba(214,170,78,.3);color:#d6aa4e;font:800 10px 'Share Tech Mono',monospace;letter-spacing:1px;padding:10px;cursor:pointer; }
   .lm-campaign-roster-row span { min-width:0;font:700 11px 'Chakra Petch',sans-serif;color:#e8e4d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .lm-campaign-roster-row strong { min-width:0;font:9px 'Share Tech Mono',monospace;color:#d6aa4e;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .lm-campaign-candidates { display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:360px;overflow:auto; }

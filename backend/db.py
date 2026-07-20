@@ -238,6 +238,11 @@ def init_db() -> None:
               created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY(username) REFERENCES users(username)
             );
+            CREATE TABLE IF NOT EXISTS password_reset_requests (
+              username TEXT PRIMARY KEY,
+              requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(username) REFERENCES users(username)
+            );
             CREATE TABLE IF NOT EXISTS characters (
               id TEXT PRIMARY KEY,
               name TEXT NOT NULL DEFAULT '',
@@ -294,6 +299,7 @@ def init_db() -> None:
               description TEXT,
               visibility TEXT NOT NULL DEFAULT 'public',
               status TEXT NOT NULL DEFAULT 'active',
+              system TEXT NOT NULL DEFAULT 'cyberpunk-red',
               created_by TEXT NOT NULL,
               created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -539,6 +545,10 @@ def init_db() -> None:
                 "UPDATE sessions SET expires_at = datetime('now', ?)",
                 (f"+{SESSION_TTL_SECONDS} seconds",),
             )
+        # Migration: "lembrar-me" needs a per-session flag so the sliding
+        # idle window (see current_session) knows which TTL to reapply.
+        if "remember" not in session_cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN remember INTEGER NOT NULL DEFAULT 0")
 
         # Migration: older databases have an assets table without extra.
         asset_cols = {
@@ -593,6 +603,16 @@ def init_db() -> None:
         if "elevation" not in token_cols:
             conn.execute("ALTER TABLE campaign_map_tokens ADD COLUMN elevation REAL NOT NULL DEFAULT 0")
 
+        # Migration: campaigns carry the RPG system they run, so pickers can
+        # show a per-system badge. Pre-existing campaigns are Cyberpunk RED.
+        campaign_cols = {
+            row["name"] for row in conn.execute("PRAGMA table_info(campaigns)").fetchall()
+        }
+        if "system" not in campaign_cols:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN system TEXT NOT NULL DEFAULT 'cyberpunk-red'")
+        if "banner_url" not in campaign_cols:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN banner_url TEXT")
+
         # Migration: Google Sign-In support — users may now be linked to a
         # Google account instead of (or in addition to) a password.
         user_cols = {
@@ -602,6 +622,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
         if "email" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        if "avatar_url" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub"
             " ON users(google_sub) WHERE google_sub IS NOT NULL",

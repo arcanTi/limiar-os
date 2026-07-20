@@ -46,8 +46,10 @@ class LimiarHandler(
         exact = {
             "/api/health": self._get_health,
             "/api/meta/config": self._get_config,
+            "/api/meta/login-art": self._get_login_art,
             "/api/session": self._get_session,
             "/api/users": self._get_users,
+            "/api/password-reset-requests": self._get_password_reset_requests,
             "/api/campaigns": self._get_campaigns,
             "/api/notifications": self._get_notifications,
             "/api/characters": self._get_characters,
@@ -85,6 +87,7 @@ class LimiarHandler(
             "/api/login": self._post_login,
             "/api/register": self._post_register,
             "/api/auth/google": self._post_google_login,
+            "/api/password-reset-requests": self._post_password_reset_request,
             "/api/logout": self._post_logout,
             "/api/chat": self._post_chat,
             "/api/combat-state/end-turn": self._post_combat_end_turn,
@@ -97,6 +100,9 @@ class LimiarHandler(
         if session is None:
             return None
 
+        if path == "/api/users/me":
+            return self._post_users_me(session)
+
         if path == "/api/player-characters":
             return self._post_player_characters(session)
 
@@ -106,6 +112,9 @@ class LimiarHandler(
 
         if path == "/api/users":
             return self._post_users()
+
+        if path == "/api/uploads/images":
+            return self.handle_upload()
 
         if self.route_campaign_post(path):
             return None
@@ -128,7 +137,6 @@ class LimiarHandler(
             "/api/hq": self._post_hq,
             "/api/tarot-state": self._post_tarot_state,
             "/api/combat-state": self._post_combat_state,
-            "/api/uploads/images": self.handle_upload,
         }
         if path in gm_routes:
             return gm_routes[path]()
@@ -148,6 +156,12 @@ class LimiarHandler(
 
         if path.startswith("/api/users/"):
             return self._delete_user(unquote(path[len("/api/users/") :]))
+
+        if path.startswith("/api/password-reset-requests/"):
+            return self._delete_password_reset_request(unquote(path[len("/api/password-reset-requests/") :]))
+
+        if self.route_campaign_delete(path):
+            return None
 
         routes = {
             "/api/characters/": "characters",

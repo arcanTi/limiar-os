@@ -1,338 +1,503 @@
 # README-PLANO.md — Plano unico do Limiar OS
 
-Criado 2026-07-18. **Este documento substitui e unifica**:
+Atualizado em 2026-07-18. Este documento e a fonte unica para ordem de
+execucao, dependencias, criterios de aceite e status do produto.
 
-| Doc antigo | O que era | Status |
+`README-MAPA.md` continua como auditoria do motor do mapa, bugs e evidencias
+visuais. Identificadores antigos como F1-F8, M1-M8, CM0-CM5 e G1-G12 aparecem
+apenas para permitir a leitura de commits e discussoes anteriores; eles nao
+dependem de documentos de plano ausentes no checkout.
+
+Nenhum item deste plano e descartado por ser grande. Trabalho extenso deve ser
+dividido nas entregas verificaveis descritas aqui, executadas na ordem indicada.
+
+## 1. North star e escopo
+
+> A mesa roda uma sessao inteira de Cyberpunk RED dentro do Limiar OS, sem
+> depender do Foundry para ficha, combate, mapa, comunicacao ou estado da
+> campanha.
+
+Escopo confirmado:
+
+- O produto suporta **Cyberpunk RED**. Campanhas, mapa, regras, catalogo e UI
+  devem apresentar somente esse sistema.
+- O produto e local-first: o servidor Python e o SQLite continuam suficientes
+  para executar a mesa.
+- Login por usuario e senha local e o fluxo base e deve funcionar sem servicos
+  externos.
+- Google Login e opcional. O SDK e as chamadas externas so podem ser ativados
+  quando `GOOGLE_CLIENT_ID` estiver configurado; sua ausencia nunca pode impedir
+  o login local.
+- O canvas coleta contexto fisico; `systemAdapter` traduz; os modulos de dominio
+  resolvem as regras; o usuario confirma a aplicacao.
+- Enforcement de mesa continua advisory: a UI avisa e registra, sem substituir
+  a decisao do GM.
+- O projeto nao busca paridade generica com Foundry em audio, video, hex grid ou
+  marketplace de modulos.
+- O projeto nao se torna SaaS nesta sequencia de trabalho.
+- Nenhuma dependencia pesada de renderizacao entra no mapa; Canvas 2D,
+  geometria propria e assets locais continuam como base.
+
+## 2. Como este plano deve ser executado
+
+### 2.1 Unidade de entrega
+
+Cada checkbox representa uma entrega que pode ser implementada, revisada,
+testada e commitada sem depender de outro checkbox da mesma fase, salvo quando
+a dependencia estiver escrita explicitamente.
+
+Cada entrega deve conter:
+
+1. contrato ou comportamento esperado;
+2. alteracao de dominio/aplicacao antes da UI quando houver regra;
+3. teste automatizado do caminho principal e da falha relevante;
+4. build de `dist/` quando `frontend/src/` mudar;
+5. verificacao no servidor real quando houver UI, auth, API ou persistencia;
+6. evidencia curta no commit ou na secao 9 deste documento.
+
+### 2.2 Gate tecnico global
+
+Uma entrega so esta concluida quando os checks aplicaveis estiverem verdes:
+
+```bash
+python3 -m pytest backend/tests -q
+cd frontend && npm test
+cd frontend && npm run typecheck
+cd frontend && npm run build
+git diff --check
+```
+
+Para UI e persistencia, o gate inclui `python3 server.py`, `/api/health`, pagina
+servida por HTTP, interacao visivel e leitura posterior do estado pela API.
+`python3 -m http.server` nao comprova auth, API ou SQLite.
+
+### 2.3 Regra de documentacao
+
+- O snapshot da secao 3 sempre registra data e commit analisado.
+- Contagens de testes sao evidencia datada, nao um contador permanente.
+- Entregas antigas ficam na secao 4; nao permanecem misturadas ao backlog.
+- O roadmap nao registra frases temporarias como "agente trabalhando agora".
+- `README.md` descreve o produto executavel; este arquivo descreve o trabalho.
+
+## 3. Snapshot verificado
+
+Base de codigo analisada em 2026-07-18 no commit `efda3c5`, com mudancas locais
+adicionais na experiencia de login e nestes documentos.
+
+Validacao executada no snapshot:
+
+- backend: **77 testes aprovados**;
+- frontend: **49 arquivos / 623 testes aprovados**;
+- TypeScript: `tsc --noEmit` aprovado;
+- build Vite: aprovado em diretorio temporario;
+- higiene: `git diff --check` aprovado.
+
+Estado funcional:
+
+| Area | Estado verificado | Proximo fechamento |
 | --- | --- | --- |
-| `PLANO-PRODUTO.md` | visao de produto (eixos E1–E7) | absorvido aqui (secoes 1, 5, 8) |
-| `PLANO-MAPA-FOUNDRY.md` | construcao do mapa (F1–F8) | ENCERRADO — tudo entregue; decisoes tecnicas herdadas na secao 4 |
-| `PLANO-MAPA-2.md` | integracao mapa<->mesa (M1–M8) | absorvido no roadmap (secao 5) |
-| `PLANO-COMBATE-MAPA.md` | mecanica CPR no mapa (G1–G12, CM0–CM5) | absorvido (secoes 5 e 6) |
+| Fichas, cyberware, tarot e campanhas | operacional e persistente | robustez e mobile |
+| Combate CPR | amplo, com modulos puros testados | ligar ataque single-target ao resolver central |
+| Mesa/mapa | F1-F8, Onda 0 e Onda 1 implementadas | prova completa, Pointer Events e render em camadas |
+| Mapa -> combate | ataque medido, foco, AoE e contexto situacional ligados | persistencia atomica do AoE |
+| Municao e LUCK | cockpit e HUD do mapa implementados | validar fluxo completo em sessao |
+| Sync | long-poll unificado implementado | remover poll redundante de 4s e testar reconexao |
+| Auth | senha local e Google implementados | tornar Google realmente opcional e migrar sessao para cookie |
+| Nexus Breach | funcional dentro do app | ligar pins e economia |
+| Documentacao | README de produto e plano unificado | manter sincronizados por entrega |
 
-`README-MAPA.md` continua vivo como **auditoria/evidencia** do motor do mapa
-(bugs B1–B6, gaps A1–A10, Ondas 1–3 de qualidade) — as Ondas entram no roadmap
-daqui, a evidencia fica la. Os quatro planos antigos ganham banner apontando
-para este arquivo e nao recebem mais atualizacao.
+Riscos de codigo abertos e confirmados:
 
-Motivo da unificacao: os quatro planos descreviam o MESMO trabalho com nomes
-diferentes (M2 do MAPA-2 = CM1 do COMBATE-MAPA; M4 = CM3; Onda 4 do
-README-MAPA = M2/M3/M4...) e ja estavam divergindo — checkboxes atualizados
-num doc e nao no outro, fases concluidas sob um nome e pendentes sob outro.
-A tabela de equivalencia esta na secao 9.
+1. O fluxo AoE chama `applyCharacterPatch()` sem aguardar a persistencia e pode
+   resolver o template antes de confirmar o dano de todos os alvos.
+2. `campaign-map.js` mantem long-poll e `setInterval(loadSoft, 4000)` ao mesmo
+   tempo.
+3. `deleteProp()` e `damageProp()` ainda usam `confirm()`/`prompt()` nativos.
+4. `mapAttackIntent`, `mapFocusIntent` e `mapAoeIntent` repetem o mesmo envelope
+   de storage, expiracao e consumo.
+5. `Component.js`, `ui/views/combat.js` e `pages/campaign-map.js` concentram
+   orquestracao demais e precisam ser divididos por responsabilidade.
+6. A pagina de login carrega recursos Google externamente mesmo quando a
+   integracao nao esta configurada.
 
----
+## 4. Base entregue
 
-## 1. North star e nao-objetivos
+Estas entregas existem e nao voltam ao backlog. Ajustes de regressao aparecem
+na fase CORRECAO.
 
-> A mesa roda a sessao inteira dentro do Limiar OS, sem abrir o Foundry.
+- [x] F1-F8: cenas, tokens, pings, audiencia, fog individual, templates AoE,
+      regua com DV, paredes, portas, LOS, luzes, long-poll e QoL.
+- [x] Onda 0: correcoes de fog offscreen, GC de reveals e guardas defensivas.
+- [x] CM0: `luckCurrent`, gasto pre-rolagem, reset do GM, `currentAmmo`, gasto
+      por modo e recarga.
+- [x] CM1: estado de combate no mapa, turno destacado, HUD de round, menu do
+      token, foco de ficha/cockpit e ataque medido.
+- [x] M3: canal por campanha com topicos `map`, `chat`, `combat` e `roster`.
+- [x] CM2: pedido de evasao no dispositivo do defensor e Death Save no inicio
+      do turno Mortally Wounded.
+- [x] AREA nucleo: template `untilResolved`, `resolveAreaAttack`, supressao,
+      cobertura destrutivel e chips situacionais.
+- [x] MUNICAO-NO-MAPA: badge de pente, recarga e aviso `needsReload` no HUD.
+- [x] Onda 1 nucleo: HUD de token, drag rico, toolbar com icones, grid
+      adaptativo, zoom suave, nomes incrementais e modal reutilizavel.
+- [x] Entrada da Mesa por campanha, retorno para o app e empty state diferente
+      para GM e player.
+- [x] README do produto reconhece a Mesa como funcional.
 
-Tudo neste plano se justifica por aproximar essa frase da realidade.
+## 5. Roadmap de execucao
 
-Nao-objetivos (decididos, nao esquecidos):
+A ordem abaixo e unica. Todo o escopo listado sera executado; dependencias
+servem para ordenar, nao para remover trabalho.
 
-- Nao competir com Foundry em paridade generica (audio, video, hex grid,
-  marketplace de modulos, animacoes).
-- Nao virar SaaS/hosted por ora — local-first para a mesa do grupo.
-- Nao adicionar dependencia externa nova (sem PixiJS, sem CDN).
-- O canvas NUNCA e dono de regra de jogo — mapa coleta contexto fisico,
-  adapter traduz, engine resolve, usuario confirma. Enforcement e sempre
-  **advisory**: avisar, nunca bloquear.
+### Fase 1 — ALINHAMENTO
 
-## 2. Estado atual (inventario, verificado 2026-07-18)
+Objetivo: fazer codigo, documentacao e escopo Cyberpunk RED dizerem a mesma
+coisa.
 
-Suites: **backend 63/63, frontend 578/578** (rodadas hoje, verdes).
+- [x] Reescrever `README-PLANO.md` com snapshot, riscos, fases e gates atuais.
+- [x] Reescrever `README.md` com Mesa, auth local-first e Google opcional.
+- [ ] Remover da criacao de campanha qualquer opcao fora do escopo Cyberpunk
+      RED e manter o valor canonico do sistema definido internamente.
+- [ ] Adicionar teste de criacao/edicao de campanha que prove que o sistema CPR
+      nao muda durante a vida da campanha.
+- [ ] Separar as mudancas locais atuais em commits tematicos: auth/login,
+      campanha, assets, documentacao e bundles gerados.
+- [ ] Atualizar o snapshot desta secao depois dos commits e registrar os SHAs na
+      secao 9.
 
-| Modulo | Estado | Nota |
+Aceite: produto, backend, login, Mesa e documentacao apresentam apenas
+Cyberpunk RED; o working tree fica dividido em commits revisaveis.
+
+### Fase 2 — CORRECAO
+
+Objetivo: fechar os riscos encontrados antes de adicionar novas regras.
+
+#### 2A. Persistencia AoE
+
+- [ ] Fazer `applyCharacterPatch()` retornar a Promise da API e propagar falha.
+- [ ] Criar comando de aplicacao em lote que calcule todos os patches antes de
+      gravar.
+- [ ] Aguardar a confirmacao de todos os alvos antes de marcar o template como
+      resolvido.
+- [ ] Em falha parcial, manter o template aberto, mostrar quais alvos falharam e
+      permitir repetir somente os pendentes.
+- [ ] Testar sucesso total, falha de um alvo, retry e falha ao resolver template.
+- [ ] Validar no servidor real e reler personagens/template pela API.
+
+#### 2B. Sync
+
+- [ ] Remover o poll fixo de 4s do mapa.
+- [ ] Manter fallback de 15s com backoff de 1s e cancelamento no unload.
+- [ ] Fazer o mapa reagir somente aos topicos que alteram seu payload.
+- [ ] Testar reconexao, troca de campanha, duas abas e queda temporaria do
+      long-poll.
+
+#### 2C. Dialogos do mapa
+
+- [ ] Migrar remocao de prop para `openConfirmModal()`.
+- [ ] Migrar dano de prop para `openPromptModal()` com validacao numerica.
+- [ ] Buscar qualquer `prompt()`/`confirm()` restante no mapa e migrar para o
+      mesmo componente.
+- [ ] Testar confirmar, cancelar, Escape, backdrop e valor invalido.
+
+Aceite: nenhuma mutacao de AREA e perdida silenciosamente; o mapa usa um canal
+principal com um fallback; nenhuma acao do mapa abre dialogo nativo.
+
+### Fase 3 — PROVA
+
+Objetivo: provar uma sessao completa com GM e player reais.
+
+- [x] Botao MESA por campanha.
+- [x] Link de retorno no header do mapa.
+- [x] Empty state: GM recebe instrucao de preparacao; player recebe estado de
+      espera.
+- [x] README descreve a Mesa.
+- [ ] Executar smoke GM de cenas, upload, grid, tokens, walls/portas, luzes,
+      fog, terreno, props, templates e pings.
+- [ ] Executar smoke player em segunda conta, verificando audiencia, ownership,
+      movimento do proprio token, ping e ausencia de segredos do GM.
+- [ ] Executar F4 fim a fim: medir no mapa, abrir cockpit, rolar ataque e salvar
+      resultado.
+- [ ] Executar AREA fim a fim depois da fase 2A: resolver, aplicar dano, recarregar
+      e confirmar persistencia.
+- [ ] Executar duas abas com alteracoes de map/chat/combat/roster e reconexao.
+- [ ] Rodar uma sessao real inteira e registrar cada friccao na secao 10.
+- [ ] Transformar toda friccao observada em checkbox com dono tecnico, aceite e
+      fase definida.
+
+Aceite: uma sessao completa termina sem Foundry e sem correcao manual de banco.
+
+### Fase 4 — ARQUITETURA
+
+Objetivo: dividir os tres maiores pontos de concentracao sem mudar regras ou UI.
+
+#### 4A. Intents de navegacao
+
+- [ ] Criar envelope versionado comum com `key`, `version`, `createdAt`, TTL,
+      parse, save, load e clear.
+- [ ] Migrar `mapAttackIntent` com testes de compatibilidade.
+- [ ] Migrar `mapFocusIntent` com testes de compatibilidade.
+- [ ] Migrar `mapAoeIntent` com testes de compatibilidade.
+- [ ] Manter os payloads especificos tipados em modulos pequenos.
+
+#### 4B. Controller do mapa
+
+- [ ] Extrair estado e seletores de `campaign-map.js`.
+- [ ] Extrair sync/reload/reconexao.
+- [ ] Extrair render do canvas por camada.
+- [ ] Extrair Pointer/input handlers.
+- [ ] Extrair comandos persistentes de cena, token, prop, luz e template.
+- [ ] Manter `pages/campaign-map.js` como composition root da pagina.
+
+#### 4C. Cockpit e Component
+
+- [ ] Mover aplicacao AoE/supressao para comandos em `application/`.
+- [ ] Mover persistencia de personagem para um servico async unico.
+- [ ] Separar handlers de combate por ataque, dano, condicoes, turno e recursos.
+- [ ] Manter `Component.js` apenas como orquestrador de estado e views.
+- [ ] Adicionar testes de contrato entre handlers e `Component`.
+
+Aceite: cada arquivo principal tem responsabilidades nomeadas, e as suites
+provam que a divisao preservou comportamento.
+
+### Fase 5 — MOTOR
+
+Objetivo: completar desempenho e input do mapa.
+
+#### 5A. Render em camadas
+
+- [ ] Criar cena de benchmark com 30 tokens, 20 paredes e 10 luzes.
+- [ ] Instrumentar p50/p95 de frame, quantidade de redraws e custo por camada.
+- [ ] Separar background/grid, objetos estaticos, tokens, fog/luz e overlays.
+- [ ] Implementar dirty flags por camada.
+- [ ] Invalidar somente as camadas afetadas por cada mutacao.
+- [ ] Atingir p95 menor que 16ms na cena de referencia e registrar a medicao.
+
+#### 5B. Pointer Events e touch
+
+- [ ] Substituir `mousedown/mousemove/mouseup` por Pointer Events.
+- [ ] Implementar pointer capture para drag de token e ferramentas.
+- [ ] Implementar pan de um dedo, pinch zoom de dois dedos e cancelamento.
+- [ ] Implementar long-press para menu de contexto.
+- [ ] Preservar mouse, teclado, wheel zoom e atalhos existentes.
+- [ ] Testar mouse, touch sintetico e viewport real de telefone.
+
+Aceite: benchmark cumpre o budget e todas as interacoes principais usam Pointer
+Events sem regressao de mouse/teclado.
+
+### Fase 6 — MOBILE
+
+Objetivo: entregar um companion completo para o jogador.
+
+#### 6A. App raiz em 375px
+
+- [ ] Ajustar shell, ficha, abas e drawers para 375px sem scroll horizontal.
+- [ ] Tornar HP, rolagens, condicoes, notas e fim de turno acessiveis com uma
+      mao.
+- [ ] Garantir alvos de toque de pelo menos 44px nas acoes principais.
+- [ ] Validar teclado virtual em inputs e textareas.
+
+#### 6B. Mapa de leitura
+
+- [ ] Colapsar toolbar por grupos.
+- [ ] Converter painel lateral em drawer.
+- [ ] Adaptar HUD, status e menu do token ao viewport.
+- [ ] Usar pinch/pan implementados na fase 5B.
+
+#### 6C. Escrita do player
+
+- [ ] Permitir selecionar e mover somente o proprio token.
+- [ ] Permitir ping e abertura da propria ficha/cockpit.
+- [ ] Exibir feedback advisory de MOVE e terreno.
+- [ ] Manter ferramentas de preparacao de cena exclusivas do GM.
+
+Aceite: o jogador executa seu turno essencial em 375px sem solicitar o desktop.
+
+### Fase 7 — RAW-COMBATE
+
+Objetivo: ligar todos os gaps CPR restantes ao fluxo real de mesa.
+
+#### 7A. Ataque single-target
+
+- [ ] Criar adapter entre o estado do cockpit e `resolveCombatAttack`.
+- [ ] Migrar to-hit, defesa/evasao, municao, dano, armadura e critico por etapas.
+- [ ] Comparar o resultado novo com fixtures do fluxo atual.
+- [ ] Remover o calculo duplicado somente depois da paridade automatizada.
+
+#### 7B. Economia de turno
+
+- [ ] Modelar Move + 1 Acao no estado de combate.
+- [ ] Registrar deslocamento acumulado por combatente e terreno.
+- [ ] Mostrar budget e trilha vermelha advisory ao exceder.
+- [ ] Registrar acao usada e resetar ambos em `advanceCombatTurn`.
+- [ ] Expor marcadores no cockpit e HUD do mapa.
+
+#### 7C. Alcance e defesa
+
+- [ ] Expor arma selecionada ao mapa.
+- [ ] Desenhar aneis das bandas DV da arma.
+- [ ] Implementar banda DV melee generica.
+- [ ] Fazer timeout de evasao cair no DV correto.
+- [ ] Implementar gate explicito do GM para pedido de evasao.
+- [ ] Aplicar adjacencia advisory para Estabilizar e melee reach.
+
+#### 7D. Interacoes corporais
+
+- [ ] Modelar agarrar, escapar, estrangular e escudo humano.
+- [ ] Persistir vinculo temporario entre tokens durante o agarramento.
+- [ ] Resolver checks opostos e estados resultantes.
+- [ ] Expor acoes no menu do token e no cockpit.
+
+#### 7E. Regras complementares
+
+- [ ] Aplicar malfunction de arma poor em d10=1.
+- [ ] Integrar Facedown ao menu de contexto e ao status resultante.
+- [ ] Completar UX de vinculo roster-token.
+- [ ] Criar testes RAW para todos os itens desta fase.
+
+Aceite: `resolveCombatAttack` e o pipeline oficial de single-target, e G5, G6,
+G7, G9, G11 e G12 possuem UI, persistencia e testes.
+
+### Fase 8 — CONTEUDO
+
+Objetivo: ligar sistemas existentes a momentos visiveis da sessao.
+
+#### 8A. Tarot no mapa
+
+- [ ] Publicar evento efemero pelo canal de campanha no trigger 3x6.
+- [ ] Renderizar overlay da carta para a audiencia correta.
+- [ ] Sincronizar animacao, resumo mecanico e link para o log.
+- [ ] Testar reconexao sem repetir efeito mecanico.
+
+#### 8B. Journal
+
+- [ ] Tipar mensagens na origem como `roll`, `damage`, `system` ou `chat`.
+- [ ] Adicionar filtros e busca.
+- [ ] Permitir pins de journal com link "ver no mapa".
+- [ ] Preservar compatibilidade das mensagens antigas.
+
+#### 8C. Nexus na Mesa
+
+- [ ] Criar pin `net` com permissao e payload validado.
+- [ ] Abrir Nexus Breach dentro do fluxo da campanha.
+- [ ] Registrar resultado no journal/chat.
+- [ ] Creditar recompensa pela economia existente de forma idempotente.
+- [ ] Testar repetir/atualizar pagina sem duplicar recompensa.
+
+Aceite: Tarot, Journal e Nexus geram eventos persistentes e auditaveis dentro
+da campanha.
+
+### Fase 9 — AUTH E ROBUSTEZ
+
+Objetivo: completar seguranca, portabilidade e operacao prolongada.
+
+#### 9A. Google Login opcional e local-first
+
+- [ ] Servir fonte local ou usar stack de fontes do sistema no login.
+- [ ] Consultar `/api/meta/config` antes de carregar o SDK Google.
+- [ ] Injetar o SDK somente quando `GOOGLE_CLIENT_ID` existir.
+- [ ] Ocultar divisor e botao Google quando a integracao estiver desligada.
+- [ ] Manter usuario/senha funcional com internet bloqueada.
+- [ ] Testar configurado, nao configurado, timeout e token invalido.
+
+#### 9B. Cookie de sessao e CSRF
+
+- [ ] Emitir cookie `httpOnly; SameSite=Strict` no login local e Google.
+- [ ] Definir comportamento `Secure` para HTTPS sem quebrar localhost HTTP.
+- [ ] Criar token CSRF separado e validar toda rota mutante.
+- [ ] Migrar `http.ts` para `credentials` e remover Authorization manual.
+- [ ] Migrar `session.ts` sem manter token legivel no `localStorage`.
+- [ ] Revogar cookie no logout e expirar sessoes no servidor.
+- [ ] Testar login, refresh, logout, CSRF ausente/invalido e duas abas.
+
+#### 9C. Dados e operacao
+
+- [ ] Implementar export de cena JSON com schema versionado.
+- [ ] Implementar import GM-only com validacao e preview.
+- [ ] Adicionar indices SQLite para consultas por campanha/cena.
+- [ ] Compactar reveals sem alterar a projecao por audiencia.
+- [ ] Criar backup antes de migracoes destrutivas futuras.
+- [ ] Adicionar smoke de payload grande, fog e sessao prolongada.
+
+Aceite: login local funciona offline, Google e opcional, sessoes nao ficam em
+`localStorage`, cenas sao portaveis e o banco possui indices verificados.
+
+## 6. Gaps de mecanica — status vivo
+
+| Gap | Estado em 2026-07-18 | Fechamento |
 | --- | --- | --- |
-| Fichas vivas, cyberware, tarot, campanhas | maduro | planos anteriores concluidos |
-| Engine de combate CPR (dominio) | maduro | 16 modulos puros testados; **parte segue orfa da UI** (secao 6) |
-| Cockpit de combate (UI) | maduro+ | CM0 (LUCK+municao) e CM2 (evasao-prompt, Death Save auto) entregues |
-| Mapa tatico — dados/rotas/dominio | solido | F1–F8 + fixes Onda 0; nucleo acima da media (auditoria README-MAPA) |
-| Mapa tatico — camada de experiencia | aquem | gaps A1–A10 do README-MAPA; Ondas 1–3 pendentes |
-| Mapa <-> combate | nucleo pronto | F4 (regua->ataque), CM1 (turno, context menu, focus intent, LOS advisory) |
-| Sync tempo real | **unificado** | M3 entregue: long-poll por campanha, 4 topicos; sobra so poll de seguranca 15s |
-| Login/auth | rework em voo | Google Sign-In novo (`login.html`, `auth.py`) — **fora de qualquer plano ate hoje**, ver secao 7 |
-| Nexus Breach | funcional | ilha — vinculo com economia e aposta da fase CONTEUDO |
-| README.md do produto | **desatualizado** | ainda afirma que a entrada Mesa foi removida — corrigir na fase PROVA |
+| G1 supressao | implementado; smoke completo pendente | PROVA |
+| G2 cobertura destrutivel | implementado; dialogs e smoke pendentes | CORRECAO/PROVA |
+| G3 LUCK | fechado | entregue |
+| G4 municao | fechado no cockpit e HUD | entregue |
+| G5 agarrao/escudo humano | aberto | RAW-COMBATE 7D |
+| G6 economia de turno | aberto | RAW-COMBATE 7B |
+| G7 evasao | nucleo implementado; gate e fallback DV pendentes | RAW-COMBATE 7C |
+| G8 modificadores situacionais | auto-fill de luz/LOS/cobertura implementado | PROVA |
+| G9 malfunction | aberto | RAW-COMBATE 7E |
+| G10 Death Save no turno | fechado | entregue |
+| G11 vinculo roster-token | nucleo implementado; UX final pendente | RAW-COMBATE 7E |
+| G12 DV melee generica | aberto | RAW-COMBATE 7C |
 
-### Ja entregue (nao replanejam, so referencia)
+## 7. Decisoes tecnicas transversais
 
-- **F1–F8** (2026-07-09/10): pings, contrato de audiencia, badges CPR, fog
-  individual, templates AoE, regua->ataque com DV, walls/portas/LoS,
-  iluminacao, long-poll do mapa, QoL. Detalhe: `PLANO-MAPA-FOUNDRY.md`.
-- **Onda 0** (2026-07-17): B1 fog offscreen e B5 GC de reveals corrigidos;
-  B3/B4 eram falso-positivo; B2 guarda defensiva. Detalhe: `README-MAPA.md`.
-- **CM0** (2026-07-17): LUCK (pool `luckCurrent`, stepper pre-rolagem, reset
-  GM) + municao (`currentAmmo` por arma, gasto por modo, RECARREGAR),
-  tudo advisory.
-- **CM1** (2026-07-17): bloco `combat` no `map_state`, highlight de turno,
-  HUD de round, context menu no token (5 acoes), `mapFocusIntent`, medir e
-  usar no ataque via menu, LOS advisory; fix real: `upsert_token` nunca
-  atualizava `character_id`.
-- **M3** (2026-07-18): `backend/repositories/campaign_sync.py` — canal
-  long-poll por campanha com topicos `map/chat/combat/roster`;
-  `startCampaignSync` no `Component.js` substitui os `setInterval` de chat
-  (3.5s) e roster (5s); poll de seguranca 15s; canal antigo do mapa delega
-  pro mesmo modulo.
-- **CM2** (2026-07-18): evasao como prompt no device do defensor
-  (`kind:'request'` + M3, timeout 45s) e Death Save automatico ao virar o
-  turno de Mortally Wounded.
+- Canvas 2D proprio; geometria pura em `frontend/src/domain/map/` com Vitest.
+- O mapa nao importa regras de combate diretamente; usa `systemAdapter` CPR.
+- Logica nova nasce em `domain/`, `application/` ou handlers especializados;
+  pages e `Component` orquestram.
+- Migracoes seguem `CREATE TABLE IF NOT EXISTS`, introspeccao por
+  `PRAGMA table_info` e `ALTER TABLE ADD COLUMN`.
+- Documentos de cena usam ID estavel, `scene.revision` e `expectedRevision`.
+- `map_state()` projeta a audiencia no servidor; segredos do GM nao chegam ao
+  player.
+- Strings novas sao sanitizadas na storage boundary.
+- Notificacao de sync invalida estado e dispara GET autorizado; nao transporta
+  estado sensivel.
+- Pointer Events sao obrigatorios para toda interacao nova.
+- `dist/` e reconstruido na mesma entrega que altera `frontend/src/`.
+- Persistencia que representa uma unica acao do usuario deve confirmar todas as
+  gravacoes antes de encerrar/ocultar o fluxo visual.
 
-## 3. O que NAO esta na branch (trabalho em voo, sem commit)
+## 8. Ordem resumida
 
-Branch `main` tem 3 commits; **50 arquivos em voo** (32 modificados + 18
-novos) contendo TUDO desde `aee9c34`:
+1. ALINHAMENTO
+2. CORRECAO
+3. PROVA
+4. ARQUITETURA
+5. MOTOR
+6. MOBILE
+7. RAW-COMBATE
+8. CONTEUDO
+9. AUTH E ROBUSTEZ
 
-1. **Onda 0** — `campaign-map.js`, `repositories/campaign_maps.py` + testes.
-2. **CM0 + CM1 + CM2** — `combat.js` (+262), `Component.js` (+208),
-   `mapFocusIntent.ts` (novo), `campaign_maps.py`, testes (+258 no
-   `combat.test.js`).
-3. **M3** — `campaign_sync.py` (novo), rota em `campaigns.py`,
-   `campaigns.ts`, `test_campaign_sync.py` (novo).
-4. **Login Google** — `auth.py` (+132: verificacao de id_token via
-   tokeninfo, `users.google_sub`, `GOOGLE_CLIENT_ID`), `login.html`,
-   `login.css`, `pages/login.js`, `test_auth.py` (+175), `db.py`, `config.py`.
-5. **Extracao de tema do mapa** — `styles/map/base.css` +
-   `styles/map/themes/cyberpunk.css` (CSS saiu do `campaign-map.html`,
-   `<link id="map-theme">`) — semente do multi-sistema/tema, feita sem
-   constar em plano.
-6. **dist/ rebuildado** — `limiar-app.js`, `campaign-map.js`, `index.js`,
-   `index2.js` (chunk de auth compartilhado, novo), `login.js`.
-7. Docs/tooling — planos, `README-MAPA.md`, `CLAUDE.md`, `graphify-out/`.
+Essa ordem pode receber correcoes de regressao imediatamente, mas nenhuma fase
+ou checkbox e removido. Uma friccao descoberta entra na secao 10 e recebe uma
+posicao explicita nesta sequencia.
 
-Avaliacao de suficiencia (codigo investigado, nao so docs):
+## 9. Registro de entregas
 
-- CM0/CM1/CM2/M3: **suficientes** — claims dos planos batem com o codigo
-  (LUCK/ammo ligados no cockpit, sync sem `setInterval` de dados, so
-  clock/heartbeat/turn-timer/anim de dado + poll de seguranca 15s), suites
-  verdes, verificacao ao vivo documentada.
-- M1 (prova de mesa): **NAO feito** — sem botao MESA por campanha em
-  `campaigns.js`, sem empty state no mapa, sem link de retorno, README.md
-  desatualizado, sessao real pendente. **Agente trabalhando nisso agora
-  (2026-07-18).**
-- Risco do lote: um unico bloco gigante sem commit mistura 5 entregas
-  independentes. Prioridade de higiene: commitar por tema (ver secao 8).
+Registrar somente entregas verificadas, no formato:
 
-## 4. Decisoes tecnicas transversais (imutaveis salvo decisao nova)
+```text
+YYYY-MM-DD | Fase/item | commit | testes | evidencia live/API
+```
 
-Herdadas de FOUNDRY/MAPA-2, continuam valendo para todo trabalho novo:
+- 2026-07-18 | base pre-rewrite | `efda3c5` | backend 77, frontend 623,
+  typecheck/build/diff-check verdes | auditorias anteriores em `README-MAPA.md`
+- 2026-07-18 | ALINHAMENTO docs | working tree | README e plano sincronizados |
+  validacao textual e diff-check
 
-- Canvas 2D proprio; geometria pura em `frontend/src/domain/map/` com vitest;
-  a page so desenha.
-- Migracoes no padrao `backend/db.py` (`CREATE TABLE IF NOT EXISTS` +
-  `PRAGMA table_info` -> `ALTER TABLE ADD COLUMN`).
-- Documentos de cena com `id` estavel + `scene.revision`/`expectedRevision`;
-  nada de last-write-wins em lista inteira (anti-exemplo: corrida do
-  terrain-paint).
-- `map_state()` e projecao server-side por audiencia; segredo de GM nunca
-  chega ao payload do player.
-- Sanitizacao de strings novas na storage boundary existente.
-- Pointer Events para todo evento novo (base do touch).
-- O mapa nunca importa `domain/combat` direto — tudo via `systemAdapter`.
-- Sync: notificacao nunca transporta estado — invalida e refaz GET
-  autorizado; backoff 1s; fallback poll.
-- Rebuild disciplinado de `dist/` a cada entrega.
+## 10. Backlog vivo de friccao
 
-## 5. Roadmap unificado (ordem unica, sem nomes duplicados)
+Cada entrada precisa de data, reproducao, impacto, fase e criterio de aceite.
 
-Uma sequencia. Cada fase referencia o detalhe no doc de origem quando existe.
-
-### Fase PROVA — provar a mesa de verdade (= M1, EM ANDAMENTO 2026-07-18)
-
-Pre-requisito de tudo. Detalhe: PLANO-MAPA-2 secao M1 + README-MAPA secao 4.
-
-- [ ] Prova tecnica restante no browser: walls/portas, luzes, templates,
-      terreno, player view (segunda conta!), F4 fim-a-fim, multi-aba.
-- [ ] UX de entrada/retorno: botao MESA por campanha (`campaigns.js`), link
-      de retorno no header do mapa, empty state (GM cria / player avisa).
-- [ ] README.md atualizado (Mesa existe; mapa F1–F8; login Google).
-- [ ] 1 sessao real com o mapa do inicio ao fim; friccao anotada na secao 10.
-
-### Fase MOTOR — camada de experiencia do mapa (= Ondas 1–3 do README-MAPA)
-
-Reconstruir a UX sobre o nucleo de dados correto. Detalhe: README-MAPA sec. 5.
-
-- [ ] Onda 1 — direct manipulation: token HUD (HP inline, badges clicaveis),
-      drag rico (ghost + custo ao vivo), toolbar com icones, grid adaptativo,
-      zoom suave, nome auto-incrementado, dialogos proprios (fim do
-      `prompt()`).
-- [ ] Onda 2 — render em camadas com dirty-flags (p95 frame <16ms na cena de
-      referencia: 30 tokens, 20 paredes, 10 luzes).
-- [ ] Onda 3 — Pointer Events em TODA interacao + touch (pan, pinch,
-      long-press = context menu).
-
-A ordem PROVA -> MOTOR pode inverter itens pontuais se a sessao real (PROVA
-passo 4) apontar friccao mais urgente — friccao real > roadmap teorico.
-
-### Fase AREA — resolver area e ambiente (= M4 + CM3)
-
-Detalhe: PLANO-MAPA-2 M4 + PLANO-COMBATE-MAPA CM3.
-
-- [ ] Granada: template `untilResolved` -> RESOLVER lista tokens afetados ->
-      `resolveAreaAttack` (engine orfao vira motor) -> aplicar no cockpit com
-      2 confirmacoes -> template marcado resolvido.
-- [ ] Supressao (G1): template 25m + WILL DV15 em lote + badge `suprimido`.
-- [ ] Cobertura destrutivel (G2): documento de cena `prop` com HP; bloqueia
-      LOS enquanto `hp>0`; escombro visual.
-- [ ] Chips situacionais preenchidos pelo mapa (luz/LOS/cobertura) — fecha
-      G8 de verdade (hoje so stepper MOD generico).
-
-### Fase MUNICAO-NO-MAPA (= CM4, pequena)
-
-- [ ] Contador municao/pente no token HUD (persistencia do CM0 ja existe),
-      RECARREGAR no HUD, aviso `needs_reload` advisory.
-
-### Fase MOBILE — companion do jogador (= M5 / E4)
-
-- [ ] Passo 1 (barato): ficha e combate responsivos no app raiz — HP,
-      rolagens, condicoes, fim de turno em 375px.
-- [ ] Passo 2: mapa leitura — toolbar colapsavel, paineis drawer, pinch/pan.
-- [ ] Passo 3: escrita minima de player — mover proprio token + ping.
-      GM tools continuam desktop-first (corte deliberado).
-
-### Fase RAW-FINAL (= CM5 + gaps restantes)
-
-- [ ] Migrar ataque single-target do `roll()` manual para
-      `resolveCombatAttack` (refactor separado, so com cockpit estavel —
-      liga o ultimo engine orfao grande).
-- [ ] Economia de turno (G6): Move + 1 Acao, budget MOVE no drag do proprio
-      turno, trilha vermelha ao exceder, reset em `advanceCombatTurn`.
-- [ ] Aneis de banda DV da arma no canvas (precisa "arma selecionada" no
-      mapa).
-- [ ] Banda de DV melee generica (G12) — fecha o timeout de evasao caindo
-      em DV; decisao de conteudo.
-- [ ] Agarrao/estrangular/escudo humano (G5): token anexado, check oposto.
-- [ ] Malfunction poor d10=1 (G9); Facedown via context menu; marcadores de
-      acao no HUD; adjacencia advisory p/ Estabilizar e melee reach;
-      avaliacao de gate GM no botao de evasao.
-
-### Fase MULTI — segundo sistema (= M6 / E5)
-
-Bloqueada por pre-condicao de produto: segunda campanha REAL (pull, nao push).
-
-- [ ] Migracao `campaigns.system` (default `'cpr'`, imutavel pos-criacao) +
-      `campaigns.theme`.
-- [ ] Registry de adapters no cliente; segundo adapter minimo (zombies).
-- [ ] `unitsPerCell`/`unitLabel`/multiplicadores da config do sistema.
-- [ ] Tema por campanha — a extracao `styles/map/themes/` ja em voo e o
-      primeiro passo; formalizar preset por `theme`.
-
-### Fase CONTEUDO — encantamento (= M7 / E6+E7, janelas curtas)
-
-- [ ] Tarot no mapa: overlay da carta no trigger 3x6 (efemero via canal M3).
-- [ ] Journal: tipar chat na origem (`roll/damage/system/chat`), filtro na
-      UI, pins linkaveis ("ver no mapa").
-- [ ] Nexus na mesa: pin `net` -> run do Nexus Breach -> recompensa credita
-      economia existente.
-
-### Fase ROBUSTEZ (= M8, por gatilho, nao por agenda)
-
-- [ ] Compactacao de reveals (gatilho: payload >~200KB ou lag de fog).
-- [x] Limite de conexoes long-poll por usuario/campanha + timeout — semaforo
-      de 64 waiters em `campaign_sync.py` (2026-07-18, junto com fix de path
-      traversal).
-- [ ] Export/import de cena JSON (GM-only, validado no servidor).
-- [ ] Auditoria de indices SQLite (`campaign_id, scene_id`).
-- [ ] **Token de sessao para cookie httpOnly** (registrado 2026-07-18,
-      auditoria de infra). Hoje o token fica em `localStorage`
-      (`frontend/src/infrastructure/session.ts`), legivel por qualquer XSS
-      futuro. Nao e urgente sozinho — os dois vetores concretos que o
-      tornariam explorable (path traversal, SVG stored-XSS) ja foram
-      fechados na mesma auditoria — mas e a defesa que falta se um XSS novo
-      aparecer. Escopo real: emitir cookie `httpOnly; SameSite=Strict` no
-      login (`backend/api/auth.py`), middleware CSRF pra toda rota
-      mutante (cookie nao viaja em header `Authorization`, entao vira
-      submissao automatica — precisa de token CSRF separado), e reescrever
-      `frontend/src/infrastructure/api/http.ts` + `session.ts` pra parar de
-      gerenciar o token manualmente. Maior que os outros itens desta fase;
-      tratar como sub-tema proprio, nao como um checkbox de uma tarde.
-
-## 6. Gaps de mecanica — status vivo (era G1–G12)
-
-| Gap | Status 2026-07-18 | Fase que fecha |
-| --- | --- | --- |
-| G1 supressao | aberto | AREA |
-| G2 cobertura destrutivel | aberto | AREA |
-| G3 LUCK | **FECHADO** (CM0) | — |
-| G4 municao | metade: ficha/cockpit ok; falta HUD no token | MUNICAO-NO-MAPA |
-| G5 agarrao/escudo humano | aberto | RAW-FINAL |
-| G6 economia de turno | aberto | RAW-FINAL |
-| G7 evasao como fluxo | nucleo fechado (CM2); falta gate GM + timeout->DV | RAW-FINAL |
-| G8 modificadores situacionais | parcial (stepper MOD); catalogo+auto-fill pendente | AREA |
-| G9 malfunction | aberto | RAW-FINAL |
-| G10 Death Save no turno | **FECHADO** (CM2) | — |
-| G11 vinculo roster<->token | quase: fix `upsert_token` + menu; falta UX "vinculo forte" | PROVA/MOTOR |
-| G12 DV melee generica | aberto (timeout de evasao expira sem DV) | RAW-FINAL |
-
-## 7. Desalinhamentos encontrados (codigo + graphify, 2026-07-18)
-
-Investigacao com grep + relatorio `graphify-out/GRAPH_REPORT.md` (grafo
-construido de `aee9c34` + arvore atual; 2111 nos, 5705 arestas, zero ciclo
-de import — arquitetura saudavel no macro).
-
-1. **Engines orfaos confirmados**: `resolveCombatAttack` e
-   `resolveAreaAttack` tem ZERO uso em `ui/`, `application/` e `pages/`
-   (so testes). No grafo, a comunidade `combatAttackEngine.ts` (43) nao tem
-   aresta de chamada vinda das comunidades de UI do combate — o pipeline
-   testado nunca roda em producao. Fases AREA e RAW-FINAL existem em grande
-   parte para LIGAR o que ja esta pronto.
-2. **Login Google fora de plano**: maior mudanca de backend em voo (+132
-   linhas em `auth.py`, migracao `google_sub`, pagina nova) sem constar em
-   nenhum dos 4 planos — so uma mencao de passagem no PLANO-PRODUTO. Este
-   doc o registra (secao 3); falta: documentar no README.md (fase PROVA) e
-   commitar como tema proprio.
-3. **`Component` e god node**: 166 arestas, betweenness 0.105 — maior hub do
-   grafo, ponte entre api/views/domain. M3 ja tirou os polls; mas cada fase
-   nova tende a adicionar metodos nele. Regra: logica nova nasce em
-   view/handler/domain, `Component` so orquestra. (Sem refactor big-bang —
-   so disciplina de crescimento.)
-4. **Par `mapAttackIntent`/`mapFocusIntent`**: comunidades gemeas identicas
-   (0.27 cada) — padrao duplicado deliberado. Aceitavel; se nascer um
-   TERCEIRO intent (ex.: `mapAoeIntent` na fase AREA), unificar num envelope
-   generico versionado em vez de triplicar.
-5. **`validation.py` com coesao 0.05** — graphify sugere split; baixa
-   prioridade, so quando tocar nela por outro motivo.
-6. **Ruido conhecido do grafo**: arestas INFERRED para `three.min.js`/
-   `cannon.min.js` (vendor minificado) sao falso-positivo de inferencia;
-   ignorar.
-7. **Docs eram a maior desconexao**: mesmo trabalho com dois nomes (M2=CM1,
-   M4=CM3, Onda 4=M2-M4), checkbox marcado num doc e aberto no outro,
-   README.md do produto contradizendo o codigo. Este arquivo e a correcao;
-   manter UM doc de plano daqui em diante.
-
-## 8. Higiene (fazer antes de abrir frente nova)
-
-- [ ] **Commitar o trabalho em voo por tema** (5 commits sugeridos: onda-0,
-      cm0+cm1+cm2+m3, login-google, tema-mapa, docs) — 50 arquivos num lote
-      unico e risco real de perda/confusao.
-- [ ] Atualizar README.md (Mesa existe; login Google; apontar pra este
-      plano).
-- [ ] `graphify update .` apos cada leva (manter o grafo fresco).
-- [ ] Rebuild `dist/` disciplinado a cada entrega (`limiar-app.js`,
-      `campaign-map.js`, `login.js`).
-
-## 9. Tabela de equivalencia (para ler docs/commits antigos)
-
-| Nome antigo | Onde vive agora |
-| --- | --- |
-| E1 (produto) / M1 (mapa-2) | Fase PROVA |
-| E2 / M2 / CM1 | entregue (secao 2) |
-| E3 / M3 / pre-req CM2 | entregue (secao 2) |
-| M4 / CM3 / parte de E2 | Fase AREA |
-| CM4 | Fase MUNICAO-NO-MAPA |
-| M5 / E4 | Fase MOBILE |
-| CM5 | Fase RAW-FINAL |
-| M6 / E5 | Fase MULTI |
-| M7 / E6 / E7 | Fase CONTEUDO |
-| M8 | Fase ROBUSTEZ |
-| Ondas 1–3 (README-MAPA) | Fase MOTOR |
-| Onda 0 / CM0 / CM2 | entregues (secao 2) |
-
-## 10. Backlog vivo de friccao (alimentado pela fase PROVA)
-
-Anotar aqui, com data, cada friccao observada em sessao real. Esta lista
-reordena as fases — friccao real > roadmap teorico.
-
-- 2026-07-17: auditoria live achou B1–B6 + A1–A10 (ver README-MAPA.md);
-  Onda 0 resolveu os bugs reais; A1–A10 viraram a fase MOTOR.
-- (proximas entradas da sessao real aqui)
+- 2026-07-17 | auditoria live encontrou B1-B6 e A1-A10 | Onda 0 corrigiu os
+  bugs confirmados; os gaps de experiencia foram absorvidos em MOTOR.
+- 2026-07-18 | AoE pode resolver template antes de confirmar todos os patches |
+  CORRECAO 2A | aceite: nenhuma falha parcial fica invisivel.
+- 2026-07-18 | mapa combina long-poll e poll de 4s | CORRECAO 2B | aceite:
+  long-poll principal mais fallback de 15s testado.
+- 2026-07-18 | props ainda abrem dialogos nativos | CORRECAO 2C | aceite:
+  todas as acoes usam o modal do mapa.
+- 2026-07-18 | tres intents repetem envelope/sessionStorage | ARQUITETURA 4A |
+  aceite: envelope comum com payloads tipados e compatibilidade testada.

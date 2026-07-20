@@ -155,17 +155,20 @@ describe('ui/views/desktop desktopRenderVals', () => {
     expect(setState).toHaveBeenCalledWith({ scanOn: false });
   });
 
-  it('exposes the active campaign switch affordance when a campaign is set', () => {
-    const vals = desktopRenderVals(baseState({ activeCampaignId: 'camp-1', activeCampaignName: 'Night City Blues' }), renderDeps());
-
-    expect(vals.hasActiveCampaign).toBe(true);
-    expect(vals.activeCampaignName).toBe('Night City Blues');
+  it('toggles the top-left menu open state', () => {
+    const setState = vi.fn();
+    const vals = desktopRenderVals(baseState({ topMenuOpen: false }), renderDeps({ setState }));
+    vals.toggleTopMenu();
+    expect(setState).toHaveBeenCalledWith({ topMenuOpen: true });
   });
 
-  it('hides the campaign switch affordance when no campaign is active', () => {
-    const vals = desktopRenderVals(baseState({ activeCampaignId: '' }), renderDeps());
-
-    expect(vals.hasActiveCampaign).toBe(false);
+  it('closes the top-left menu and navigates to settings', () => {
+    const setState = vi.fn();
+    const go = vi.fn();
+    const vals = desktopRenderVals(baseState({ topMenuOpen: true }), renderDeps({ setState, go }));
+    vals.openTopMenuSettings();
+    expect(setState).toHaveBeenCalledWith({ topMenuOpen: false });
+    expect(go).toHaveBeenCalledWith('system');
   });
 
   it('renders bodymap asset and wires clickable chrome descriptions', () => {

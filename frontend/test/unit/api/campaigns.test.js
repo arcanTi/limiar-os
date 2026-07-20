@@ -22,6 +22,8 @@ describe('infrastructure/api/campaigns', () => {
     await api.create({ name: 'Limiar' });
     await api.invite('camp 1', 'player');
     await api.join('camp 1', 'char-1');
+    await api.cancelInvite('camp 1', 'player');
+    await api.removeMember('camp 1', 'player');
 
     expect(calls.map(call => call.path)).toEqual([
       '/campaigns',
@@ -29,9 +31,13 @@ describe('infrastructure/api/campaigns', () => {
       '/campaigns',
       '/campaigns/camp%201/invite',
       '/campaigns/camp%201/join',
+      '/campaigns/camp%201/invites/player',
+      '/campaigns/camp%201/members/player',
     ]);
     expect(JSON.parse(calls[3].options.body)).toEqual({ username: 'player' });
     expect(JSON.parse(calls[4].options.body)).toEqual({ characterId: 'char-1' });
+    expect(calls[5].options.method).toBe('DELETE');
+    expect(calls[6].options.method).toBe('DELETE');
   });
 });
 

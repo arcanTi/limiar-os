@@ -9,6 +9,9 @@ const IP_AWARD_KEYS = ['group', 'warrior', 'socializer', 'explorer', 'roleplayer
 // HQ ledger), the HQ ledger history, and admin user management.
 export function hqRenderVals(state = {}, deps = {}) {
   const S = state;
+  const authUser = S.authUser || {};
+  const profileDraft = S.profileDraft || {};
+  const profileRole = profileDraft.role || authUser.role || 'player';
   const ipAward = S.ipAward || {};
   const ipAwardTotal = IP_AWARD_KEYS.reduce((sum, key) => sum + asNumber(ipAward[key], 0, 0, 9999), 0);
   const ipAwardBtnStyle = 'lm-ip-award-btn' + (ipAwardTotal > 0 ? ' lm-ip-award-btn--on' : ' lm-ip-award-btn--off');
@@ -24,8 +27,34 @@ export function hqRenderVals(state = {}, deps = {}) {
     onEdit: () => deps.editUserDraft(user),
     onDelete: () => deps.deleteUser(user.username),
   }));
+  const passwordResetRows = (S.passwordResetRequests || []).map(request => ({
+    ...request,
+    roleLabel: String(request.role || 'player').toUpperCase(),
+    onResolve: () => deps.editUserDraft(request),
+    onDismiss: () => deps.dismissPasswordResetRequest(request.username),
+  }));
 
   return {
+    profileUsername: authUser.username || '',
+    profileAvatarUrl: authUser.avatarUrl || '',
+    profileEmail: profileDraft.email ?? (authUser.email || ''),
+    profileCurrentPassword: profileDraft.currentPassword || '',
+    profileNewPassword: profileDraft.newPassword || '',
+    profileIsAdmin: authUser.role === 'admin',
+    profileRoleTogglable: authUser.role !== 'admin',
+    profileIsGm: profileRole === 'gm',
+    profileGmBtnStyle: 'lm-ui-btn lm-ui-btn--compact' + (profileRole === 'gm' ? ' lm-ui-btn--teal' : ' lm-ui-btn--ghost-teal'),
+    profilePlayerBtnStyle: 'lm-ui-btn lm-ui-btn--compact' + (profileRole === 'player' ? ' lm-ui-btn--gold' : ' lm-ui-btn--ghost-gold'),
+    profileStatus: S.profileStatus || '',
+    onProfileEmail: (e) => deps.setProfileField('email', e.target.value),
+    onProfileCurrentPassword: (e) => deps.setProfileField('currentPassword', e.target.value),
+    onProfileNewPassword: (e) => deps.setProfileField('newPassword', e.target.value),
+    onProfileAvatarUpload: (e) => deps.uploadAvatar(e.target.files && e.target.files[0]),
+    setProfileRolePlayer: () => deps.setProfileField('role', 'player'),
+    setProfileRoleGm: () => deps.setProfileField('role', 'gm'),
+    saveProfile: deps.saveProfile,
+    openCampaigns: deps.openCampaigns,
+
     hqIp, ipAwardTotal, ipAwardBtnStyle,
     ipAwardGroup: ipAward.group || '',
     ipAwardWarrior: ipAward.warrior || '',
@@ -41,6 +70,8 @@ export function hqRenderVals(state = {}, deps = {}) {
     hqIpLogRows,
     noHqIpLog: hqIpLogRows.length === 0,
     userRows,
+    passwordResetRows,
+    hasPasswordResetRows: passwordResetRows.length > 0,
     canManageUsers: !!S.gmAuthenticated,
     canManageStaffRoles: isStaffAdmin,
     userDraftUsername: userDraft.username || '',
@@ -63,6 +94,52 @@ export function hqRenderVals(state = {}, deps = {}) {
 // loadUsers already live there and aren't being duplicated here).
 export function hqHandlers(component) {
   return {
+    setProfileField: (key, value) => component.setState(s => ({ profileDraft: { ...(s.profileDraft || {}), [key]: value } })),
+    openCampaigns: () => globalThis.limiarCampaigns?.toggle?.(),
+
+    async saveProfile() {
+      if (!(component.api() && component.api().users)) return;
+      const draft = component.state.profileDraft || {};
+      const authUser = component.state.authUser || {};
+      const payload = {};
+      if (draft.email !== undefined) payload.email = draft.email;
+      if (draft.newPassword) {
+        payload.newPassword = draft.newPassword;
+        payload.currentPassword = draft.currentPassword || '';
+      }
+      if (draft.role && draft.role !== authUser.role) payload.role = draft.role;
+      try {
+        const updated = await component.api().users.updateMe(payload);
+        const mergedUser = { ...authUser, ...updated };
+        const staff = ['admin', 'gm'].includes(mergedUser.role);
+        component.setState({
+          authUser: mergedUser,
+          gmAuthenticated: staff,
+          gm: staff && component.state.gm,
+          profileDraft: { email: mergedUser.email || '' },
+          profileStatus: 'Perfil salvo',
+        });
+      } catch (err) {
+        component.setState({ profileStatus: 'Falha ao salvar perfil: ' + (err.message || '') });
+      }
+    },
+
+    async uploadAvatar(file) {
+      if (!file || !(component.api() && component.api().uploads && component.api().users)) return;
+      const authUser = component.state.authUser || {};
+      try {
+        const asset = await component.api().uploads.image(file, { scope: 'user-avatar', ownerId: authUser.username });
+        if (!(asset && asset.url)) throw new Error('upload sem url');
+        const updated = await component.api().users.updateMe({ avatarUrl: asset.url });
+        component.setState({
+          authUser: { ...authUser, ...updated },
+          profileStatus: 'Foto de perfil atualizada',
+        });
+      } catch (err) {
+        component.setState({ profileStatus: 'Falha ao enviar foto: ' + (err.message || '') });
+      }
+    },
+
     setIpAwardField: (key, value) => component.setState(s => ({ ipAward: { ...(s.ipAward || {}), [key]: value } })),
 
     async applyIpAward() {
@@ -113,12 +190,23 @@ export function hqHandlers(component) {
         await component.api().users.upsert(draft);
         component.setState({ userDraft: { username: '', password: '', role: 'player', email: '' }, gmStatus: 'Usuario salvo' });
         await component.loadUsers();
+        await component.loadPasswordResetRequests();
       } catch (err) {
         component.setState({ gmStatus: 'Falha ao salvar usuario: ' + (err.message || '') });
       }
     },
 
     editUserDraft: (user) => component.setState({ userDraft: { username: user.username || '', password: '', role: user.role || 'player', email: user.email || '' } }),
+
+    async dismissPasswordResetRequest(username) {
+      if (!(component.api() && component.api().users && component.state.gmAuthenticated)) return;
+      try {
+        await component.api().users.dismissPasswordResetRequest(username);
+        await component.loadPasswordResetRequests();
+      } catch (err) {
+        component.setState({ gmStatus: 'Falha ao ignorar solicitacao: ' + (err.message || '') });
+      }
+    },
 
     async deleteUser(username) {
       if (!(component.api() && component.api().users && component.state.gmAuthenticated)) return;

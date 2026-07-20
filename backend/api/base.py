@@ -7,7 +7,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
 from urllib.parse import unquote, urlparse
 
-from ..config import _MAX_BODY_BYTES, INDEX_FILE, ROOT, SESSION_TTL_SECONDS
+from ..config import _MAX_BODY_BYTES, INDEX_FILE, REMEMBER_SESSION_TTL_SECONDS, ROOT, SESSION_TTL_SECONDS
 from ..db import db
 from ..domain.validation import ValidationError
 
@@ -83,7 +83,11 @@ class BaseHandler(SimpleHTTPRequestHandler):
             return None
         with db() as conn:
             row = conn.execute(
-                "SELECT token, username, role, expires_at FROM sessions WHERE token = ?",
+                """
+                SELECT s.token, s.username, s.role, s.expires_at, s.remember, u.avatar_url
+                FROM sessions s JOIN users u ON u.username = s.username
+                WHERE s.token = ?
+                """,
                 (token,),
             ).fetchone()
             if not row:
@@ -98,12 +102,14 @@ class BaseHandler(SimpleHTTPRequestHandler):
                 if dead:
                     conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
                     return None
-            # Silent handshake: slide the idle window forward on every authed hit.
+            # Silent handshake: slide the idle window forward on every authed
+            # hit, using whichever TTL this session was started with.
+            ttl = REMEMBER_SESSION_TTL_SECONDS if row["remember"] else SESSION_TTL_SECONDS
             conn.execute(
                 "UPDATE sessions SET expires_at = datetime('now', ?) WHERE token = ?",
-                (f"+{SESSION_TTL_SECONDS} seconds", token),
+                (f"+{ttl} seconds", token),
             )
-        return {"token": row["token"], "username": row["username"], "role": row["role"]}
+        return {"token": row["token"], "username": row["username"], "role": row["role"], "avatarUrl": row["avatar_url"]}
 
     def is_staff_session(self, session: dict[str, str] | None) -> bool:
         return bool(session and session.get("role") in ("admin", "gm"))
