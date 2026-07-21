@@ -142,10 +142,12 @@ def upsert_campaign(payload: dict[str, object], session: dict[str, str]) -> dict
         existing = conn.execute(
             "SELECT created_by, system, banner_url FROM campaigns WHERE id = ?", (campaign_id,),
         ).fetchone()
-        # Callers that don't send a system (e.g. the campaigns drawer) must not
-        # reset an existing campaign's system on edit.
-        if not system:
-            system = str(existing["system"] if existing and existing["system"] else "cyberpunk-red")
+        # System is fixed at creation: an existing campaign always keeps its
+        # original system, regardless of what the payload sends on edit.
+        if existing:
+            system = str(existing["system"] or "cyberpunk-red")
+        elif not system:
+            system = "cyberpunk-red"
         # Same rule for the banner: an edit call that omits it keeps whatever
         # was uploaded before instead of blanking the card out. `clearBanner`
         # is the explicit escape hatch to actually remove it.

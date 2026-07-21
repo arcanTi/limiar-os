@@ -77,6 +77,22 @@ def test_campaign_ownership_gate_and_banner_and_invite_cancel_and_member_removal
     assert joined["members"] == []
 
 
+def test_campaign_system_is_immutable_after_creation(db_conn):
+    campaign = campaigns.upsert_campaign({"name": "Fixed System Run", "system": "cyberpunk-red"}, GM)
+    assert campaign["system"] == "cyberpunk-red"
+
+    # An edit that omits system keeps it, same as before.
+    kept = campaigns.upsert_campaign({"id": campaign["id"], "name": "Fixed System Run"}, GM)
+    assert kept["system"] == "cyberpunk-red"
+
+    # An edit that explicitly sends a different system must not change it:
+    # the system is fixed at creation for the campaign's lifetime.
+    tampered = campaigns.upsert_campaign(
+        {"id": campaign["id"], "name": "Fixed System Run", "system": "dnd5e"}, GM,
+    )
+    assert tampered["system"] == "cyberpunk-red"
+
+
 def test_campaign_api_invite_edit_and_delete_routes_are_owner_gated(campaign_handler, make_session):
     owner = make_session("gm-owner", role="gm")
     other = make_session("gm-other", role="gm")
