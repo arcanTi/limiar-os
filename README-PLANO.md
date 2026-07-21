@@ -108,13 +108,20 @@ Estado funcional:
 
 Riscos de codigo abertos e confirmados:
 
-1. O fluxo AoE chama `applyCharacterPatch()` sem aguardar a persistencia e pode
-   resolver o template antes de confirmar o dano de todos os alvos.
-2. `campaign-map.js` mantem long-poll e `setInterval(loadSoft, 4000)` ao mesmo
-   tempo.
+1. ~~O fluxo AoE chama `applyCharacterPatch()` sem aguardar a persistencia e~~
+   ~~pode resolver o template antes de confirmar o dano de todos os alvos.~~
+   Resolvido 2026-07-20: `rollAndApplyMapAoe` (combat.js) agora aguarda
+   `Promise.allSettled` de todos os patches; falha parcial mantem o template
+   aberto so com os alvos pendentes; falha ao marcar resolvido nao permite
+   re-rolar dano (`damageApplied` trava o retry no passo de resolver).
+2. ~~`campaign-map.js` mantem long-poll e `setInterval(loadSoft, 4000)` ao~~
+   ~~mesmo tempo.~~ Resolvido 2026-07-20: poll fixo trocado por fallback de
+   15s com retry de 1s, cancelado no unload.
 3. `deleteProp()` e `damageProp()` ainda usam `confirm()`/`prompt()` nativos.
-4. `mapAttackIntent`, `mapFocusIntent` e `mapAoeIntent` repetem o mesmo envelope
-   de storage, expiracao e consumo.
+4. ~~`mapAttackIntent`, `mapFocusIntent` e `mapAoeIntent` repetem o mesmo~~
+   ~~envelope de storage, expiracao e consumo.~~ Resolvido 2026-07-20: os tres
+   agora usam `domain/map/intentEnvelope.ts`; cada um so tipa e valida seu
+   proprio payload.
 5. `Component.js`, `ui/views/combat.js` e `pages/campaign-map.js` concentram
    orquestracao demais e precisam ser divididos por responsabilidade.
 6. A pagina de login carrega recursos Google externamente mesmo quando a
@@ -174,29 +181,34 @@ Objetivo: fechar os riscos encontrados antes de adicionar novas regras.
 
 #### 2A. Persistencia AoE
 
-- [ ] Fazer `applyCharacterPatch()` retornar a Promise da API e propagar falha.
-- [ ] Criar comando de aplicacao em lote que calcule todos os patches antes de
+- [x] Fazer `applyCharacterPatch()` retornar a Promise da API e propagar falha.
+- [x] Criar comando de aplicacao em lote que calcule todos os patches antes de
       gravar.
-- [ ] Aguardar a confirmacao de todos os alvos antes de marcar o template como
+- [x] Aguardar a confirmacao de todos os alvos antes de marcar o template como
       resolvido.
-- [ ] Em falha parcial, manter o template aberto, mostrar quais alvos falharam e
+- [x] Em falha parcial, manter o template aberto, mostrar quais alvos falharam e
       permitir repetir somente os pendentes.
 - [ ] Testar sucesso total, falha de um alvo, retry e falha ao resolver template.
+      `ui/views/combat.js` nao tem suite (view/orquestracao sem testes, ver
+      ARQUITETURA 4C); cobertura automatizada fica pendente ate a extracao dos
+      comandos AoE para `application/`.
 - [ ] Validar no servidor real e reler personagens/template pela API.
 
 #### 2B. Sync
 
-- [ ] Remover o poll fixo de 4s do mapa.
-- [ ] Manter fallback de 15s com backoff de 1s e cancelamento no unload.
-- [ ] Fazer o mapa reagir somente aos topicos que alteram seu payload.
+- [x] Remover o poll fixo de 4s do mapa.
+- [x] Manter fallback de 15s com backoff de 1s e cancelamento no unload.
+- [x] Fazer o mapa reagir somente aos topicos que alteram seu payload (canal
+      dedicado `wait_for_map_update`/`mapVersion` ja so bumpa em mutacao de
+      mapa; nao usa os topicos globais map/chat/combat/roster do `campaigns.py`).
 - [ ] Testar reconexao, troca de campanha, duas abas e queda temporaria do
       long-poll.
 
 #### 2C. Dialogos do mapa
 
-- [ ] Migrar remocao de prop para `openConfirmModal()`.
-- [ ] Migrar dano de prop para `openPromptModal()` com validacao numerica.
-- [ ] Buscar qualquer `prompt()`/`confirm()` restante no mapa e migrar para o
+- [x] Migrar remocao de prop para `openConfirmModal()`.
+- [x] Migrar dano de prop para `openPromptModal()` com validacao numerica.
+- [x] Buscar qualquer `prompt()`/`confirm()` restante no mapa e migrar para o
       mesmo componente.
 - [ ] Testar confirmar, cancelar, Escape, backdrop e valor invalido.
 
@@ -233,21 +245,43 @@ Objetivo: dividir os tres maiores pontos de concentracao sem mudar regras ou UI.
 
 #### 4A. Intents de navegacao
 
-- [ ] Criar envelope versionado comum com `key`, `version`, `createdAt`, TTL,
-      parse, save, load e clear.
-- [ ] Migrar `mapAttackIntent` com testes de compatibilidade.
-- [ ] Migrar `mapFocusIntent` com testes de compatibilidade.
-- [ ] Migrar `mapAoeIntent` com testes de compatibilidade.
-- [ ] Manter os payloads especificos tipados em modulos pequenos.
+- [x] Criar envelope versionado comum com `key`, `version`, `createdAt`, TTL,
+      parse, save, load e clear (`domain/map/intentEnvelope.ts`).
+- [x] Migrar `mapAttackIntent` com testes de compatibilidade.
+- [x] Migrar `mapFocusIntent` com testes de compatibilidade.
+- [x] Migrar `mapAoeIntent` com testes de compatibilidade.
+- [x] Manter os payloads especificos tipados em modulos pequenos.
 
 #### 4B. Controller do mapa
 
-- [ ] Extrair estado e seletores de `campaign-map.js`.
-- [ ] Extrair sync/reload/reconexao.
-- [ ] Extrair render do canvas por camada.
-- [ ] Extrair Pointer/input handlers.
+- [x] Extrair estado e seletores de `campaign-map.js`
+      (`pages/campaignMapSelectors.js`: sceneSize, tokenRadius, visionRadiusPx,
+      lightRadiusPx/Position, canMove/canEditTemplate, tokenAt/templateAt/
+      propAt/wallAt, losWalls, liveVisionTokens, tokenVisibleNow,
+      buildAttackMeasure — puros, parametrizados por `state`, sem ctx/DOM).
+- [x] Extrair sync/reload/reconexao (`pages/campaignMapSync.js`; long-poll +
+      fallback 15s isolados do DOM/estado da pagina, testados com fake timers).
+- [x] Extrair render do canvas por camada
+      (`pages/campaignMapCanvasRenderer.js`: pipeline RAF e camadas nomeadas,
+      com ordem de pintura e coalescencia testadas).
+- [x] Extrair Pointer/input handlers
+      (`pages/campaignMapPointerHandlers.js`: hover/press/drag/release do
+      canvas, com selecao, pan e ciclo de ferramentas; e
+      `pages/campaignMapKeyboardHandlers.js`: atalhos, Escape e setas;
+      ambos testados).
 - [ ] Extrair comandos persistentes de cena, token, prop, luz e template.
-- [ ] Manter `pages/campaign-map.js` como composition root da pagina.
+      Cena feita (`pages/campaignMapSceneCommands.js`: saveScene/newScene/
+      activateScene/uploadMap/useImageSize, testado). Prop feita
+      (`pages/campaignMapPropCommands.js`: saveProp/deleteProp/damageProp,
+      testado). Token feito (`pages/campaignMapTokenCommands.js`:
+      saveToken/deleteToken/syncPlayers/uploadToken, testado). Luz feita
+      (`pages/campaignMapLightCommands.js`: saveLight/deleteLight/toggleLight,
+      testado). Template feito (`pages/campaignMapTemplateCommands.js`:
+      saveTemplatePlacement/saveTemplateEdit/deleteTemplate, testado).
+- [x] Manter `pages/campaign-map.js` como composition root da pagina:
+      comandos, renderizador, ciclo de dados, sync, seletores e handlers de
+      input sao compostos por adapters locais; o ciclo de dados foi isolado
+      em `pages/campaignMapDataRuntime.js` e testado.
 
 #### 4C. Cockpit e Component
 
@@ -486,6 +520,45 @@ YYYY-MM-DD | Fase/item | commit | testes | evidencia live/API
   typecheck/build/diff-check verdes | auditorias anteriores em `README-MAPA.md`
 - 2026-07-18 | ALINHAMENTO docs | working tree | README e plano sincronizados |
   validacao textual e diff-check
+- 2026-07-20 | CORRECAO 2C: deleteProp/damageProp migrados para modal proprio |
+  working tree | backend 85, frontend 633, typecheck/build verdes | `grep`
+  confirma zero `prompt()`/`confirm()` restante em `campaign-map.js`; smoke
+  visual de login/delete pendente por falta de credencial de teste
+- 2026-07-20 | CORRECAO 2B: poll fixo de 4s removido, fallback 15s/retry 1s |
+  working tree | backend 85, frontend 633, typecheck/build verdes | smoke de
+  reconexao/duas abas/queda do long-poll ainda pendente (requer sessao live)
+- 2026-07-20 | CORRECAO 2A: AoE aguarda todos os patches antes de resolver
+  template, retry so nos alvos pendentes | working tree | frontend 633,
+  typecheck/build verdes | falta suite automatizada de `combat.js` (view sem
+  testes) e smoke live com falha real de API
+- 2026-07-20 | ARQUITETURA 4A: `intentEnvelope.ts` criado; mapAttackIntent,
+  mapFocusIntent e mapAoeIntent migrados | working tree | frontend 639
+  (+6 testes novos em `intentEnvelope.test.js`; suites existentes das tres
+  intents passaram sem alteracao, provando compatibilidade), typecheck/build
+  verdes
+- 2026-07-20 | ARQUITETURA 4B (parcial): sync/reload extraidos para
+  `pages/campaignMapSync.js` | working tree | frontend 644 (+5 testes com
+  fake timers cobrindo long-poll change/erro/abort e fallback 15s/1s),
+  typecheck/build verdes; `campaign-map.js` so troca chamadas por
+  `mapSync.startRealtime/scheduleFallbackPoll/stop`, comportamento identico
+- 2026-07-20 | ARQUITETURA 4B (parcial): comandos de cena extraidos para
+  `pages/campaignMapSceneCommands.js` | working tree | frontend 653 (+9
+  testes cobrindo saveScene ativa/inativa, newScene com/sem nome, activateScene,
+  uploadMap sucesso/sem-arquivo/falha, useImageSize sem fonte), typecheck/build
+  verdes; token/prop/luz/template ainda no arquivo da pagina
+- 2026-07-20 | ARQUITETURA 4B (parcial): estado/seletores extraidos para
+  `pages/campaignMapSelectors.js` | working tree | frontend 663 (+10 testes
+  cobrindo sceneSize, tokenRadius, canMove/canEditTemplate, tokenAt/templateAt/
+  propAt/wallAt, liveVisionTokens com modo individual, tokenVisibleNow com fog,
+  lightPosition, buildAttackMeasure self-target/invisivel/valido), backend 85,
+  typecheck/build verdes; `campaign-map.js` mantem os mesmos nomes de funcao
+  como wrappers finos (`(...a) => selectors.x(state, ...a)`), zero mudanca de
+  comportamento
+- 2026-07-20 | ARQUITETURA 4B (parcial): comandos de prop extraidos para
+  `pages/campaignMapPropCommands.js` | working tree | frontend 669 (+6 testes
+  cobrindo save sucesso/falha, delete cancelado/confirmado com limpeza de
+  selecao, damage cancelado/invalido/aplicado/destruido), backend 85,
+  typecheck/build verdes
 
 ## 10. Backlog vivo de friccao
 
@@ -494,9 +567,12 @@ Cada entrada precisa de data, reproducao, impacto, fase e criterio de aceite.
 - 2026-07-17 | auditoria live encontrou B1-B6 e A1-A10 | Onda 0 corrigiu os
   bugs confirmados; os gaps de experiencia foram absorvidos em MOTOR.
 - 2026-07-18 | AoE pode resolver template antes de confirmar todos os patches |
-  CORRECAO 2A | aceite: nenhuma falha parcial fica invisivel.
-- 2026-07-18 | mapa combina long-poll e poll de 4s | CORRECAO 2B | aceite:
-  long-poll principal mais fallback de 15s testado.
+  CORRECAO 2A | resolvido em 2026-07-20: patches aguardados via
+  `Promise.allSettled`, falha parcial mantem template aberto e retry so nos
+  pendentes; falta suite automatizada (view sem testes) e smoke live.
+- 2026-07-18 | mapa combina long-poll e poll de 4s | CORRECAO 2B | resolvido em
+  2026-07-20: poll fixo de 4s removido, fallback agora e 15s com retry de 1s
+  em falha; falta rodar o smoke de reconexao/duas abas.
 - 2026-07-18 | props ainda abrem dialogos nativos | CORRECAO 2C | aceite:
   todas as acoes usam o modal do mapa.
 - 2026-07-18 | tres intents repetem envelope/sessionStorage | ARQUITETURA 4A |
