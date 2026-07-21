@@ -48,6 +48,7 @@ const els = {
   newCampaignCancel: byId('newCampaignCancel'),
   newCampaignStatus: byId('newCampaignStatus'),
   systemAvailability: byId('systemAvailability'),
+  newCampaignSubmit: byId('newCampaignSubmit'),
 };
 
 // ---------- random hero illustration (inline SVG, flat friendly style) ----------
@@ -353,6 +354,7 @@ function updateSystemAvailability() {
   const label = { yes: 'Yes', no: 'No', partially: 'Partially' }[implementation];
   els.systemAvailability.textContent = `Implementado · ${label}`;
   els.systemAvailability.className = `system-availability implementation-${implementation}`;
+  els.newCampaignSubmit.disabled = implementation !== 'yes';
 }
 function openCampaignModal() {
   els.newCampaignModal.hidden = false;
@@ -395,6 +397,11 @@ els.newCampaignForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const name = els.newCampaignName.value.trim();
   if (!name) return;
+  const meta = systemMeta(els.newCampaignSystem.value);
+  if (meta.implementation !== 'yes') {
+    showStatus(els.newCampaignStatus, 'Sistema ainda nao implementado', 'err');
+    return;
+  }
   setButtonLoading(els.newCampaignForm, true);
   const basePayload = {
     name,
