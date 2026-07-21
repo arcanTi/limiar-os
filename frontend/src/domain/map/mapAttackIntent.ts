@@ -1,8 +1,10 @@
+import { visionContainsPoint } from './visionEngine.ts';
+import { createIntentEnvelope, parseIntentEnvelope, loadIntentEnvelope, saveIntentEnvelope, clearIntentEnvelope, IntentEnvelopeMeta } from './intentEnvelope.ts';
+
 export const MAP_ATTACK_INTENT_KEY = 'limiar.mapAttackIntent.v1';
 export const MAP_ATTACK_INTENT_MAX_AGE_MS = 10 * 60 * 1000;
 
-export interface MapAttackIntent {
-  version: 1;
+export interface MapAttackIntentPayload {
   campaignId: string;
   sceneId: string;
   attackerTokenId: string;
@@ -12,49 +14,42 @@ export interface MapAttackIntent {
   targetName: string;
   cells: number;
   rangeMeters: number;
-  createdAt: number;
 }
 
-export function createMapAttackIntent(input: Omit<MapAttackIntent, 'version' | 'createdAt'>, now: number = Date.now()): MapAttackIntent {
-  return { ...input, version: 1, createdAt: now };
-}
+export type MapAttackIntent = MapAttackIntentPayload & IntentEnvelopeMeta;
 
-export function parseMapAttackIntent(value: unknown, now: number = Date.now()): MapAttackIntent | null {
-  if (!value || typeof value !== 'object') return null;
-  const raw = value as Partial<MapAttackIntent>;
+function validateMapAttackIntentPayload(raw: Record<string, unknown>): MapAttackIntentPayload | null {
   const fields = ['campaignId', 'sceneId', 'attackerTokenId', 'attackerCharacterId', 'targetTokenId', 'targetCharacterId'];
-  if (raw.version !== 1 || fields.some(key => !String(raw[key as keyof MapAttackIntent] || ''))) return null;
+  if (fields.some(key => !String(raw[key] || ''))) return null;
   const cells = Number(raw.cells);
   const rangeMeters = Number(raw.rangeMeters);
-  const createdAt = Number(raw.createdAt);
-  if (!(cells >= 0) || !(rangeMeters >= 0) || !(createdAt > 0) || now - createdAt > MAP_ATTACK_INTENT_MAX_AGE_MS || createdAt > now + 60_000) return null;
+  if (!(cells >= 0) || !(rangeMeters >= 0)) return null;
   return {
-    version: 1,
     campaignId: String(raw.campaignId), sceneId: String(raw.sceneId),
     attackerTokenId: String(raw.attackerTokenId), attackerCharacterId: String(raw.attackerCharacterId),
     targetTokenId: String(raw.targetTokenId), targetCharacterId: String(raw.targetCharacterId),
-    targetName: String(raw.targetName || raw.targetCharacterId), cells, rangeMeters, createdAt,
+    targetName: String(raw.targetName || raw.targetCharacterId), cells, rangeMeters,
   };
 }
 
+export function createMapAttackIntent(input: MapAttackIntentPayload, now: number = Date.now()): MapAttackIntent {
+  return createIntentEnvelope(input, now);
+}
+
+export function parseMapAttackIntent(value: unknown, now: number = Date.now()): MapAttackIntent | null {
+  return parseIntentEnvelope(value, validateMapAttackIntentPayload, MAP_ATTACK_INTENT_MAX_AGE_MS, now);
+}
+
 export function loadMapAttackIntent(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | undefined, now: number = Date.now()): MapAttackIntent | null {
-  if (!storage) return null;
-  try {
-    const intent = parseMapAttackIntent(JSON.parse(storage.getItem(MAP_ATTACK_INTENT_KEY) || 'null'), now);
-    if (!intent) storage.removeItem(MAP_ATTACK_INTENT_KEY);
-    return intent;
-  } catch (_) {
-    storage.removeItem(MAP_ATTACK_INTENT_KEY);
-    return null;
-  }
+  return loadIntentEnvelope(storage, MAP_ATTACK_INTENT_KEY, validateMapAttackIntentPayload, MAP_ATTACK_INTENT_MAX_AGE_MS, now);
 }
 
 export function saveMapAttackIntent(storage: Pick<Storage, 'setItem'>, intent: MapAttackIntent): void {
-  storage.setItem(MAP_ATTACK_INTENT_KEY, JSON.stringify(intent));
+  saveIntentEnvelope(storage, MAP_ATTACK_INTENT_KEY, intent);
 }
 
 export function clearMapAttackIntent(storage: Pick<Storage, 'removeItem'> | null | undefined): void {
-  if (storage) storage.removeItem(MAP_ATTACK_INTENT_KEY);
+  clearIntentEnvelope(storage, MAP_ATTACK_INTENT_KEY);
 }
 
 export function mapTokenVisibleNow(mapState: { scene?: { fogEnabled?: boolean; explorationMode?: string; gridSize?: number }; tokens?: unknown[]; walls?: unknown[]; lights?: unknown[] }, token: { visible?: boolean; x?: number; y?: number } | null | undefined, options: { gm?: boolean; username?: string } = {}): boolean {
@@ -81,4 +76,3 @@ export function mapTokenVisibleNow(mapState: { scene?: { fogEnabled?: boolean; e
       && visionContainsPoint({ x: Number(source.x), y: Number(source.y) }, lightRadius, walls, target);
   });
 }
-import { visionContainsPoint } from './visionEngine.ts';
