@@ -1441,10 +1441,21 @@ export function combatHandlers(component) {
   function dismissMapAoeResolve() {
     component.setState({ mapAoeContext: null });
   }
+  // CORRECAO 2A: applyCharacterPatch's writer is a real API call — it can
+  // fail per-target (network blip, stale character). The old flow fired all
+  // patches without awaiting them, then always marked the template resolved,
+  // so a failed patch was lost silently and the target list disappeared.
+  // Now: compute every patch first, await them together, only resolve the
+  // template once every included target confirmed, and on partial failure
+  // shrink the context to just the pending ids so the same button retries
+  // only what didn't land. `damageApplied` short-circuits a retry into
+  // "just resolve" so a resolve-only failure can never re-roll (and thus
+  // double-apply) damage that already landed.
   async function rollAndApplyMapAoe() {
     if (!component.ensureGm('Login do mestre necessario para resolver area')) return;
     const ctx = component.state.mapAoeContext;
     if (!ctx) return;
+    if (ctx.damageApplied) return resolveMapAoeTemplate(ctx);
     const includedIds = ctx.includedTargetIds || ctx.targetCharacterIds || [];
     const targets = includedIds.map(id => combatCharacter(id)).filter(Boolean);
     if (!targets.length) return component.flash('Selecione ao menos um alvo');
@@ -1465,33 +1476,54 @@ export function combatHandlers(component) {
       damageRoll,
     }));
     const results = resolveAreaAttack(contexts, Math.random);
-    const lines = [];
-    results.forEach((result, idx) => {
+    const patches = results.map((result, idx) => {
       const target = targets[idx];
       const hpLoss = Math.max(0, component.asNumber(result.hpDamage, 0, 0, 9999));
       const ablatedDelta = result.armorAblated ? Math.max(0, component.asNumber(result.armorSPBefore, 0, 0, 99) - component.asNumber(result.armorSPAfter, 0, 0, 99)) : 0;
       const nextHealth = { ...target.health, cur: Math.max(0, (target.health.cur || 0) - hpLoss) };
       const nextSpDamage = { ...(target.spDamage || {}), body: Math.max(0, ((target.spDamage && target.spDamage.body) || 0) + ablatedDelta) };
-      component.applyCharacterPatch(target.id, { health: nextHealth, spDamage: nextSpDamage });
-      lines.push(
+      return { target, hpLoss, ablatedDelta, criticalTriggered: result.criticalTriggered, patch: { health: nextHealth, spDamage: nextSpDamage } };
+    });
+    const outcomes = await Promise.allSettled(patches.map(p => component.applyCharacterPatch(p.target.id, p.patch)));
+    const succeeded = patches.filter((_, i) => outcomes[i].status === 'fulfilled');
+    const failed = patches.filter((_, i) => outcomes[i].status === 'rejected');
+    if (succeeded.length) {
+      const lines = succeeded.map(({ target, hpLoss, ablatedDelta, criticalTriggered }) =>
         (target.name || target.id).toUpperCase() + ' :: HP -' + hpLoss
         + (ablatedDelta ? ' // armadura ablada -' + ablatedDelta : '')
-        + (result.criticalTriggered ? ' // 2+ SEIS: resolver Lesao Critica manualmente na ficha' : ''),
-      );
-    });
-    component.postChat({
-      kind: 'text',
-      sender: 'SISTEMA',
-      text: 'AREA RESOLVIDA :: ' + (ctx.areaLabel || ctx.areaKind || 'template').toUpperCase() + ' :: ' + count + 'd' + sides + ' = ' + damageRoll.total + '\n' + lines.join('\n'),
-    });
+        + (criticalTriggered ? ' // 2+ SEIS: resolver Lesao Critica manualmente na ficha' : ''));
+      component.postChat({
+        kind: 'text',
+        sender: 'SISTEMA',
+        text: 'AREA RESOLVIDA :: ' + (ctx.areaLabel || ctx.areaKind || 'template').toUpperCase() + ' :: ' + count + 'd' + sides + ' = ' + damageRoll.total + '\n' + lines.join('\n'),
+      });
+    }
+    if (failed.length) {
+      const names = failed.map(({ target }) => target.name || target.id).join(', ');
+      component.flash('Falha ao aplicar dano em: ' + names + '. Template continua aberto — clique em rolar/aplicar de novo para repetir so os pendentes.', 4200);
+      component.setState(s => (s.mapAoeContext ? {
+        mapAoeContext: {
+          ...s.mapAoeContext,
+          includedTargetIds: failed.map(({ target }) => target.id),
+          targetCharacterIds: failed.map(({ target }) => target.id),
+        },
+      } : {}));
+      return;
+    }
+    await resolveMapAoeTemplate(ctx, { markDamageAppliedOnFailure: true });
+  }
+  async function resolveMapAoeTemplate(ctx, options) {
     try {
       if (component.api() && component.api().campaignMaps) {
         await component.api().campaignMaps.resolveTemplate(ctx.campaignId, { templateId: ctx.templateId, expectedRevision: ctx.expectedRevision });
       }
+      component.setState({ mapAoeContext: null });
     } catch (err) {
       component.flash('Dano aplicado, mas falha ao marcar o template resolvido no mapa: ' + err.message, 3600);
+      if (options && options.markDamageAppliedOnFailure) {
+        component.setState(s => (s.mapAoeContext ? { mapAoeContext: { ...s.mapAoeContext, damageApplied: true } } : {}));
+      }
     }
-    component.setState({ mapAoeContext: null });
   }
 
   // --- G1: Fogo Supressivo -------------------------------------------------

@@ -1054,8 +1054,9 @@ class Component extends DCLogic {
       const writer = this.state.gmAuthenticated
         ? this.api().characters.upsert
         : (this.api().characters.createPlayer || this.api().characters.upsert);
-      writer(next);
+      return writer(next);
     }
+    return Promise.resolve(next);
   }
   updateCharacterById(characterId, patch) {
     if (!this.ensureGm('Login do mestre necessario para alterar personagem')) return;
