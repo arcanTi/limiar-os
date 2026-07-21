@@ -33,7 +33,7 @@
 
           <div class="form-swap" id="formSwap">
             <form id="loginForm" class="form-face">
-              <label>Usuario
+              <label>Usuário
                 <span class="field">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 19.5c1.2-3.4 4-5 7.2-5s6 1.6 7.2 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
                   <input id="loginUsername" type="text" autocomplete="username" required>
@@ -59,22 +59,22 @@
             </form>
 
             <form id="resetRequestForm" class="form-face" hidden>
-              <label>Usuario
+              <label>Usuário
                 <span class="field">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 19.5c1.2-3.4 4-5 7.2-5s6 1.6 7.2 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
                   <input id="resetUsername" type="text" autocomplete="username" required>
                 </span>
               </label>
-              <p class="step-sub">Um mestre ou administrador vai liberar uma nova senha para voce em breve.</p>
+              <p class="step-sub">Um mestre ou administrador vai liberar uma nova senha para você em breve.</p>
               <button type="submit" class="btn-primary">
-                <span class="btn-label">Solicitar redefinicao</span>
+                <span class="btn-label">Solicitar redefinição</span>
                 <span class="btn-spinner" hidden></span>
               </button>
               <button type="button" id="resetCancel" class="btn-ghost">Voltar para o login</button>
             </form>
 
             <form id="registerForm" class="form-face" hidden>
-              <label>Novo usuario
+              <label>Novo usuário
                 <span class="field">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 19.5c1.2-3.4 4-5 7.2-5s6 1.6 7.2 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
                   <input id="registerUsername" type="text" autocomplete="username" required>
@@ -120,63 +120,88 @@
               <h1>Suas campanhas</h1>
               <p class="step-sub">Escolha uma mesa para continuar.</p>
             </div>
-            <button type="button" id="newCampaignToggle" class="btn-neo" hidden><span>+ Nova campanha</span></button>
+            <button type="button" id="newCampaignToggle" class="btn-primary btn-new-campaign" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span>Nova campanha</span>
+            </button>
           </div>
-          <form id="newCampaignForm" class="new-campaign-form" hidden>
-            <label>Nome da campanha
-              <span class="field no-icon">
-                <input id="newCampaignName" type="text" required maxlength="120">
-              </span>
-            </label>
-            <label>Sistema
-              <span class="field no-icon">
-                <select id="newCampaignSystem">
-                  <option value="cyberpunk-red">Cyberpunk RED</option>
-                  <option value="dnd5e">D&amp;D 5a Edicao</option>
-                  <option value="cthulhu">Call of Cthulhu</option>
-                  <option value="other">Outro sistema</option>
-                </select>
-              </span>
-            </label>
-            <label>Visibilidade
-              <span class="field no-icon">
-                <select id="newCampaignVisibility">
-                  <option value="public">Publica</option>
-                  <option value="private">Privada</option>
-                </select>
-              </span>
-            </label>
-            <label>Imagem de capa <span class="label-hint">(opcional)</span>
-              <span class="banner-picker" id="bannerPicker">
-                <span class="banner-picker-preview" id="bannerPreview" hidden></span>
-                <span class="banner-picker-placeholder" id="bannerPlaceholder">Escolher imagem</span>
-                <input id="newCampaignBanner" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-              </span>
-            </label>
-            <div class="new-campaign-actions">
-              <button type="submit" class="btn-neo small">
-                <span class="btn-label">Criar</span>
-                <span class="btn-spinner" hidden></span>
-              </button>
-              <button type="button" id="newCampaignCancel" class="btn-neo-ghost small">Cancelar</button>
-            </div>
-          </form>
 
           <div id="campaignList" class="campaign-list"></div>
-          <p id="campaignEmpty" class="hint" hidden>Voce ainda nao participa de nenhuma campanha. Crie uma ou aguarde um convite.</p>
+          <p id="campaignEmpty" class="hint empty-state" hidden>Você ainda não participa de nenhuma campanha. Crie uma ou aguarde um convite.</p>
 
           <div id="joinableSection" class="joinable-section" hidden>
             <span class="joinable-eyebrow">CONVITES // MESAS ABERTAS</span>
             <div id="joinableList" class="campaign-list joinable-list"></div>
           </div>
 
-          <p class="campaign-tip"><b>Dica:</b> voce pode criar ou entrar em uma campanha a qualquer momento.</p>
+          <p class="campaign-tip"><b>Dica:</b> você pode criar ou entrar em uma campanha a qualquer momento.</p>
           <p id="campaignStatus" class="status" role="status"></p>
           <button type="button" id="continueWithoutCampaign" class="continue-link">Continuar sem campanha</button>
         </div>
       </div>
     </section>
   </main>
+
+  <div id="newCampaignModal" class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="newCampaignTitle" hidden>
+    <button type="button" id="newCampaignBackdrop" class="modal-backdrop" aria-label="Fechar criação de campanha"></button>
+    <section class="modal-card">
+      <header class="modal-head">
+        <div>
+          <span class="campaign-eyebrow">NOVA CAMPANHA</span>
+          <h2 id="newCampaignTitle">Prepare uma nova mesa</h2>
+          <p>Defina o essencial agora. Os demais detalhes podem ser ajustados depois.</p>
+        </div>
+        <button type="button" id="newCampaignClose" class="modal-close" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <form id="newCampaignForm" class="new-campaign-form">
+        <label class="form-wide">Nome da campanha
+          <span class="field no-icon">
+            <input id="newCampaignName" type="text" required maxlength="120" placeholder="Ex.: Sombras sobre Night City">
+          </span>
+        </label>
+        <label>Sistema
+          <span class="field no-icon select-with-status">
+            <select id="newCampaignSystem">
+              <option value="cyberpunk-red">Cyberpunk RED</option>
+              <option value="dnd5e">D&amp;D 5ª Edição</option>
+              <option value="cthulhu">Call of Cthulhu</option>
+              <option value="other">Outro sistema</option>
+            </select>
+          </span>
+          <span id="systemAvailability" class="system-availability implementation-yes">Implementado · Yes</span>
+        </label>
+        <label>Visibilidade
+          <span class="field no-icon">
+            <select id="newCampaignVisibility">
+              <option value="public">Pública</option>
+              <option value="private">Privada</option>
+            </select>
+          </span>
+        </label>
+        <label class="form-wide">Imagem de capa <span class="label-hint">Opcional</span>
+          <span class="banner-picker" id="bannerPicker">
+            <span class="banner-picker-preview" id="bannerPreview" hidden></span>
+            <span class="banner-picker-placeholder">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v11H4zM8 7.5l1.4-2h5.2l1.4 2M8 14l2.4-2.4 2.1 2.1 1.5-1.5 2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span><b>Escolher imagem</b><small>PNG, JPG, WEBP ou GIF</small></span>
+            </span>
+            <input id="newCampaignBanner" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+          </span>
+        </label>
+        <p id="newCampaignStatus" class="status form-wide" role="status"></p>
+        <div class="new-campaign-actions form-wide">
+          <button type="button" id="newCampaignCancel" class="btn-ghost">Cancelar</button>
+          <button type="submit" class="btn-primary">
+            <span class="btn-label">Criar campanha</span>
+            <span class="btn-spinner" hidden></span>
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
   <script type="module" src="/dist/login.js"></script>
 </body>
 </html>

@@ -36,6 +36,9 @@ const els = {
   continueWithoutCampaign: byId('continueWithoutCampaign'),
   campaignStatus: byId('campaignStatus'),
   newCampaignToggle: byId('newCampaignToggle'),
+  newCampaignModal: byId('newCampaignModal'),
+  newCampaignBackdrop: byId('newCampaignBackdrop'),
+  newCampaignClose: byId('newCampaignClose'),
   newCampaignForm: byId('newCampaignForm'),
   newCampaignName: byId('newCampaignName'),
   newCampaignSystem: byId('newCampaignSystem'),
@@ -43,6 +46,8 @@ const els = {
   newCampaignBanner: byId('newCampaignBanner'),
   bannerPreview: byId('bannerPreview'),
   newCampaignCancel: byId('newCampaignCancel'),
+  newCampaignStatus: byId('newCampaignStatus'),
+  systemAvailability: byId('systemAvailability'),
 };
 
 // ---------- random hero illustration (inline SVG, flat friendly style) ----------
@@ -183,16 +188,16 @@ initHeroArt();
 
 // ---------- system badges ----------
 const SYSTEM_META = {
-  'cyberpunk-red': { label: 'Cyberpunk RED', cls: 'campaign-logo-cpr', mark: '<i>CYBER<br>PUNK</i><b>RED</b>' },
-  'dnd5e': { label: 'D&D 5e', cls: 'campaign-logo-dnd', mark: '<i>&amp;</i><b>5E</b>' },
-  'cthulhu': { label: 'Call of Cthulhu', cls: 'campaign-logo-coc', mark: '<i>CoC</i><b>7E</b>' },
+  'cyberpunk-red': { label: 'Cyberpunk RED', implementation: 'yes', cls: 'campaign-logo-cpr', mark: '<i>CYBER<br>PUNK</i><b>RED</b>' },
+  'dnd5e': { label: 'D&D 5e', implementation: 'no', cls: 'campaign-logo-dnd', mark: '<i>&amp;</i><b>5E</b>' },
+  'cthulhu': { label: 'Call of Cthulhu', implementation: 'no', cls: 'campaign-logo-coc', mark: '<i>CoC</i><b>7E</b>' },
   'other': {
-    label: 'Outro sistema', cls: 'campaign-logo-other',
+    label: 'Outro sistema', implementation: 'partially', cls: 'campaign-logo-other',
     mark: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 21.5 7v10L12 22.5 2.5 17V7L12 1.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.3 15.6h9.4L12 8.7l-4.7 6.9z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
   },
 };
 function systemMeta(system) {
-  return SYSTEM_META[String(system || '')] || SYSTEM_META['cyberpunk-red'];
+  return SYSTEM_META[String(system || '')] || SYSTEM_META.other;
 }
 
 // ---------- step transitions ----------
@@ -264,46 +269,13 @@ function joinableCampaigns(campaigns, user) {
 
 let currentUser = null;
 
-// deterministic avatar tone from username, so someone without a portrait
-// still gets a stable initials-chip color across cards/reloads
-const ROSTER_TONES = ['#d6aa4e', '#3fe0d0', '#e6bc63', '#7fe8db'];
-function rosterTone(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  return ROSTER_TONES[hash % ROSTER_TONES.length];
-}
-function initials(name) {
-  return String(name || '?').trim().slice(0, 2).toUpperCase();
-}
-function renderRoster(roster) {
-  const shown = roster.slice(0, 8);
-  const rest = roster.length - shown.length;
-  const chips = shown.map((m) => {
-    const isGmRole = m.role === 'gm' || m.role === 'admin';
-    const ring = isGmRole ? 'var(--lm-gold)' : 'var(--lm-teal)';
-    const avatarStyle = m.portraitUrl
-      ? `background-image:url(${esc(m.portraitUrl)});--roster-ring:${ring}`
-      : `background:${rosterTone(m.username)};--roster-ring:${ring}`;
-    const avatarLabel = m.portraitUrl ? '' : esc(initials(m.username));
-    return `
-      <span class="roster-chip" title="${esc(m.username)}">
-        <span class="roster-chip-avatar" style="${avatarStyle}">${avatarLabel}</span>
-        <span class="roster-chip-name">${esc(m.username)}</span>
-        <span class="roster-chip-role">${isGmRole ? 'Mestre' : 'Jogador'}</span>
-      </span>
-    `;
-  }).join('');
-  const more = rest > 0 ? `<span class="roster-chip"><span class="roster-chip-more">+${rest}</span></span>` : '';
-  return `<span class="campaign-roster">${chips}${more}</span>`;
-}
-
 function renderCampaignCard(c, user, opts) {
   const joinable = Boolean(opts && opts.joinable);
   const isGm = (user && user.role === 'admin') || c.created_by === (user && user.username) || c.createdBy === (user && user.username);
   const roster = Array.isArray(c.roster) ? c.roster : [];
   const count = Number.isFinite(c.participantCount) ? c.participantCount : roster.length;
   const meta = systemMeta(c.system);
-  const visibility = c.visibility === 'private' ? 'Privada' : 'Publica';
+  const visibility = c.visibility === 'private' ? 'Privada' : 'Pública';
   const paused = c.status === 'paused' ? ' · Pausada' : '';
   const bannerUrl = c.bannerUrl || c.banner_url || '';
   const topStyle = bannerUrl ? ` style="background-image:url(${esc(bannerUrl)})"` : '';
@@ -312,7 +284,9 @@ function renderCampaignCard(c, user, opts) {
     : `<span class="campaign-card-tag${isGm ? '' : ' player'}">${isGm ? 'Mestre' : 'Jogador'}</span>`;
   const cta = joinable
     ? (c.myInviteId ? 'Aceitar convite' : 'Ver campanha')
-    : 'Entrar na campanha';
+    : 'Entrar';
+  const implementationLabel = { yes: 'Yes', no: 'No', partially: 'Partially' }[meta.implementation] || 'No';
+  const readinessTag = `<span class="system-tag implementation-${meta.implementation}">Implementado · ${implementationLabel}</span>`;
   return `
     <button type="button" class="campaign-card${joinable ? ' joinable' : ''}" data-campaign-id="${esc(c.id)}" data-campaign-mode="${joinable ? 'joinable' : 'member'}">
       <span class="campaign-card-top${bannerUrl ? ' has-banner' : ''}"${topStyle}>
@@ -323,9 +297,8 @@ function renderCampaignCard(c, user, opts) {
         </span>
         <span class="campaign-card-count"><b>${count}</b><small>jogador${count === 1 ? '' : 'es'}</small></span>
       </span>
-      ${roster.length ? renderRoster(roster) : ''}
       <span class="campaign-card-foot">
-        ${tag}
+        <span>${tag} ${readinessTag}</span>
         <span class="campaign-card-cta">${cta} <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       </span>
     </button>
@@ -340,14 +313,14 @@ async function loadCampaignList(user) {
     const joinable = joinableCampaigns(campaigns, user || {});
     els.campaignEmpty.hidden = mine.length > 0;
     els.campaignEmpty.textContent = joinable.length > 0
-      ? 'Voce ainda nao entrou em nenhuma mesa, mas ha campanhas esperando abaixo.'
-      : 'Voce ainda nao participa de nenhuma campanha. Crie uma ou aguarde um convite.';
+      ? 'Você ainda não entrou em nenhuma mesa, mas há campanhas esperando abaixo.'
+      : 'Você ainda não participa de nenhuma campanha. Crie uma ou aguarde um convite.';
     els.campaignList.innerHTML = mine.map((c) => renderCampaignCard(c, user)).join('');
     els.joinableSection.hidden = joinable.length === 0;
     els.joinableList.innerHTML = joinable.map((c) => renderCampaignCard(c, user, { joinable: true })).join('');
     showStatus(els.campaignStatus, '', '');
   } catch (e) {
-    showStatus(els.campaignStatus, e.message || 'Nao foi possivel carregar campanhas', 'err');
+    showStatus(els.campaignStatus, e.message || 'Não foi possível carregar campanhas', 'err');
   }
 }
 
@@ -374,11 +347,35 @@ els.joinableList.addEventListener('click', (event) => {
 });
 els.continueWithoutCampaign.onclick = () => goToApp('');
 
-els.newCampaignToggle.onclick = () => {
-  els.newCampaignForm.hidden = false;
-  els.newCampaignToggle.hidden = true;
+function updateSystemAvailability() {
+  const meta = systemMeta(els.newCampaignSystem.value);
+  const implementation = meta.implementation || 'no';
+  const label = { yes: 'Yes', no: 'No', partially: 'Partially' }[implementation];
+  els.systemAvailability.textContent = `Implementado · ${label}`;
+  els.systemAvailability.className = `system-availability implementation-${implementation}`;
+}
+function openCampaignModal() {
+  els.newCampaignModal.hidden = false;
+  document.body.classList.add('modal-open');
+  showStatus(els.newCampaignStatus, '', '');
+  updateSystemAvailability();
   els.newCampaignName.focus();
-};
+}
+function closeCampaignModal() {
+  els.newCampaignModal.hidden = true;
+  document.body.classList.remove('modal-open');
+  els.newCampaignForm.reset();
+  resetBannerPicker();
+  updateSystemAvailability();
+  els.newCampaignToggle.focus();
+}
+els.newCampaignToggle.onclick = openCampaignModal;
+els.newCampaignBackdrop.onclick = closeCampaignModal;
+els.newCampaignClose.onclick = closeCampaignModal;
+els.newCampaignSystem.addEventListener('change', updateSystemAvailability);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !els.newCampaignModal.hidden) closeCampaignModal();
+});
 function resetBannerPicker() {
   els.newCampaignBanner.value = '';
   els.bannerPreview.hidden = true;
@@ -392,10 +389,7 @@ els.newCampaignBanner.addEventListener('change', () => {
   els.bannerPreview.hidden = false;
 });
 els.newCampaignCancel.onclick = () => {
-  els.newCampaignForm.hidden = true;
-  els.newCampaignToggle.hidden = false;
-  els.newCampaignForm.reset();
-  resetBannerPicker();
+  closeCampaignModal();
 };
 els.newCampaignForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -420,14 +414,14 @@ els.newCampaignForm.addEventListener('submit', async (event) => {
         // banner is a nice-to-have; a failed upload shouldn't block campaign creation
       }
     }
-    els.newCampaignForm.hidden = true;
-    els.newCampaignToggle.hidden = false;
+    els.newCampaignModal.hidden = true;
+    document.body.classList.remove('modal-open');
     els.newCampaignForm.reset();
     resetBannerPicker();
     await loadCampaignList(currentUser);
     if (campaign && campaign.id) goToApp(campaign.id);
   } catch (e) {
-    showStatus(els.campaignStatus, e.message || 'Nao foi possivel criar a campanha', 'err');
+    showStatus(els.newCampaignStatus, e.message || 'Não foi possível criar a campanha', 'err');
   } finally {
     setButtonLoading(els.newCampaignForm, false);
   }
@@ -439,10 +433,10 @@ els.loginForm.addEventListener('submit', async (event) => {
   setButtonLoading(els.loginForm, true);
   try {
     const session = await api.auth.login(els.loginUsername.value.trim(), els.loginPassword.value, els.loginRemember.checked);
-    if (!session || !session.token) throw new Error('Credenciais invalidas');
+    if (!session || !session.token) throw new Error('Credenciais inválidas');
     await showCampaignPicker(session.user);
   } catch (_e) {
-    showStatus(els.credentialsStatus, 'Credenciais invalidas', 'err');
+    showStatus(els.credentialsStatus, 'Credenciais inválidas', 'err');
   } finally {
     setButtonLoading(els.loginForm, false);
   }
@@ -461,7 +455,7 @@ els.resetRequestForm.addEventListener('submit', async (event) => {
   } finally {
     setButtonLoading(els.resetRequestForm, false);
     els.resetRequestForm.reset();
-    showStatus(els.credentialsStatus, 'Se o usuario existir, um mestre ou administrador vai liberar uma nova senha em breve.', '');
+    showStatus(els.credentialsStatus, 'Se o usuário existir, um mestre ou administrador vai liberar uma nova senha em breve.', '');
     window.setTimeout(() => setMode('login'), 2600);
   }
 });
@@ -480,10 +474,10 @@ els.registerForm.addEventListener('submit', async (event) => {
   setButtonLoading(els.registerForm, true);
   try {
     const session = await api.auth.register(els.registerUsername.value.trim(), els.registerPassword.value);
-    if (!session || !session.token) throw new Error('Nao foi possivel criar a conta');
+    if (!session || !session.token) throw new Error('Não foi possível criar a conta');
     await showCampaignPicker(session.user);
   } catch (e) {
-    showStatus(els.credentialsStatus, e.message || 'Nao foi possivel criar a conta', 'err');
+    showStatus(els.credentialsStatus, e.message || 'Não foi possível criar a conta', 'err');
   } finally {
     setButtonLoading(els.registerForm, false);
   }
