@@ -1,6 +1,6 @@
 # README-PLANO.md — Plano unico do Limiar OS
 
-Atualizado em 2026-07-18. Este documento e a fonte unica para ordem de
+Atualizado em 2026-07-21. Este documento e a fonte unica para ordem de
 execucao, dependencias, criterios de aceite e status do produto.
 
 `README-MAPA.md` continua como auditoria do motor do mapa, bugs e evidencias
@@ -81,16 +81,15 @@ servida por HTTP, interacao visivel e leitura posterior do estado pela API.
 
 ## 3. Snapshot verificado
 
-Base de codigo analisada em 2026-07-18 no commit `efda3c5`, com mudancas locais
-adicionais na experiencia de login e nestes documentos.
+Base de codigo analisada em 2026-07-21 no commit `ed443b6`.
 
 Validacao executada no snapshot:
 
-- backend: **77 testes aprovados**;
-- frontend: **49 arquivos / 623 testes aprovados**;
+- backend: **86 testes aprovados**;
+- frontend: **62 arquivos / 695 testes aprovados**;
 - TypeScript: `tsc --noEmit` aprovado;
-- build Vite: aprovado em diretorio temporario;
-- higiene: `git diff --check` aprovado.
+- build Vite: aprovado (`frontend && npm run build`);
+- higiene: gate de `dist/` do `.githooks/pre-commit` aprovado em cada commit.
 
 Estado funcional:
 
@@ -122,10 +121,17 @@ Riscos de codigo abertos e confirmados:
    ~~envelope de storage, expiracao e consumo.~~ Resolvido 2026-07-20: os tres
    agora usam `domain/map/intentEnvelope.ts`; cada um so tipa e valida seu
    proprio payload.
-5. `Component.js`, `ui/views/combat.js` e `pages/campaign-map.js` concentram
-   orquestracao demais e precisam ser divididos por responsabilidade.
+5. `Component.js` e `ui/views/combat.js` ainda concentram orquestracao de
+   combate demais (ARQUITETURA 4C pendente); `pages/campaign-map.js` ja perdeu
+   selectors, sync, render, input handlers e comandos de cena/prop/token/
+   luz/template para modulos dedicados (ARQUITETURA 4B, resolvido
+   2026-07-21) e segue so como composition root.
 6. A pagina de login carrega recursos Google externamente mesmo quando a
    integracao nao esta configurada.
+7. ~~Editar uma campanha existente enviando um `system` diferente no payload~~
+   ~~sobrescrevia o sistema da campanha.~~ Resolvido 2026-07-21: `upsert_campaign`
+   agora ignora o `system` do payload sempre que a campanha ja existe; o valor
+   gravado no banco vence, tornando o sistema imutavel apos a criacao.
 
 ## 4. Base entregue
 
@@ -163,17 +169,23 @@ coisa.
 
 - [x] Reescrever `README-PLANO.md` com snapshot, riscos, fases e gates atuais.
 - [x] Reescrever `README.md` com Mesa, auth local-first e Google opcional.
-- [ ] Remover da criacao de campanha qualquer opcao fora do escopo Cyberpunk
-      RED e manter o valor canonico do sistema definido internamente.
-- [ ] Adicionar teste de criacao/edicao de campanha que prove que o sistema CPR
-      nao muda durante a vida da campanha.
-- [ ] Separar as mudancas locais atuais em commits tematicos: auth/login,
-      campanha, assets, documentacao e bundles gerados.
-- [ ] Atualizar o snapshot desta secao depois dos commits e registrar os SHAs na
+- [x] Decisao de produto: manter todas as opcoes de sistema visiveis na
+      criacao de campanha, com badge `Implementado · Yes/No/Partially`; o
+      botao "Criar campanha" fica bloqueado (disabled + guard no submit) para
+      qualquer sistema com `implementation !== 'yes'`. Substitui a remocao das
+      opcoes prevista originalmente — decisao explicita do usuario 2026-07-21.
+- [x] Adicionar teste de criacao/edicao de campanha que prove que o sistema CPR
+      nao muda durante a vida da campanha (`test_campaign_system_is_immutable_after_creation`,
+      backend/tests/test_campaigns.py).
+- [x] Separar as mudancas locais atuais em commits tematicos: auth/login,
+      campanha, documentacao e bundles gerados (cada commit inclui o rebuild de
+      `dist/` correspondente, exigido pelo gate).
+- [x] Atualizar o snapshot desta secao depois dos commits e registrar os SHAs na
       secao 9.
 
 Aceite: produto, backend, login, Mesa e documentacao apresentam apenas
-Cyberpunk RED; o working tree fica dividido em commits revisaveis.
+Cyberpunk RED como sistema criavel; o working tree fica dividido em commits
+revisaveis.
 
 ### Fase 2 — CORRECAO
 
@@ -559,6 +571,27 @@ YYYY-MM-DD | Fase/item | commit | testes | evidencia live/API
   cobrindo save sucesso/falha, delete cancelado/confirmado com limpeza de
   selecao, damage cancelado/invalido/aplicado/destruido), backend 85,
   typecheck/build verdes
+- 2026-07-21 | CORRECAO 2A | `f0fe276` | frontend 695, typecheck/build verdes |
+  `rollAndApplyMapAoe` aguarda `Promise.allSettled`; `damageApplied` trava
+  re-rolagem de dano em retry so-de-resolver
+- 2026-07-21 | ARQUITETURA 4A+4B (fechamento) | `d727d86` | frontend 695
+  (+32 testes novos: intentEnvelope + 10 modulos `campaignMapX.js`), backend 85,
+  typecheck/build verdes | `campaign-map.js` reduzido a composition root;
+  token/luz/template tambem extraidos nesta entrega
+- 2026-07-21 | FASE 1 (redesign login) | `56fcbaa` | frontend 695,
+  typecheck/build verdes | modal dedicado de nova campanha + badge
+  `implementation` yes/no/partially nos cards
+- 2026-07-21 | ALINHAMENTO docs | `4252b08` | working tree | README-PLANO
+  sincronizado com ARQUITETURA 4A/4B e riscos resolvidos
+- 2026-07-21 | FASE 1 (bloqueio de criacao fora do escopo) | `a0b4465` |
+  frontend 695, typecheck/build verdes | testado ao vivo via `preview_start` +
+  DOM: sistema `dnd5e` desabilita o botao e o submit handler bloqueia mesmo
+  com `disabled` burlado via `requestSubmit()`; zero POST `/api/campaigns`
+  disparado
+- 2026-07-21 | FASE 1 (sistema imutavel apos criacao) | `ed443b6` | backend 86
+  (+1 teste `test_campaign_system_is_immutable_after_creation`), frontend 695,
+  typecheck/build verdes | `upsert_campaign` ignora `system` do payload quando
+  a campanha ja existe
 
 ## 10. Backlog vivo de friccao
 
