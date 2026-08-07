@@ -25,10 +25,17 @@ recomendada de executar o banco de testes.
 Instale as dependências:
 
 ```bash
-python3 -m pip install -r requirements-dev.txt
+python3 -m pip install --require-hashes -r requirements-dev.txt
 cd frontend
 npm ci
 cd ..
+```
+
+Ao alterar `requirements.in` ou `requirements-dev.in`, regenere os locks no
+container Linux de referencia:
+
+```bash
+./scripts/compile-python-locks.sh
 ```
 
 Para iniciar a aplicação completa:
