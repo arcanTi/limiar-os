@@ -1,0 +1,298 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Sheet page (SYS.01) helpers — clip-corner cyberpunk chrome, tab/stat
+   hover states, and progress bars that aren't expressible as plain
+   Tailwind utilities. Compiled into the same static stylesheet so the
+   page never depends on a runtime CDN script. */
+@layer components {
+  .clip-tr { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%); }
+  .clip-br { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
+  .clip-tl { clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); }
+  .clip-bl { clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+  .clip-all { clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px); }
+
+  .stat-box { transition: all 0.15s ease; }
+  .stat-box:hover { border-color: #3fe0d0; box-shadow: 0 0 8px rgba(63,224,208,0.25); background: #0e120d; }
+
+  .tab-btn { transition: all 0.15s ease; }
+  .tab-btn.active { color: #3fe0d0; border-bottom: 2px solid #3fe0d0; background: rgba(63,224,208,0.07); }
+  .tab-btn:not(.active):hover { color: #c8d8c8; background: rgba(255,255,255,0.03); }
+
+  /* Persistent header. */
+  .lm-app-header {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: rgba(8, 10, 7, 0.94);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(214, 170, 78, 0.2);
+  }
+  .lm-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 11px 20px;
+  }
+  @media (max-width: 1050px) {
+    .lm-topbar { padding: 9px 14px; }
+    .lm-topbar > div:first-child { flex: 0 1 auto !important; }
+  }
+  @media (max-width: 760px) {
+    .lm-topbar { gap: 8px; }
+    .lm-topbar > div:nth-child(2) { display: none !important; }
+    .lm-topbar > div:nth-child(3) { gap: 6px !important; }
+    .lm-topbar > div:nth-child(3) > div:first-child,
+    .lm-topbar > div:nth-child(3) > div:nth-child(2) { display: none !important; }
+  }
+
+  .bar-track { position: relative; height: 6px; background: #1e2b1c; border-radius: 1px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 1px; transition: width 0.4s ease; }
+
+  /* Lateral player dossier: a compact HUD inside the sheet drawer. */
+  .lm-operative-drawer { overflow:hidden; background:linear-gradient(145deg,#080b08 0%,#080a07 48%,#0a0d0a 100%); }
+  .lm-operative-drawer::before { content:"";position:absolute;z-index:-1;inset:0;opacity:.32;pointer-events:none;background-image:linear-gradient(rgba(63,224,208,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(214,170,78,.028) 1px,transparent 1px);background-size:32px 32px; }
+  .lm-operative-drawer-head { position:relative;background:linear-gradient(90deg,rgba(214,170,78,.09),transparent 64%); }
+  .lm-operative-drawer-head::after { content:"";position:absolute;left:16px;right:16px;bottom:-1px;height:1px;background:linear-gradient(90deg,#d6aa4e 0 72px,rgba(63,224,208,.7) 72px 126px,transparent 126px); }
+  .lm-operative-kicker { display:flex;align-items:center;gap:7px;font:8px 'Share Tech Mono',monospace;letter-spacing:1.6px;color:#3fe0d0; }
+  .lm-operative-kicker .pulse-dot { width:5px;height:5px;display:inline-block;border-radius:50%;background:#3fe0d0; }
+  .lm-operative-close { clip-path:polygon(0 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%); }
+  .lm-operative-profile { position:relative;display:flex;gap:16px;padding:13px 12px 12px;border:1px solid rgba(214,170,78,.17);background:linear-gradient(105deg,rgba(214,170,78,.08),rgba(8,10,7,.28) 48%,rgba(63,224,208,.035));overflow:hidden; }
+  .lm-operative-profile::after { content:"";position:absolute;right:-34px;top:-48px;width:132px;height:132px;border:1px solid rgba(63,224,208,.19);transform:rotate(45deg);pointer-events:none; }
+  .lm-operative-portrait-wrap { position:relative;z-index:1; }
+  .lm-operative-portrait-wrap::before { content:"";position:absolute;top:-5px;left:-5px;width:25px;height:25px;border-top:2px solid #3fe0d0;border-left:2px solid #3fe0d0;z-index:2;pointer-events:none; }
+  .lm-operative-portrait-wrap::after { content:"";position:absolute;right:-5px;bottom:-5px;width:25px;height:25px;border-right:2px solid #d6aa4e;border-bottom:2px solid #d6aa4e;z-index:2;pointer-events:none; }
+  .lm-operative-portrait { border:1px solid rgba(214,170,78,.38);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px)); }
+  .lm-operative-profile-main { position:relative;z-index:1; }
+  .lm-operative-idline { display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font:8px 'Share Tech Mono',monospace;letter-spacing:1.3px;color:#6f7a64; }
+  .lm-operative-index { color:#d6aa4e; }
+  .lm-operative-meta { display:flex;flex-wrap:wrap;gap:5px;margin-top:8px; }
+  .lm-operative-meta span { padding:3px 5px;border:1px solid rgba(214,170,78,.23);background:rgba(214,170,78,.05);font:8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#d6aa4e; }
+  .lm-operative-meta span:nth-child(2) { color:#3fe0d0;border-color:rgba(63,224,208,.28);background:rgba(63,224,208,.04); }
+  .lm-operative-meta span:nth-child(3) { color:#8fcf83;border-color:rgba(143,207,131,.25); }
+  .lm-operative-vitals { display:grid;grid-template-columns:1fr 1fr;gap:7px 10px;margin-top:11px; }
+  .lm-operative-vital { min-width:0; }
+  .lm-operative-vital-head { display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;font:8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64; }
+  .lm-operative-vital-head strong { color:#cfc9b8;font-weight:700;white-space:nowrap; }
+  .lm-operative-vital .bar-track { height:4px;background:rgba(255,255,255,.08); }
+  .lm-operative-vital--health .lm-operative-vital-head strong { color:#c0635b; }
+  .lm-operative-vital--humanity .lm-operative-vital-head strong { color:#3fe0d0; }
+  .lm-operative-vital--ram .lm-operative-vital-head strong { color:#b388ff; }
+  .lm-operative-vital--ip .lm-operative-vital-head strong { color:#d6aa4e; }
+  .lm-operative-tab-shell { position:relative; }
+  .lm-operative-tab-label { display:flex;justify-content:space-between;gap:8px;margin-bottom:8px;font:8px 'Share Tech Mono',monospace;letter-spacing:1.5px;color:#d6aa4e; }
+  .lm-operative-tab-label span { color:#6f7a64;white-space:nowrap; }
+  .lm-operative-tabs .tab-btn { min-width:0;border:1px solid rgba(214,170,78,.14);border-bottom:1px solid rgba(214,170,78,.14);padding:7px 4px;font-size:8px;letter-spacing:.7px; }
+  .lm-operative-tabs .tab-btn.active { border-color:rgba(63,224,208,.75);border-bottom-color:#3fe0d0;box-shadow:inset 0 -2px 0 #3fe0d0,0 0 12px rgba(63,224,208,.08); }
+  @media (max-width:420px) { .lm-operative-profile { gap:12px;padding:11px 9px; } .lm-operative-portrait-wrap { width:92px !important; } .lm-operative-portrait { width:92px !important;height:116px !important; } .lm-operative-vitals { gap:6px; } .lm-operative-meta span { font-size:7px;letter-spacing:.5px; } .lm-operative-tab-label span { display:none; } }
+
+  /* SYS.01 signal FX — exclusive to the sheet. The desktop's displayStatic
+     (styles/main.css) rattles nonstop; this one holds still and then tears,
+     so the dossier reads as a stable feed with drop-outs, not a noisy screen.
+     lm-fx-life is the opposite: never still, a slow double-beat.
+     Cycles are coprime (3.4s / 6.5s / 5.9s) so the spikes never sync up. */
+  @keyframes lmFxHeart {
+    0%, 46%, 100% { filter:brightness(1) saturate(1); }
+    7%  { filter:brightness(1.5) saturate(1.25); }
+    15% { filter:brightness(1.03) saturate(1); }
+    23% { filter:brightness(1.3) saturate(1.15); }
+    34% { filter:brightness(1) saturate(1); }
+  }
+  @keyframes lmFxHeartText {
+    0%, 46%, 100% { text-shadow:none; }
+    7%  { text-shadow:0 0 8px currentColor; }
+    15% { text-shadow:0 0 2px currentColor; }
+    23% { text-shadow:0 0 6px currentColor; }
+    34% { text-shadow:none; }
+  }
+  @keyframes lmFxGlint {
+    0%   { transform:translateX(-160%); opacity:0; }
+    10%  { opacity:.85; }
+    55%  { opacity:.3; }
+    100% { transform:translateX(320%); opacity:0; }
+  }
+  /* Idle floor, then two clustered drop-outs. Driven with steps(1,end) so the
+     frames cut instead of crossfading. */
+  @keyframes lmFxBurst {
+    0%, 43% { opacity:.05; transform:translate3d(0,0,0) scaleY(1); }
+    45%     { opacity:.52; transform:translate3d(-3px,-1px,0) scaleY(1.07); }
+    46.5%   { opacity:.12; transform:translate3d(2px,1px,0) scaleY(.96); }
+    48%     { opacity:.46; transform:translate3d(-2px,2px,0) scaleY(1.04); }
+    50%, 77% { opacity:.06; transform:translate3d(0,0,0) scaleY(1); }
+    78.5%   { opacity:.4;  transform:translate3d(3px,-2px,0) scaleY(1.05); }
+    80%, 100% { opacity:.05; transform:translate3d(0,0,0) scaleY(1); }
+  }
+  @keyframes lmFxTear {
+    0%, 43%   { transform:translateY(-140%); opacity:0; }
+    45%       { opacity:.9; }
+    49%       { transform:translateY(60%); opacity:.65; }
+    52%, 100% { transform:translateY(240%); opacity:0; }
+  }
+  @keyframes lmFxChroma {
+    0%, 43%   { transform:translateX(0); text-shadow:none; opacity:1; }
+    45%       { transform:translateX(-2px); text-shadow:2px 0 rgba(214,170,78,.85),-2px 0 rgba(63,224,208,.85); opacity:.7; }
+    47%       { transform:translateX(2px); text-shadow:-2px 0 rgba(214,170,78,.7),2px 0 rgba(63,224,208,.7); opacity:.9; }
+    49%, 77%  { transform:translateX(0); text-shadow:none; opacity:1; }
+    78.5%     { transform:translateX(1px); text-shadow:1px 0 rgba(63,224,208,.8); opacity:.78; }
+    80%, 100% { transform:translateX(0); text-shadow:none; opacity:1; }
+  }
+  @keyframes lmFxImgSlip {
+    0%, 43%   { transform:translate3d(0,0,0); filter:none; }
+    45%       { transform:translate3d(-3px,1px,0); filter:contrast(1.35) saturate(1.5) hue-rotate(-14deg); }
+    46.5%     { transform:translate3d(3px,-1px,0); filter:contrast(.82) saturate(.55); }
+    48%       { transform:translate3d(-1px,0,0); filter:contrast(1.22) hue-rotate(10deg); }
+    50%, 77%  { transform:translate3d(0,0,0); filter:none; }
+    78.5%     { transform:translate3d(2px,0,0); filter:contrast(1.25) saturate(1.35); }
+    80%, 100% { transform:translate3d(0,0,0); filter:none; }
+  }
+
+  /* HP: always moving. bar-track clips, so the pulse is filter-only (a
+     box-shadow glow would be cut off) and the glint rides inside the fill. */
+  .lm-fx-life { position:relative; overflow:hidden; animation:lmFxHeart 3.4s ease-in-out infinite; }
+  .lm-fx-life::after { content:"";position:absolute;top:0;bottom:0;left:0;width:22px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent);animation:lmFxGlint 3.4s linear infinite;pointer-events:none; }
+  .lm-fx-life-num { display:inline-block;animation:lmFxHeartText 3.4s ease-in-out infinite; }
+
+  /* HUMANITY: the bar carries the interference, the readout splits with it. */
+  .lm-fx-static-bar { position:relative; overflow:hidden; }
+  .lm-fx-static-bar::after { content:"";position:absolute;inset:-2px;background-image:repeating-linear-gradient(90deg,rgba(6,9,6,.9) 0 1px,transparent 1px 3px),repeating-linear-gradient(0deg,rgba(255,255,255,.55) 0 1px,transparent 1px 2px);mix-blend-mode:overlay;animation:lmFxBurst 6.5s steps(1,end) infinite;pointer-events:none; }
+  .lm-fx-static-num { display:inline-block;animation:lmFxChroma 6.5s steps(1,end) infinite; }
+
+  /* PORTRAIT: noise field + a tear band crossing on the same drop-out, with
+     the image itself slipping underneath. */
+  .lm-fx-static-img { position:relative; }
+  .lm-fx-static-img::after { content:"";position:absolute;inset:-6%;z-index:3;background-image:radial-gradient(circle at 22% 31%,rgba(240,234,216,.3) 0 1px,transparent 2px),radial-gradient(circle at 68% 71%,rgba(63,224,208,.26) 0 1px,transparent 2px),radial-gradient(circle at 44% 86%,rgba(214,170,78,.22) 0 1px,transparent 2px),repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,transparent 1px 3px);mix-blend-mode:screen;animation:lmFxBurst 5.9s steps(1,end) infinite;pointer-events:none; }
+  .lm-fx-static-img::before { content:"";position:absolute;left:-8%;right:-8%;top:0;height:14%;z-index:4;background:linear-gradient(180deg,transparent,rgba(63,224,208,.4) 38%,rgba(240,234,216,.6) 52%,rgba(214,170,78,.32) 66%,transparent);mix-blend-mode:screen;animation:lmFxTear 5.9s steps(1,end) infinite;pointer-events:none; }
+  .lm-fx-static-img img { animation:lmFxImgSlip 5.9s steps(1,end) infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lm-fx-life, .lm-fx-life::after, .lm-fx-life-num,
+    .lm-fx-static-bar::after, .lm-fx-static-num,
+    .lm-fx-static-img::before, .lm-fx-static-img::after, .lm-fx-static-img img { animation:none; }
+    .lm-fx-life::after, .lm-fx-static-img::before { opacity:0; }
+    .lm-fx-static-bar::after, .lm-fx-static-img::after { opacity:.05; }
+  }
+
+  .skill-row-hover:hover { background: rgba(63,224,208,0.04); }
+
+  .attr-val { font-variant-numeric: tabular-nums; }
+
+  .pulse-dot { animation: pulse-glow 2s ease-in-out infinite; }
+  @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 4px #3fe0d0; opacity: 1; } 50% { box-shadow: 0 0 10px #3fe0d0; opacity: 0.7; } }
+
+  .hp-danger .bar-fill-hp { background: #c0635b !important; }
+  .hp-warn .bar-fill-hp { background: #d6aa4e !important; }
+
+  /* SYS.01 sheet-exclusive classes, moved from styles/main.css.
+     lm-ui-*, lm-sheet-input/btn-*, lm-combat-row* and lm-chip stay in
+     styles/main.css — they're shared with combat.js/campaigns.js/tarot. */
+  .lm-sheet-textarea { width:100%;box-sizing:border-box;min-height:118px;background:rgba(214,170,78,0.05);border:1px solid rgba(214,170,78,0.22);color:#e8e4d8;font:13px/1.5 'Chakra Petch',sans-serif;padding:11px;outline:none;resize:vertical; }
+  .lm-sheet-edit-panel { margin-top:18px;border:1px solid rgba(214,170,78,0.18);background:#0b0e0a;padding:14px; }
+  .lm-sheet-edit-title { font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:10px; }
+  .lm-sheet-field { display:flex;flex-direction:column;gap:5px; }
+  .lm-sheet-field-label { font:8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64; }
+  .lm-sheet-field-label--wide { letter-spacing:1.5px; }
+  .lm-sheet-edit-section-title { font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin:14px 0 8px; }
+  .lm-sheet-edit-section-title--row { display:flex;align-items:center;gap:8px; }
+  .lm-sheet-rule { flex:1;height:1px;background:rgba(214,170,78,0.14); }
+  .lm-sheet-rule--teal { background:rgba(63,224,208,0.14); }
+  .lm-sheet-stack-sm { display:flex;flex-direction:column;gap:6px; }
+  .lm-ui-textarea--story { min-height:118px; }
+  .lm-ui-textarea--detail { min-height:76px; }
+  .lm-sheet-section-title { font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin:22px 0 10px;display:flex;align-items:center;gap:8px; }
+  .lm-sheet-section-title::after { content:"";flex:1;height:1px;background:rgba(214,170,78,0.15); }
+  .lm-core-attrs { display:grid;grid-template-columns:repeat(5,1fr);gap:10px; }
+  .lm-core-attr-btn { position:relative;background:linear-gradient(180deg,rgba(214,170,78,.055),#0b0e0a);border:1px solid rgba(214,170,78,0.22);cursor:pointer;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .15s;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));min-width:0; }
+  .lm-core-attr-btn:hover { border-color:#d6aa4e;background:rgba(214,170,78,0.08); }
+  .lm-core-attr-value { font:700 30px 'Chakra Petch',sans-serif;color:#f0ead8;line-height:1; }
+  .lm-core-attr-key { font:9px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e; }
+  .lm-core-attr-roll { position:absolute;top:5px;right:6px;font:8px 'Share Tech Mono',monospace;color:#3fe0d0; }
+  .lm-core-stat-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px; }
+  .lm-core-stat { background:#0b0e0a;border:1px solid rgba(214,170,78,0.16);padding:10px 9px;text-align:center;min-width:0; }
+  .lm-core-stat--teal { border-color:rgba(63,224,208,0.18); }
+  .lm-core-stat--danger { border-color:rgba(192,99,91,0.2); }
+  .lm-core-stat--action { cursor:pointer;border-color:rgba(214,170,78,0.28); }
+  .lm-core-stat--action:hover { border-color:#d6aa4e;background:rgba(214,170,78,0.08); }
+  .lm-core-stat-value { font:700 18px 'Chakra Petch',sans-serif;color:#d6aa4e;line-height:1; }
+  .lm-core-stat-value--teal { color:#3fe0d0; }
+  .lm-core-stat-value--danger { color:#c0635b; }
+  .lm-core-stat-value--plain { color:#f0ead8; }
+  .lm-core-stat-label { font:8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:5px; }
+  .lm-character-detail-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:8px;margin-top:10px; }
+  .lm-character-detail-grid--flags { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); }
+  .lm-character-detail-cell { min-width:0;background:linear-gradient(180deg,rgba(214,170,78,.045),#080a07);border:1px solid rgba(214,170,78,.14);border-left:2px solid var(--detail-color,#d6aa4e);padding:10px 11px;display:flex;flex-direction:column;gap:4px; }
+  .lm-character-detail-label { font:8px 'Share Tech Mono',monospace;letter-spacing:1.4px;color:#6f7a64;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .lm-character-detail-value { font:700 20px/1 'Chakra Petch',sans-serif;letter-spacing:0;color:var(--detail-color,#d6aa4e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .lm-character-detail-note { font:9px/1.3 'Share Tech Mono',monospace;letter-spacing:.7px;color:#a8a48f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .lm-character-detail-cell--wide .lm-character-detail-note { white-space:normal;overflow-wrap:anywhere; }
+  .lm-character-brief-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:10px; }
+  .lm-character-brief-panel { min-width:0;background:rgba(63,224,208,.025);border:1px solid rgba(63,224,208,.14);padding:10px 12px; }
+  .lm-character-brief-title { font:700 9px 'Share Tech Mono',monospace;letter-spacing:1.6px;color:#3fe0d0;margin-bottom:8px; }
+  .lm-character-skill-chip { display:grid;grid-template-columns:minmax(0,1fr) auto 34px;gap:8px;align-items:center;text-align:left;background:#080a07;border:1px solid rgba(214,170,78,.13);padding:8px 9px;cursor:pointer;min-width:0; }
+  .lm-character-skill-chip:hover { border-color:#3fe0d0;background:rgba(63,224,208,.055); }
+  .lm-character-skill-chip span, .lm-character-gear-row span { min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 12px 'Chakra Petch',sans-serif;color:#e8e4d8; }
+  .lm-character-skill-chip em, .lm-character-gear-row em { font:9px 'Share Tech Mono',monospace;color:#6f7a64;font-style:normal;white-space:nowrap; }
+  .lm-character-skill-chip strong, .lm-character-gear-row strong { font:700 12px 'Share Tech Mono',monospace;color:#d6aa4e;text-align:right;white-space:nowrap; }
+  .lm-character-gear-row { display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;background:#080a07;border:1px solid rgba(214,170,78,.13);padding:8px 9px;min-width:0; }
+  .lm-character-empty { font:10px 'Share Tech Mono',monospace;color:#6f7a64;background:#080a07;border:1px solid rgba(214,170,78,.1);padding:10px; }
+  .lm-psychosis-banner { border:1px solid rgba(214,170,78,0.4);background:rgba(214,170,78,0.08);padding:12px 14px;margin-top:12px; }
+  .lm-psychosis-banner--extreme { border-color:rgba(192,99,91,0.6);background:rgba(192,99,91,0.1);animation:psychosisPulse 1.4s ease-in-out infinite; }
+  .lm-psychosis-banner-title { font:700 12px 'Chakra Petch',sans-serif;letter-spacing:2px;color:#d6aa4e; }
+  .lm-psychosis-banner--extreme .lm-psychosis-banner-title { color:#c0635b; }
+  .lm-psychosis-banner-desc { font:11px/1.5 'Chakra Petch',sans-serif;color:#9a9883;margin-top:6px; }
+  .lm-core-ledger { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px; }
+  .lm-dense-list { display:flex;flex-direction:column;gap:6px; }
+  /* Read-only skill filtering narrows the visible rows without changing the
+     persisted character. */
+  .lm-skill-filter { display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:9px; }
+  .lm-skill-filter-input { flex:1;min-width:180px;background:#080a07;border:1px solid rgba(214,170,78,0.22);color:#e8e4d8;font:12px 'Chakra Petch',sans-serif;padding:8px 10px;outline:none; }
+  .lm-skill-filter-input:focus { border-color:#3fe0d0; }
+  .lm-skill-filter-input::placeholder { color:#6f7a64; }
+  .lm-skill-filter-toggle { flex:none;font:700 9px 'Share Tech Mono',monospace;letter-spacing:1.2px;color:#d6aa4e;background:transparent;border:1px solid rgba(214,170,78,0.32);padding:8px 10px;cursor:pointer;transition:color .15s,background .15s,border-color .15s; }
+  .lm-skill-filter-toggle:hover { border-color:#d6aa4e; }
+  .lm-skill-filter-toggle--on { color:#080a07;background:#3fe0d0;border-color:#3fe0d0; }
+  .lm-skill-filter-clear { flex:none;font:700 9px 'Share Tech Mono',monospace;letter-spacing:1.2px;color:#6f7a64;background:transparent;border:1px solid rgba(111,122,100,0.35);padding:8px 10px;cursor:pointer; }
+  .lm-skill-filter-clear:hover { color:#c0635b;border-color:rgba(192,99,91,0.5); }
+  .lm-skill-filter-count { font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#3fe0d0; }
+
+  .lm-skill-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:8px;align-items:start; }
+  .lm-skill-col { display:flex;flex-direction:column;gap:6px;min-width:0; }
+  .lm-skill-row { display:grid;grid-template-columns:minmax(0,1fr) 36px 48px 40px;gap:8px;align-items:center;text-align:left;background:#0b0e0a;border:1px solid rgba(214,170,78,0.14);padding:8px 9px;cursor:pointer;min-width:0;transition:border-color .15s,background .15s; }
+  .lm-skill-row:hover { border-color:#3fe0d0;background:rgba(63,224,208,0.06); }
+  .lm-skill-name-wrap { display:flex;align-items:center;gap:5px;min-width:0; }
+  .lm-skill-name { font:600 12px 'Chakra Petch',sans-serif;color:#cfc9b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1; }
+  .lm-skill-badge { flex:none;font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;padding:1px 4px;border:1px solid rgba(214,170,78,0.35);color:#d6aa4e; }
+  .lm-skill-badge--cyber { color:#3fe0d0;border-color:rgba(63,224,208,0.35); }
+  .lm-skill-stat { font:9px 'Share Tech Mono',monospace;color:#d6aa4e; }
+  .lm-skill-level { font:9px 'Share Tech Mono',monospace;color:#6f7a64; }
+  .lm-skill-total { font:700 13px 'Share Tech Mono',monospace;color:#3fe0d0;text-align:right; }
+  .lm-ip-row { display:grid;grid-template-columns:1.35fr .52fr .52fr .58fr .62fr;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(214,170,78,0.13);padding:8px; }
+  .lm-ip-name { font:600 11px 'Chakra Petch',sans-serif;color:#cfc9b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .lm-ip-meta { font:8px 'Share Tech Mono',monospace;letter-spacing:1px;margin-top:2px; }
+  .lm-ip-cell { font:10px 'Share Tech Mono',monospace;color:#6f7a64; }
+  .lm-ip-cell--strong { font:700 11px 'Share Tech Mono',monospace; }
+  .lm-chrome-slot { display:flex;flex-direction:column;gap:8px;background:#0b0e0a;border-left:2px solid var(--slot-color,#d6aa4e);padding:9px 12px; }
+  .lm-chrome-slot-head { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+  .lm-chrome-slot-title { display:block;font:600 13px 'Chakra Petch',sans-serif;color:var(--slot-color,#d6aa4e);letter-spacing:.5px; }
+  .lm-chrome-slot-meta { display:block;font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64; }
+  .lm-chrome-remove { flex:none;font:700 9px 'Share Tech Mono',monospace;color:#c0635b;background:transparent;border:1px solid rgba(192,99,91,0.35);padding:5px 7px;cursor:pointer; }
+  .lm-chrome-enh-label { background:#080a07;border-left:2px solid #b388ff;padding:7px 12px;font:9px 'Share Tech Mono',monospace;color:#b388ff;letter-spacing:1px; }
+  .lm-chrome-enh-controls { display:flex;gap:6px;flex-wrap:wrap;background:#080a07;border-left:2px solid rgba(179,136,255,.5);padding:7px 12px; }
+  .lm-effect-group { background:rgba(63,224,208,0.035);border:1px solid rgba(63,224,208,0.14);padding:10px 12px; }
+  .lm-effect-row { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,140px);gap:10px;align-items:start;background:#080a07;border-left:2px solid #3fe0d0;padding:8px 10px; }
+  .lm-effect-desc { display:block;font:600 12px 'Chakra Petch',sans-serif;color:#e8e4d8; }
+  .lm-effect-type { display:block;font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:3px; }
+  .lm-ip-panel { margin-top:14px;border:1px solid rgba(214,170,78,0.18);background:rgba(11,14,10,0.82);padding:12px; }
+  .lm-ip-section-title { font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:10px;display:flex;align-items:center;gap:8px; }
+  .lm-ip-history-toggle { width:100%;display:flex;justify-content:space-between;align-items:center;background:transparent;border:none;color:#d6aa4e;font:700 10px 'Share Tech Mono',monospace;letter-spacing:2px;padding:0;cursor:pointer; }
+  .lm-ip-history-meta { margin-top:10px;font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64; }
+  .lm-ip-history-empty { font:11px 'Share Tech Mono',monospace;color:#6f7a64;margin-top:8px; }
+  .lm-ip-history-list { display:flex;flex-direction:column;gap:5px;margin-top:7px; }
+  .lm-ip-history-row { display:grid;grid-template-columns:.62fr 1fr .42fr;gap:7px;background:#080a07;border:1px solid rgba(214,170,78,0.1);padding:7px;font:9px 'Share Tech Mono',monospace;letter-spacing:.5px; }
+  .lm-ip-history-row--hq { border-color:rgba(63,224,208,0.1); }
+  .lm-ip-history-when { color:#6f7a64; }
+  .lm-ip-history-label { min-width:0;color:#cfc9b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .lm-ip-history-amount { text-align:right;white-space:nowrap; }
+}

@@ -1,0 +1,5873 @@
+{
+  "schemaVersion": 1,
+  "notes": [
+    "Internal canonical package for Limiar OS validation.",
+    "Contains only data explicitly provided by the 2026-07-02 catalog rules prompt.",
+    "Do not infer Cyberpunk RED book rules from this file; extend only when explicit source data is provided."
+  ],
+  "sourceTypes": [
+    "official-core",
+    "official-dlc",
+    "official-supplement",
+    "homebrew-limiar",
+    "unvalidated"
+  ],
+  "officialStats": [
+    "INT",
+    "REF",
+    "DEX",
+    "TECH",
+    "COOL",
+    "WILL",
+    "LUCK",
+    "MOVE",
+    "BODY",
+    "EMP"
+  ],
+  "skillAliases": {
+    "Melee Weapons": "Melee Weapon",
+    "Weapon Tech": "Weaponstech",
+    "Weapons Tech": "Weaponstech",
+    "Photograph/Film": "Photography/Film",
+    "Street Slang": "Streetslang",
+    "Language (Street Slang)": "Language (Streetslang)"
+  },
+  "invalidSkillLikeFields": {
+    "Evidence Collection": {
+      "reason": "Not an official skill in the current system.",
+      "canonicalAction": "Convert to contextual effect or remove automatic bonus."
+    },
+    "Disguise": {
+      "reason": "Not an official skill in the current system.",
+      "canonicalAction": "Convert to contextual effect, or split into Acting and Wardrobe & Style only when an explicit rule says so."
+    },
+    "Pericia Selecionada (definir na instalacao)": {
+      "reason": "Not a skill.",
+      "canonicalAction": "Convert to selectedSkillBonus."
+    },
+    "Perception (as cegas/no escuro)": {
+      "reason": "Not a skill.",
+      "canonicalAction": "Convert to senseMode or conditionalSkillBonus."
+    },
+    "Perception (deteccao por radar/sonar)": {
+      "reason": "Not a skill.",
+      "canonicalAction": "Convert to senseMode."
+    },
+    "Athletics (natacao)": {
+      "reason": "Not a skill.",
+      "canonicalAction": "Convert to movementMode or conditionalSkillBonus."
+    },
+    "MOVE_ao_patinar": {
+      "reason": "Not a stat.",
+      "canonicalAction": "Convert to movementMode."
+    }
+  },
+  "cyberwareFoundations": {
+    "Neural Link": {
+      "seedCodes": [
+        "NEURAL-LINK"
+      ],
+      "category": "neuralware",
+      "foundational": true,
+      "optionSlotsProvided": 5
+    },
+    "Chipware Socket": {
+      "seedCodes": [
+        "CHIP-SOCKET"
+      ],
+      "requires": [
+        "Neural Link"
+      ],
+      "requiredFor": [
+        "Chipware"
+      ]
+    },
+    "Cybereye": {
+      "seedCodes": [
+        "CYBEREYE"
+      ],
+      "category": "cyberoptics",
+      "foundational": true,
+      "optionSlotsProvided": 3,
+      "slotUnit": "per eye"
+    },
+    "Cyberaudio Suite": {
+      "seedCodes": [
+        "CYBERAUDIO"
+      ],
+      "category": "cyberaudio",
+      "foundational": true,
+      "optionSlotsProvided": 3,
+      "maxInstalled": 1
+    },
+    "Cyberarm": {
+      "seedCodes": [
+        "CYBERARM"
+      ],
+      "category": "cyberlimb",
+      "foundational": true,
+      "optionSlotsProvided": 4,
+      "includes": [
+        {
+          "name": "Standard Hand",
+          "humanityLoss": 0,
+          "slotCost": 0,
+          "whenIncludedBy": "Cyberarm"
+        }
+      ]
+    },
+    "Cyberleg": {
+      "seedCodes": [
+        "CYBERLEG"
+      ],
+      "category": "cyberlimb",
+      "foundational": true,
+      "optionSlotsProvided": 3,
+      "includes": [
+        {
+          "name": "Standard Foot",
+          "humanityLoss": 0,
+          "slotCost": 0,
+          "whenIncludedBy": "Cyberleg"
+        }
+      ]
+    },
+    "Internal Body Cyberware": {
+      "category": "internal",
+      "optionSlotsAvailable": 7
+    },
+    "External Body Cyberware": {
+      "category": "external",
+      "optionSlotsAvailable": 7
+    },
+    "Fashionware": {
+      "category": "fashion",
+      "optionSlotsAvailable": 7
+    }
+  },
+  "slotRules": [
+    {
+      "id": "paired-cyberoptics",
+      "description": "Some cyberoptics require two paired Cybereyes and must consume slots in both eyes."
+    },
+    {
+      "id": "paired-cyberlegs",
+      "description": "Most paired cyberleg options require two Cyberlegs and must be installed in two different Cyberlegs; Humanity Loss is paid for each option instance unless the item explicitly says otherwise."
+    },
+    {
+      "id": "separate-by-location",
+      "description": "Cyberware slots are separate by location/category."
+    }
+  ],
+  "coreRangedWeaponProfiles": {
+    "Medium Pistol": {
+      "weaponSkill": "Handgun",
+      "damage": "2d6",
+      "magazine": 12,
+      "ammoType": "M Pistol",
+      "rof": 2,
+      "handsRequired": 1,
+      "concealable": true,
+      "cost": 50,
+      "costCategory": "Costly"
+    },
+    "Heavy Pistol": {
+      "weaponSkill": "Handgun",
+      "damage": "3d6",
+      "magazine": 8,
+      "ammoType": "H Pistol",
+      "rof": 2,
+      "handsRequired": 1,
+      "concealable": true,
+      "cost": 100,
+      "costCategory": "Premium"
+    },
+    "Very Heavy Pistol": {
+      "weaponSkill": "Handgun",
+      "damage": "4d6",
+      "magazine": 8,
+      "ammoType": "VH Pistol",
+      "rof": 1,
+      "handsRequired": 1,
+      "concealable": false,
+      "cost": 100,
+      "costCategory": "Premium"
+    },
+    "SMG": {
+      "weaponSkill": "Handgun",
+      "damage": "2d6",
+      "magazine": 30,
+      "ammoType": "M Pistol",
+      "rof": 1,
+      "handsRequired": 1,
+      "concealable": true,
+      "cost": 100,
+      "costCategory": "Premium",
+      "special": [
+        "Autofire 3",
+        "Suppressive Fire"
+      ]
+    },
+    "Heavy SMG": {
+      "weaponSkill": "Handgun",
+      "damage": "3d6",
+      "magazine": 40,
+      "ammoType": "H Pistol",
+      "rof": 1,
+      "handsRequired": 1,
+      "concealable": false,
+      "cost": 100,
+      "costCategory": "Premium",
+      "special": [
+        "Autofire 3",
+        "Suppressive Fire"
+      ]
+    },
+    "Shotgun": {
+      "weaponSkill": "Shoulder Arms",
+      "damage": "5d6",
+      "magazine": 4,
+      "ammoType": "Slug",
+      "rof": 1,
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "special": [
+        "Shotgun Shell compatible"
+      ]
+    },
+    "Assault Rifle": {
+      "weaponSkill": "Shoulder Arms",
+      "damage": "5d6",
+      "magazine": 25,
+      "ammoType": "Rifle",
+      "rof": 1,
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "special": [
+        "Autofire 4",
+        "Suppressive Fire"
+      ]
+    },
+    "Sniper Rifle": {
+      "weaponSkill": "Shoulder Arms",
+      "damage": "5d6",
+      "magazine": 4,
+      "ammoType": "Rifle",
+      "rof": 1,
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive"
+    },
+    "Bows & Crossbows": {
+      "weaponSkill": "Archery",
+      "damage": "4d6",
+      "magazine": null,
+      "ammoType": "Arrow",
+      "rof": 1,
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 100,
+      "costCategory": "Premium"
+    },
+    "Grenade Launcher": {
+      "weaponSkill": "Heavy Weapons",
+      "damage": "6d6",
+      "magazine": 2,
+      "ammoType": "Grenade",
+      "rof": 1,
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "special": [
+        "Explosive"
+      ]
+    },
+    "Rocket Launcher": {
+      "weaponSkill": "Heavy Weapons",
+      "damage": "8d6",
+      "magazine": 1,
+      "ammoType": "Rocket",
+      "rof": 1,
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "special": [
+        "Explosive"
+      ]
+    }
+  },
+  "coreMeleeWeaponProfiles": {
+    "Light Melee Weapon": {
+      "weaponSkill": "Melee Weapon",
+      "damage": "1d6",
+      "rof": 2,
+      "handsRequired": "varies",
+      "concealable": true,
+      "cost": 50,
+      "costCategory": "Costly"
+    },
+    "Medium Melee Weapon": {
+      "weaponSkill": "Melee Weapon",
+      "damage": "2d6",
+      "rof": 2,
+      "handsRequired": "varies",
+      "concealable": false,
+      "cost": 50,
+      "costCategory": "Costly"
+    },
+    "Heavy Melee Weapon": {
+      "weaponSkill": "Melee Weapon",
+      "damage": "3d6",
+      "rof": 2,
+      "handsRequired": "varies",
+      "concealable": false,
+      "cost": 100,
+      "costCategory": "Premium"
+    },
+    "Very Heavy Melee Weapon": {
+      "weaponSkill": "Melee Weapon",
+      "damage": "4d6",
+      "rof": 1,
+      "handsRequired": "varies",
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive"
+    }
+  },
+  "coreCyberweaponProfiles": {
+    "Big Knucks": {
+      "seedCodes": [
+        "BIG-KNUCKS"
+      ],
+      "cyberweaponProfile": "Medium Melee Weapon",
+      "damage": "2d6",
+      "rof": 2,
+      "skill": "Brawling",
+      "skillNote": "Prompt allows Brawling or Melee Weapon according to current engine design, but prefers Brawling for punch-like attacks.",
+      "concealable": true
+    },
+    "Scratchers": {
+      "seedCodes": [
+        "SCRATCHERS"
+      ],
+      "cyberweaponProfile": "Light Melee Weapon",
+      "damage": "1d6",
+      "rof": 2,
+      "skill": "Melee Weapon",
+      "concealable": true
+    },
+    "Rippers": {
+      "seedCodes": [
+        "RIPPERS"
+      ],
+      "cyberweaponProfile": "Medium Melee Weapon",
+      "damage": "2d6",
+      "rof": 2,
+      "skill": "Melee Weapon",
+      "concealable": true
+    },
+    "Slice 'N Dice": {
+      "seedCodes": [
+        "SLICE-DICE"
+      ],
+      "cyberweaponProfile": "Medium Melee Weapon",
+      "damage": "2d6",
+      "rof": 2,
+      "skill": "Melee Weapon",
+      "concealable": true
+    },
+    "Wolvers": {
+      "seedCodes": [
+        "WOLVERS"
+      ],
+      "cyberweaponProfile": "Heavy Melee Weapon",
+      "damage": "3d6",
+      "rof": 2,
+      "skill": "Melee Weapon",
+      "concealable": true
+    },
+    "Talon Foot": {
+      "seedCodes": [
+        "TALON-FOOT"
+      ],
+      "cyberweaponProfile": "Light Melee Weapon",
+      "damage": "1d6",
+      "rof": 2,
+      "skill": "Melee Weapon",
+      "concealable": true
+    },
+    "Cybersnake": {
+      "seedCodes": [
+        "SNAKE"
+      ],
+      "cyberweaponProfile": "Very Heavy Melee Weapon",
+      "damage": "4d6",
+      "rof": 1,
+      "skill": "Melee Weapon",
+      "concealable": true
+    },
+    "Vampyres": {
+      "seedCodes": [
+        "VAMPYRES"
+      ],
+      "cyberweaponProfile": "Excellent Quality Light Melee Weapon",
+      "damage": "1d6",
+      "rof": 2,
+      "skill": "Melee Weapon",
+      "concealable": true,
+      "special": [
+        "Can deliver Poison or Biotoxin when loaded"
+      ]
+    },
+    "Dartgun Eye": {
+      "seedCodes": [
+        "DARTGUN-EYE"
+      ],
+      "weaponSkill": "Exotic or Shoulder Arms/Handgun according to existing engine support",
+      "exotic": true,
+      "damage": "1d6",
+      "rof": 1,
+      "magazine": 1,
+      "concealable": true,
+      "special": [
+        "Can load poison or drug"
+      ]
+    },
+    "Popup Grenade Launcher": {
+      "seedCodes": [
+        "POPUP-GL"
+      ],
+      "weaponSkill": "Heavy Weapons",
+      "damage": "6d6",
+      "rof": 1,
+      "magazine": 1,
+      "ammoType": "Grenade",
+      "concealable": true,
+      "special": [
+        "Explosive"
+      ]
+    },
+    "Popup Melee Weapon": {
+      "seedCodes": [
+        "POP-MELEE"
+      ],
+      "container": true,
+      "allowedWeapons": [
+        "Light Melee Weapon",
+        "Medium Melee Weapon",
+        "Heavy Melee Weapon"
+      ],
+      "damage": "selected installed weapon",
+      "rof": "selected installed weapon",
+      "skill": "selected installed weapon",
+      "concealable": true,
+      "concealableNote": "Concealable even if selected weapon is not normally concealable."
+    },
+    "Popup Ranged Weapon": {
+      "container": true,
+      "allowedWeapons": [
+        "one-handed ranged weapon"
+      ],
+      "damage": "selected installed weapon",
+      "rof": "selected installed weapon",
+      "skill": "selected installed weapon",
+      "magazine": "selected installed weapon",
+      "concealable": true,
+      "concealableNote": "Concealable even if selected weapon is not normally concealable."
+    }
+  },
+  "itemEffectCorrections": {
+    "Amplified Hearing": {
+      "seedCodes": [
+        "AMP-HEARING"
+      ],
+      "conditionalSkillBonus": [
+        {
+          "skill": "Perception",
+          "value": 2,
+          "condition": "hearing is relevant"
+        }
+      ]
+    },
+    "Voice Stress Analyzer": {
+      "seedCodes": [
+        "VOICE-STRESS"
+      ],
+      "conditionalSkillBonus": [
+        {
+          "skill": "Human Perception",
+          "value": 2,
+          "condition": "voice/stress/lie analysis is relevant"
+        },
+        {
+          "skill": "Interrogation",
+          "value": 2,
+          "condition": "voice/stress/lie analysis is relevant"
+        }
+      ]
+    },
+    "AudioVox": {
+      "seedCodes": [
+        "AUDIOVOX"
+      ],
+      "conditionalSkillBonus": [
+        {
+          "skill": "Acting",
+          "value": 2,
+          "condition": "singing/voice is relevant"
+        },
+        {
+          "skill": "Play Instrument",
+          "value": 2,
+          "condition": "singing/voice is relevant"
+        }
+      ]
+    },
+    "Image Enhance": {
+      "seedCodes": [
+        "IMAGE-ENH"
+      ],
+      "requires": [
+        "two paired Cybereyes"
+      ],
+      "flatSkillBonus": [
+        {
+          "skill": "Perception",
+          "value": 2
+        },
+        {
+          "skill": "Lip Reading",
+          "value": 2
+        },
+        {
+          "skill": "Conceal/Reveal Object",
+          "value": 2
+        }
+      ]
+    },
+    "Medscanner": {
+      "seedCodes": [
+        "MEDSCAN"
+      ],
+      "flatSkillBonus": [
+        {
+          "skill": "First Aid",
+          "value": 2
+        },
+        {
+          "skill": "Paramedic",
+          "value": 2
+        }
+      ]
+    },
+    "Toxin Binders": {
+      "seedCodes": [
+        "TOX-BIND"
+      ],
+      "flatSkillBonus": [
+        {
+          "skill": "Resist Torture/Drugs",
+          "value": 2
+        }
+      ]
+    },
+    "Grafted Muscle and Bone Lace": {
+      "seedCodes": [
+        "MUSCLE-LACE"
+      ],
+      "statModifier": {
+        "stat": "BODY",
+        "value": 2,
+        "max": 10
+      },
+      "affects": [
+        "HP",
+        "Seriously Wounded threshold",
+        "Death Save"
+      ]
+    },
+    "Implanted Linear Frame Sigma": {
+      "seedCodes": [
+        "LINEAR-SIGMA"
+      ],
+      "setEffectiveStat": {
+        "stat": "BODY",
+        "value": 12
+      },
+      "affects": [
+        "HP",
+        "Seriously Wounded threshold",
+        "Death Save"
+      ],
+      "requires": [
+        "BODY 6",
+        "Grafted Muscle and Bone Lace"
+      ]
+    },
+    "Implanted Linear Frame Beta": {
+      "seedCodes": [
+        "LINEAR-BETA"
+      ],
+      "setEffectiveStat": {
+        "stat": "BODY",
+        "value": 14
+      },
+      "affects": [
+        "HP",
+        "Seriously Wounded threshold",
+        "Death Save"
+      ],
+      "requires": [
+        "BODY 8",
+        "two Grafted Muscle and Bone Lace instances"
+      ]
+    },
+    "Skin Weave": {
+      "seedCodes": [
+        "SKIN-WEAVE"
+      ],
+      "armorLayer": {
+        "sp": 7,
+        "locations": [
+          "body",
+          "head"
+        ],
+        "stacksWithWornArmor": false,
+        "ablates": true,
+        "recovery": "1 SP per day of rest"
+      }
+    },
+    "Subdermal Armor": {
+      "seedCodes": [
+        "SUBDERMAL-ARMOR"
+      ],
+      "armorLayer": {
+        "sp": 11,
+        "locations": [
+          "body",
+          "head"
+        ],
+        "stacksWithWornArmor": false,
+        "ablates": true,
+        "recovery": "1 SP per day of rest"
+      }
+    },
+    "Radar/Sonar Implant": {
+      "seedCodes": [
+        "RAD-SON-INT"
+      ],
+      "senseMode": "terrain scan within 50m/yd",
+      "limitations": [
+        "Cannot scan through cover",
+        "No generic +2 Perception bonus"
+      ]
+    },
+    "Low Light / Infrared / UV": {
+      "seedCodes": [
+        "LOWLIGHT-UV"
+      ],
+      "senseMode": "Ignore penalties due to darkness, smoke, fog, and similar conditions.",
+      "requires": [
+        "two paired Cybereyes"
+      ],
+      "slotCost": {
+        "perCybereye": 2
+      }
+    },
+    "Targeting Scope": {
+      "seedCodes": [
+        "TARGET-SCOPE"
+      ],
+      "conditionalAttackBonus": [
+        {
+          "value": 1,
+          "condition": "aimed shots"
+        }
+      ],
+      "requires": [
+        "Cybereye"
+      ]
+    },
+    "TeleOptics": {
+      "seedCodes": [
+        "TELE-OPT"
+      ],
+      "senseMode": "Detail up to 800m/yd.",
+      "conditionalAttackBonus": [
+        {
+          "value": 1,
+          "condition": "Aimed Shot against targets 51m/yd or farther away"
+        }
+      ],
+      "requires": [
+        "Cybereye"
+      ]
+    },
+    "Skate Foot": {
+      "seedCodes": [
+        "SKATE-FOOT"
+      ],
+      "movementMode": "Increases movement by 6m/yd only when using Run Action on suitable surface.",
+      "requires": [
+        "two paired Cyberlegs"
+      ]
+    },
+    "Web Foot": {
+      "seedCodes": [
+        "WEB-FOOT"
+      ],
+      "movementMode": "Negates movement penalty when swimming.",
+      "requires": [
+        "two paired Cyberlegs"
+      ]
+    },
+    "Jump Booster": {
+      "seedCodes": [
+        "JUMP-BOOSTER"
+      ],
+      "movementMode": "Negates movement penalty when jumping.",
+      "requires": [
+        "two paired Cyberlegs"
+      ],
+      "slotCost": {
+        "perCyberleg": 2
+      }
+    },
+    "Grip Foot": {
+      "movementMode": "Negates movement penalty when climbing.",
+      "requires": [
+        "two paired Cyberlegs"
+      ]
+    },
+    "Hardened Shielding": {
+      "seedCodes": [
+        "HARD-SHIELD"
+      ],
+      "empProtection": {
+        "scope": "parent cyberlimb and installed options only",
+        "globalEmpImmunity": false
+      },
+      "requires": [
+        "Cyberarm",
+        "Cyberleg"
+      ]
+    }
+  },
+  "faqRules": [
+    "Cyberweapons like Scratchers, Rippers, Wolvers, Slice 'N Dice, Cybersnake, Talon Foot, Big Knucks, and Vampyres cannot be bought as Poor/Excellent variants like normal weapons unless a specific upgrade or Tech rule handles it.",
+    "Popup Melee Weapon can contain Light, Medium, or Heavy Melee Weapons, including Exotic/Poor/Excellent if the selected installed weapon has that quality.",
+    "If an Implanted Linear Frame is disabled by EMP, BODY and Death Save drop back to non-frame values while disabled, but HP boost remains.",
+    "Cyberware slots are separate by location/category."
+  ],
+  "unvalidatedItems": [],
+  "unvalidatedSourceRule": {
+    "sourceText": "cyberware DLC compilado",
+    "sourceType": "unvalidated",
+    "unlessExplicitOfficialSourceTypeKnown": true
+  },
+  "homebrewLimiarReservedItems": [
+    "MANTIS-BLADE",
+    "MONOWIRE",
+    "COMBAT-TAIL",
+    "GORILLA-ARMS",
+    "ENH-HYD-RAM",
+    "ENH-PNEU-ACT",
+    "ENH-TUNG-REIN",
+    "ENH-DBL-EDGE",
+    "ENH-MONO-EDG",
+    "ENH-BARB-LIN",
+    "ENH-ELECTRO",
+    "ENH-THERMAL"
+  ],
+  "homebrewLimiarReservedRule": {
+    "sourceType": "homebrew-limiar",
+    "requiresGmApproval": true,
+    "implementationStatus": "implemented by homebrewLimiarCatalogCorrections"
+  },
+  "coreCyberwareCatalogCorrections": {
+    "NEURAL-LINK": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Neural Link",
+      "cyberwareType": "neuralware",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "foundational": true,
+      "optionSlotsProvided": 5,
+      "unique": true,
+      "desc": "sistema neural artificial necessario para plugs neurais e subdermal grip; possui 5 option slots."
+    },
+    "BD-REC": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Braindance Recorder",
+      "cyberwareType": "neuralware",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "NEURAL-LINK"
+        }
+      ],
+      "parentType": "neuralware",
+      "allowedParentTypes": [
+        "Neural Link"
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "records user experience to memory chip or external device"
+        }
+      ],
+      "desc": "grava experiencias do usuario em chip ou dispositivo externo."
+    },
+    "CHIP-SOCKET": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Chipware Socket",
+      "cyberwareType": "neuralware",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "NEURAL-LINK"
+        }
+      ],
+      "parentType": "neuralware",
+      "allowedParentTypes": [
+        "Neural Link"
+      ],
+      "desc": "soquete instalado na nuca; necessario para usar chipware."
+    },
+    "INTERFACE-PLUGS": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Interface Plugs",
+      "cyberwareType": "neuralware",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "NEURAL-LINK"
+        }
+      ],
+      "parentType": "neuralware",
+      "allowedParentTypes": [
+        "Neural Link"
+      ],
+      "desc": "plugs no pulso ou cabeca para conexao com maquinas."
+    },
+    "KERENZIKOV": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Kerenzikov",
+      "cyberwareType": "neuralware",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "NEURAL-LINK"
+        }
+      ],
+      "mutuallyExclusiveGroup": "speedware",
+      "effects": [
+        {
+          "type": "speedware",
+          "value": {
+            "initiativeBonus": 2,
+            "alwaysOn": true
+          },
+          "stackingRule": "doNotStack"
+        }
+      ],
+      "desc": "speedware que adiciona +2 a iniciativa; apenas um speedware pode estar instalado."
+    },
+    "SANDEVISTAN": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Sandevistan",
+      "cyberwareType": "neuralware",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "NEURAL-LINK"
+        }
+      ],
+      "mutuallyExclusiveGroup": "speedware",
+      "effects": [
+        {
+          "type": "speedware",
+          "value": {
+            "initiativeBonus": 3,
+            "duration": "1 minute",
+            "activation": "Action",
+            "cooldown": "1 hour"
+          },
+          "stackingRule": "doNotStack"
+        }
+      ],
+      "desc": "speedware ativado com uma acao; adiciona +3 a iniciativa por 1 minuto e possui cooldown de 1 hora."
+    },
+    "CHEM-ANAL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Chemical Analyzer",
+      "cyberwareType": "chipware",
+      "install": "n/a",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CHIP-SOCKET"
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "tests substance for chemical composition and compares to database"
+        }
+      ],
+      "desc": "chipware que analisa substancias e compara com banco de dados."
+    },
+    "MEM-CHIP": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Memory Chip",
+      "cyberwareType": "chipware",
+      "install": "n/a",
+      "cost": 10,
+      "costCategory": "Cheap",
+      "humanityLossAverage": 0,
+      "humanityLossDice": "N/A",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CHIP-SOCKET"
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "data storage"
+        }
+      ],
+      "desc": "armazenamento de dados acessivel por cyberware."
+    },
+    "OLF-BOOST": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Olfactory Boost",
+      "cyberwareType": "chipware",
+      "install": "n/a",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CHIP-SOCKET"
+        }
+      ],
+      "effects": [
+        {
+          "type": "conditionalSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Tracking"
+          ],
+          "condition": "tracking by scent"
+        }
+      ],
+      "desc": "permite rastrear pelo cheiro usando Tracking."
+    },
+    "PAIN-EDITOR": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Pain Editor",
+      "cyberwareType": "chipware",
+      "install": "n/a",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CHIP-SOCKET"
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "ignore penalties from being Seriously Wounded"
+        }
+      ],
+      "desc": "ignora penalidades por estar Seriously Wounded."
+    },
+    "SKILL-CHIP": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Skill Chip",
+      "cyberwareType": "chipware",
+      "install": "n/a",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CHIP-SOCKET"
+        }
+      ],
+      "effects": [
+        {
+          "type": "selectedSkillBonus",
+          "value": {
+            "level": 3,
+            "rule": "selected skill is treated as level 3 unless already 3 or higher"
+          },
+          "condition": "selectedSkill must be defined on installed instance"
+        }
+      ],
+      "desc": "chip que fornece uma pericia especifica em nivel 3, salvo se a pericia ja for 3 ou maior."
+    },
+    "TACT-BOOST": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Tactile Boost",
+      "cyberwareType": "chipware",
+      "install": "n/a",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CHIP-SOCKET"
+        }
+      ],
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "detects motion within 20m/yd by placing hand on a surface"
+        }
+      ],
+      "desc": "detecta movimento dentro de 20m/yd ao tocar uma superficie."
+    },
+    "CYBEREYE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Cybereye",
+      "cyberwareType": "cyberoptics",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "foundational": true,
+      "optionSlotsProvided": 3,
+      "countMode": "multiple",
+      "permitsMultiple": true,
+      "paired": true,
+      "desc": "olho artificial; cada Cybereye possui 3 option slots."
+    },
+    "ANTI-DAZ": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Anti-Dazzle",
+      "cyberwareType": "cyberoptics",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBEREYE",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "location": "cyberoptics"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "allowedParentTypes": [
+        "Cybereye"
+      ],
+      "paired": true,
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "immune to flash effects"
+        }
+      ],
+      "desc": "imunidade a efeitos causados por flashes de luz."
+    },
+    "CHYRON": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Chyron",
+      "cyberwareType": "cyberoptics",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBEREYE"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "projects subscreen into field of vision"
+        }
+      ],
+      "desc": "projeta uma subtela no campo de visao."
+    },
+    "COLOR-SH": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Color Shift",
+      "cyberwareType": "cyberoptics",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBEREYE"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "eye color/pattern changes"
+        }
+      ],
+      "desc": "permite mudancas ilimitadas de cor e padrao do olho."
+    },
+    "DARTGUN-EYE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Dartgun",
+      "cyberwareType": "cyberoptics",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBEREYE"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "optionSlotsRequired": 3,
+      "weaponProfile": {
+        "weaponType": "Exotic Dartgun",
+        "weaponSkill": "Handgun",
+        "damage": "1d6",
+        "rof": 1,
+        "kind": "weapon",
+        "magazine": 1,
+        "ammoType": "Dart",
+        "handsRequired": 0,
+        "concealable": true,
+        "exotic": true,
+        "specialRules": [
+          "can load poison or drug"
+        ]
+      },
+      "effects": [
+        {
+          "type": "poisonOrDrugDelivery",
+          "value": true
+        }
+      ],
+      "desc": "dartgun exotica de tiro unico escondida no olho."
+    },
+    "IMAGE-ENH": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Image Enhance",
+      "cyberwareType": "cyberoptics",
+      "install": "mall",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBEREYE",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "location": "cyberoptics"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "paired": true,
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "flatSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Perception"
+          ]
+        },
+        {
+          "type": "flatSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Lip Reading"
+          ]
+        },
+        {
+          "type": "flatSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Conceal/Reveal Object"
+          ]
+        }
+      ],
+      "desc": "melhora imagem e analise visual; adiciona +2 a Perception, Lip Reading e Conceal/Reveal Object."
+    },
+    "LOWLIGHT-UV": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Low Light / Infrared / UV",
+      "cyberwareType": "cyberoptics",
+      "install": "mall",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBEREYE",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "location": "cyberoptics"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "paired": true,
+      "optionSlotsRequired": 2,
+      "slotCost": {
+        "perCybereye": 2
+      },
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "ignore penalties due to darkness, smoke, fog, and similar conditions"
+        }
+      ],
+      "desc": "ignora penalidades por escuridao, fumaca, neblina e condicoes similares."
+    },
+    "MICRO-OPT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "MicroOptics",
+      "cyberwareType": "cyberoptics",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBEREYE"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "400x magnification"
+        }
+      ],
+      "desc": "fornece magnificacao de 400x."
+    },
+    "MICRO-VID": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "MicroVideo",
+      "cyberwareType": "cyberoptics",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBEREYE"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "optionSlotsRequired": 2,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "records audio and video to Memory Chip or linked Agent"
+        }
+      ],
+      "desc": "camera ocular que grava audio e video em Memory Chip ou Agent vinculado."
+    },
+    "RAD-DET-OPT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Radiation Detector",
+      "cyberwareType": "cyberoptics",
+      "install": "clinic",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBEREYE"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "radiation readings within 100m/yd displayed visually"
+        }
+      ],
+      "desc": "detecta radiacao dentro de 100m/yd."
+    },
+    "TARGET-SCOPE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Targeting Scope",
+      "cyberwareType": "cyberoptics",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBEREYE"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "conditionalSkillBonus",
+          "value": {
+            "attackCheckBonus": 1
+          },
+          "condition": "aimedShot"
+        }
+      ],
+      "desc": "adiciona +1 ao Check ao fazer Aimed Shot."
+    },
+    "TELE-OPT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "TeleOptics",
+      "cyberwareType": "cyberoptics",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBEREYE"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "detail up to 800m/yd"
+        },
+        {
+          "type": "conditionalSkillBonus",
+          "value": {
+            "attackCheckBonus": 1
+          },
+          "condition": "Aimed Shot against target at 51m/yd or farther"
+        }
+      ],
+      "desc": "visao detalhada ate 800m/yd; +1 em Aimed Shot contra alvos a 51m/yd ou mais."
+    },
+    "VIRTUALITY": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Virtuality",
+      "cyberwareType": "cyberoptics",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBEREYE",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "location": "cyberoptics"
+        }
+      ],
+      "parentType": "cyberoptics",
+      "paired": true,
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "projects cyberspace imagery over user view"
+        }
+      ],
+      "desc": "projeta imagens do cyberspace sobre a visao do usuario."
+    },
+    "CYBERAUDIO": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Cyberaudio Suite",
+      "cyberwareType": "cyberaudio",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "foundational": true,
+      "optionSlotsProvided": 3,
+      "unique": true,
+      "maxInstalled": 1,
+      "desc": "suite cyberaudio com 3 option slots; nao pode instalar mais de uma."
+    },
+    "AMP-HEARING": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Amplified Hearing",
+      "cyberwareType": "cyberaudio",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "conditionalSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Perception"
+          ],
+          "condition": "hearingRelevant"
+        }
+      ],
+      "desc": "+2 em Perception para Checks envolvendo audicao."
+    },
+    "AUD-REC": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Audio Recorder",
+      "cyberwareType": "cyberaudio",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "records audio to Memory Chip or linked Agent"
+        }
+      ],
+      "desc": "grava audio em Memory Chip ou Agent vinculado."
+    },
+    "BUG-DET": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Bug Detector",
+      "cyberwareType": "cyberaudio",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "beeps within 2m/yd of listening device"
+        }
+      ],
+      "desc": "emite alerta quando esta a ate 2m/yd de um dispositivo de escuta."
+    },
+    "HOM-TRAC": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Homing Tracer",
+      "cyberwareType": "cyberaudio",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "follow linked tracer up to 1 mile away"
+        }
+      ],
+      "desc": "permite seguir um rastreador vinculado ate 1 milha."
+    },
+    "INT-AGENT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Internal Agent",
+      "cyberwareType": "cyberaudio",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "internal Agent, audio-only unless linked to Cybereye with Chyron"
+        }
+      ],
+      "desc": "Agent interno funcional; audio apenas salvo se vinculado a Cybereye com Chyron."
+    },
+    "LEVEL-DAMP": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Level Damper",
+      "cyberwareType": "cyberaudio",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "immune to effects caused by loud noises"
+        }
+      ],
+      "desc": "imunidade a efeitos causados por ruidos altos."
+    },
+    "RADIO-COMM": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Radio Communicator",
+      "cyberwareType": "cyberaudio",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "radio communication within 1 mile"
+        }
+      ],
+      "desc": "comunicacao por radio com alcance de 1 milha."
+    },
+    "RADIO-SCAN-MUSIC": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Radio Scanner / Music Player",
+      "cyberwareType": "cyberaudio",
+      "install": "clinic",
+      "cost": 50,
+      "costCategory": "Costly",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "plays music or tunes radio broadcasts"
+        }
+      ],
+      "desc": "toca musica ou sintoniza transmissoes de radio."
+    },
+    "RADAR-DET": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Radar Detector",
+      "cyberwareType": "cyberaudio",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "detects active radar beam within 100m/yd"
+        }
+      ],
+      "desc": "alerta quando um feixe de radar ativo esta dentro de 100m/yd."
+    },
+    "SCRAM-DESC": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Scrambler/Descrambler",
+      "cyberwareType": "cyberaudio",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "scrambles outgoing and descrambles incoming communications"
+        }
+      ],
+      "desc": "embaralha comunicacoes enviadas e desembaralha comunicacoes recebidas."
+    },
+    "VOICE-STRESS": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Voice Stress Analyzer",
+      "cyberwareType": "cyberaudio",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "parentType": "cyberaudio",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "conditionalSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Human Perception"
+          ],
+          "condition": "voiceRelevant=true"
+        },
+        {
+          "type": "conditionalSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Interrogation"
+          ],
+          "condition": "voiceRelevant=true"
+        }
+      ],
+      "desc": "+2 em Human Perception e Interrogation para analise de voz/estresse."
+    },
+    "AUDIOVOX": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "AudioVox",
+      "cyberwareType": "internal",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "conditionalSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Acting"
+          ],
+          "condition": "singingVoiceRelevant=true"
+        },
+        {
+          "type": "conditionalSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Play Instrument"
+          ],
+          "condition": "singingVoiceRelevant=true"
+        }
+      ],
+      "desc": "sintetizador de voz; +2 em Acting e Play Instrument ao cantar."
+    },
+    "SEX-IMPL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Midnight Lady / Mr. Studd",
+      "cyberwareType": "internal",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "flavor only"
+        }
+      ],
+      "desc": "implante sexual cosmetico/funcional."
+    },
+    "CONTRACEPTIVE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Contraceptive Implant",
+      "cyberwareType": "internal",
+      "install": "mall",
+      "cost": 10,
+      "costCategory": "Cheap",
+      "humanityLossAverage": 0,
+      "humanityLossDice": "N/A",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "prevents undesired pregnancy"
+        }
+      ],
+      "desc": "previne gravidez indesejada."
+    },
+    "ENH-ANTI": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Enhanced Antibodies",
+      "cyberwareType": "internal",
+      "install": "mall",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "after stabilization, user heals BODY x 2 for each day spent resting"
+        }
+      ],
+      "desc": "apos estabilizacao, cura BODY x2 para cada dia de descanso."
+    },
+    "SNAKE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Cybersnake",
+      "cyberwareType": "internal",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 1,
+      "weaponProfile": {
+        "weaponType": "Very Heavy Melee Weapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "4d6",
+        "rof": 1,
+        "handsRequired": 0,
+        "concealable": true,
+        "exotic": false
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        }
+      ],
+      "desc": "arma melee muito pesada montada no esofago; pode ser ocultada."
+    },
+    "GILLS": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Gills",
+      "cyberwareType": "internal",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "breathe underwater"
+        }
+      ],
+      "desc": "permite respirar debaixo d'agua."
+    },
+    "MUSCLE-LACE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Grafted Muscle and Bone Lace",
+      "cyberwareType": "internal",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "statModifier",
+          "value": {
+            "stat": "BODY",
+            "value": 2,
+            "max": 10,
+            "affects": [
+              "HP",
+              "Wound Threshold",
+              "Death Save"
+            ]
+          },
+          "appliesTo": [
+            "BODY"
+          ]
+        }
+      ],
+      "desc": "aumenta BODY em 2, alterando HP, Wound Threshold e Death Save; nao pode elevar BODY acima de 10."
+    },
+    "AIR-SUPP": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Independent Air Supply",
+      "cyberwareType": "internal",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "provides 30 minutes of oxygen and refills in 1 hour from ambient atmosphere"
+        }
+      ],
+      "desc": "fornece 30 minutos de oxigenio e recarrega em 1 hora."
+    },
+    "NASAL-FILTER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Nasal Filters",
+      "cyberwareType": "internal",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "immune to toxic gases, fumes, and similar dangers"
+        }
+      ],
+      "desc": "imunidade a gases toxicos, fumacas e perigos similares."
+    },
+    "RAD-SON-INT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Radar/Sonar Implant",
+      "cyberwareType": "internal",
+      "install": "clinic",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "senseMode",
+          "value": "scans terrain within 50m/yd; cannot scan through cover"
+        }
+      ],
+      "desc": "escaneia terreno dentro de 50m/yd; nao atravessa cover."
+    },
+    "TOX-BIND": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Toxin Binders",
+      "cyberwareType": "internal",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "flatSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Resist Torture/Drugs"
+          ]
+        }
+      ],
+      "desc": "+2 em Resist Torture/Drugs."
+    },
+    "VAMPYRES": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Vampyres",
+      "cyberwareType": "internal",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 1,
+      "weaponProfile": {
+        "weaponType": "Excellent Quality Light Melee Weapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "1d6",
+        "rof": 2,
+        "handsRequired": 0,
+        "concealable": true,
+        "quality": "excellent",
+        "specialRules": [
+          "can add Poison or Biotoxin"
+        ]
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        },
+        {
+          "type": "poisonOrDrugDelivery",
+          "value": true
+        }
+      ],
+      "desc": "arma melee leve de excelente qualidade implantada na boca; pode carregar Poison ou Biotoxin."
+    },
+    "HIDDEN-HOLSTER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Hidden Holster",
+      "cyberwareType": "external",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "can store concealable weapon inside body"
+        }
+      ],
+      "desc": "permite guardar uma arma concealable dentro do corpo."
+    },
+    "SKIN-WEAVE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Skin Weave",
+      "cyberwareType": "external",
+      "install": "hospital",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "armorLayer",
+          "value": {
+            "sp": 7,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "stacksWithWornArmor": false,
+            "ablates": true,
+            "recovery": "1 SP per day of rest"
+          },
+          "stackingRule": "doNotStack"
+        }
+      ],
+      "desc": "corpo e cabeca tem SP 7; nao soma com armadura vestida; abla; recupera 1 SP por dia de descanso."
+    },
+    "SUBDERMAL-ARMOR": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Subdermal Armor",
+      "cyberwareType": "external",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "armorLayer",
+          "value": {
+            "sp": 11,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "stacksWithWornArmor": false,
+            "ablates": true,
+            "recovery": "1 SP per day of rest"
+          },
+          "stackingRule": "doNotStack"
+        }
+      ],
+      "desc": "corpo e cabeca tem SP 11; nao soma com armadura vestida; abla; recupera 1 SP por dia de descanso."
+    },
+    "SUB-POCKET": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Subdermal Pocket",
+      "cyberwareType": "external",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "2x4 inch storage space under skin"
+        }
+      ],
+      "desc": "pequeno espaco de armazenamento sob a pele."
+    },
+    "CYBERARM": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Cyberarm",
+      "cyberwareType": "cyberarm",
+      "install": "hospital",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "foundational": true,
+      "optionSlotsProvided": 4,
+      "countMode": "multiple",
+      "permitsMultiple": true,
+      "paired": true,
+      "includes": [
+        {
+          "name": "Standard Hand",
+          "humanityLoss": 0,
+          "slotCost": 0,
+          "whenIncludedBy": "Cyberarm"
+        }
+      ],
+      "desc": "braco substituto com 4 option slots; vem com Standard Hand sem HL e sem slot."
+    },
+    "STD-HAND": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Standard Hand",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "specialRules": [
+        "if included by Cyberarm, humanityLoss=0 and slotCost=0"
+      ],
+      "desc": "mao cybernetica padrao."
+    },
+    "BIG-KNUCKS": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Big Knucks",
+      "cyberwareType": "cyberweapon",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "weaponProfile": {
+        "weaponType": "Medium Melee Weapon",
+        "weaponSkill": "Brawling",
+        "damage": "2d6",
+        "rof": 2,
+        "handsRequired": 1,
+        "concealable": true
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        }
+      ],
+      "desc": "nos dos dedos blindados; arma melee media; pode ser ocultada."
+    },
+    "CYBERDECK-ARM": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Cyberdeck",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 3,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "cyberdeck installed in cyberarm"
+        }
+      ],
+      "desc": "cyberdeck instalado em cyberarm, ocupando 3 slots."
+    },
+    "GRAPPLE-HAND": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Grapple Hand",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "fires hand with grapple line up to 30m/yd; cannot be used as weapon"
+        }
+      ],
+      "desc": "dispara a mao com linha de grappling ate 30m/yd; nao pode ser usada como arma."
+    },
+    "MEDSCAN": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Medscanner",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 2,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "flatSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "First Aid"
+          ]
+        },
+        {
+          "type": "flatSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Paramedic"
+          ]
+        }
+      ],
+      "desc": "scanner medico instalado no cyberarm; +2 em First Aid e Paramedic."
+    },
+    "POPUP-GL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Popup Grenade Launcher",
+      "cyberwareType": "cyberweapon",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 2,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "weaponProfile": {
+        "weaponType": "Grenade Launcher",
+        "weaponSkill": "Heavy Weapons",
+        "damage": "6d6",
+        "rof": 1,
+        "magazine": 1,
+        "ammoType": "Grenade",
+        "handsRequired": 0,
+        "concealable": true,
+        "specialRules": [
+          "explosive",
+          "single shot",
+          "concealed in cyberarm"
+        ]
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        }
+      ],
+      "desc": "lancador de granada de tiro unico instalado no cyberarm; pode ser ocultado."
+    },
+    "POP-MELEE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Popup Melee Weapon",
+      "cyberwareType": "cyberweapon",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 2,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "container": true,
+      "allowedContainedTypes": [
+        "Light Melee Weapon",
+        "Medium Melee Weapon",
+        "Heavy Melee Weapon"
+      ],
+      "weaponProfile": {
+        "container": true,
+        "damage": "selected installed weapon",
+        "rof": "selected installed weapon",
+        "weaponSkill": "selected installed weapon",
+        "concealable": true
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        },
+        {
+          "type": "containerSlots",
+          "value": [
+            "Light Melee Weapon",
+            "Medium Melee Weapon",
+            "Heavy Melee Weapon"
+          ]
+        }
+      ],
+      "desc": "arma melee leve, media ou pesada instalada no cyberarm; pode ser ocultada."
+    },
+    "POP-SHIELD": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Popup Shield",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 3,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "bulletproof shield installed in cyberarm"
+        }
+      ],
+      "desc": "bulletproof shield instalado no cyberarm; pode ser ocultado e substituido quando chega a 0 HP."
+    },
+    "POP-RANGED": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Popup Ranged Weapon",
+      "cyberwareType": "cyberweapon",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 2,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "container": true,
+      "allowedContainedTypes": [
+        "one-handed ranged weapon"
+      ],
+      "weaponProfile": {
+        "container": true,
+        "damage": "selected installed weapon",
+        "rof": "selected installed weapon",
+        "weaponSkill": "selected installed weapon",
+        "magazine": "selected installed weapon",
+        "concealable": true
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        },
+        {
+          "type": "containerSlots",
+          "value": [
+            "one-handed ranged weapon"
+          ]
+        }
+      ],
+      "desc": "arma ranged de uma mao instalada no cyberarm; pode ser ocultada mesmo se normalmente nao for concealable."
+    },
+    "QUICK-MOUNT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Quick Change Mount",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "remove or install cyberarm as an Action"
+        }
+      ],
+      "desc": "permite remover ou instalar um cyberarm como uma acao."
+    },
+    "RIPPERS": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Rippers",
+      "cyberwareType": "cyberweapon",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "weaponProfile": {
+        "weaponType": "Medium Melee Weapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "2d6",
+        "rof": 2,
+        "concealable": true
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        }
+      ],
+      "desc": "garras de carbo-glass; arma melee media; pode ser ocultada."
+    },
+    "SCRATCHERS": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Scratchers",
+      "cyberwareType": "cyberweapon",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "optionSlotsRequired": 1,
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "weaponProfile": {
+        "weaponType": "Light Melee Weapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "1d6",
+        "rof": 2,
+        "concealable": true
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        }
+      ],
+      "desc": "unhas de carbo-glass; arma melee leve; pode ser ocultada."
+    },
+    "SH-CAM": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Shoulder Cam",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 2,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "video camera mounted in shoulder, concealable"
+        }
+      ],
+      "desc": "camera de video montada no ombro; pode ser ocultada."
+    },
+    "SLICE-DICE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Slice 'N Dice",
+      "cyberwareType": "cyberweapon",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "weaponProfile": {
+        "weaponType": "Medium Melee Weapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "2d6",
+        "rof": 2,
+        "concealable": true
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        }
+      ],
+      "desc": "chicote monofilamento implantado no polegar; arma melee media; pode ser ocultado."
+    },
+    "SUB-GRIP": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Subdermal Grip",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "NEURAL-LINK"
+        }
+      ],
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "use Smartgun without Interface Plug"
+        }
+      ],
+      "desc": "permite usar Smartgun sem Interface Plug."
+    },
+    "TECHSCANNER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Techscanner",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 2,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERARM",
+          "codes": [
+            "CYBERARM"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "conditionalSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Basic Tech",
+            "Cybertech",
+            "Electronics/Security Tech",
+            "Weaponstech",
+            "Land Vehicle Tech",
+            "Air Vehicle Tech",
+            "Sea Vehicle Tech"
+          ],
+          "condition": "diagnosing broken tech / applicable TECH-based repair skill"
+        }
+      ],
+      "desc": "scanner tecnico no cyberarm; ajuda a diagnosticar tecnologia quebrada e concede +2 a skills TECH aplicaveis."
+    },
+    "TOOL-HAND": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Tool Hand",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "fingers contain screwdriver, wrench, small drill, and other tools"
+        }
+      ],
+      "desc": "dedos contem ferramentas como chave, furadeira pequena e similares."
+    },
+    "WOLVERS": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Wolvers",
+      "cyberwareType": "cyberweapon",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 1,
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "weaponProfile": {
+        "weaponType": "Heavy Melee Weapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "3d6",
+        "rof": 2,
+        "concealable": true
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        }
+      ],
+      "desc": "garras longas saindo dos nos dos dedos; arma melee pesada; pode ser ocultada."
+    },
+    "CYBERLEG": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Cyberleg",
+      "cyberwareType": "cyberleg",
+      "install": "hospital",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "foundational": true,
+      "optionSlotsProvided": 3,
+      "countMode": "multiple",
+      "permitsMultiple": true,
+      "paired": true,
+      "includes": [
+        {
+          "name": "Standard Foot",
+          "humanityLoss": 0,
+          "slotCost": 0,
+          "whenIncludedBy": "Cyberleg"
+        }
+      ],
+      "desc": "perna substituta com 3 option slots; vem com Standard Foot sem HL e sem slot."
+    },
+    "STD-FOOT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Standard Foot",
+      "cyberwareType": "cyberleg",
+      "install": "clinic",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 2,
+      "humanityLossDice": "1d6/2 round up",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "code": "CYBERLEG",
+          "codes": [
+            "CYBERLEG"
+          ]
+        }
+      ],
+      "specialRules": [
+        "if included by Cyberleg, humanityLoss=0 and slotCost=0"
+      ],
+      "desc": "pe cybernetico padrao."
+    },
+    "GRIP-FOOT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Grip Foot",
+      "cyberwareType": "cyberleg",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBERLEG",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "location": "cyberlegs"
+        }
+      ],
+      "paired": true,
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "movementMode",
+          "value": "negates movement penalty when climbing"
+        }
+      ],
+      "desc": "tracao aprimorada; nega penalidade de movimento ao escalar."
+    },
+    "JUMP-BOOSTER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Jump Booster",
+      "cyberwareType": "cyberleg",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBERLEG",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "location": "cyberlegs"
+        }
+      ],
+      "paired": true,
+      "optionSlotsRequired": 2,
+      "slotCost": {
+        "perCyberleg": 2
+      },
+      "effects": [
+        {
+          "type": "movementMode",
+          "value": "negates movement penalty when jumping"
+        }
+      ],
+      "desc": "hidraulica nas pernas; nega penalidade de movimento ao pular."
+    },
+    "SKATE-FOOT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Skate Foot",
+      "cyberwareType": "cyberleg",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBERLEG",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "location": "cyberlegs"
+        }
+      ],
+      "paired": true,
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "movementMode",
+          "value": "increases movement by 6m/yd when using Run Action on suitable surface"
+        }
+      ],
+      "desc": "patins embutidos; aumenta movimento em 6m/yd ao usar Run Action em superficie adequada."
+    },
+    "TALON-FOOT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Talon Foot",
+      "cyberwareType": "cyberweapon",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "allowedParentTypes": [
+        "Cyberleg",
+        "meat leg special case"
+      ],
+      "weaponProfile": {
+        "weaponType": "Light Melee Weapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "1d6",
+        "rof": 2,
+        "concealable": true
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "value": true
+        }
+      ],
+      "desc": "lamina montada no pe; arma melee leve; pode ser ocultada."
+    },
+    "WEB-FOOT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Web Foot",
+      "cyberwareType": "cyberleg",
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBERLEG",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "location": "cyberlegs"
+        }
+      ],
+      "paired": true,
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "movementMode",
+          "value": "negates movement penalty when swimming"
+        }
+      ],
+      "desc": "membrana entre os dedos; nega penalidade de movimento ao nadar."
+    },
+    "HARD-SHIELD": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Hardened Shielding",
+      "cyberwareType": "cyberlimb",
+      "install": "clinic",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "codes": [
+            "CYBERARM",
+            "CYBERLEG"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "empProtection",
+          "value": {
+            "scope": "parent",
+            "value": "parent cyberlimb and installed options cannot be rendered inoperable by EMP pulses or Non-Black ICE Program effects",
+            "globalEmpImmunity": false
+          }
+        }
+      ],
+      "desc": "protege apenas o cyberlimb pai e suas opcoes contra EMP/Non-Black ICE; nao concede imunidade global."
+    },
+    "PLASTIC-COVER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Plastic Covering",
+      "cyberwareType": "cyberlimb",
+      "install": "mall",
+      "cost": 100,
+      "costCategory": "Premium",
+      "humanityLossAverage": 0,
+      "humanityLossDice": "N/A",
+      "optionSlotsRequired": 0,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "codes": [
+            "CYBERARM",
+            "CYBERLEG"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "flavor"
+        }
+      ],
+      "desc": "cobertura plastica cosmetica para cyberlimb."
+    },
+    "REALSKINN-COVER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Realskinn Covering",
+      "cyberwareType": "cyberlimb",
+      "install": "mall",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 0,
+      "humanityLossDice": "N/A",
+      "optionSlotsRequired": 0,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "codes": [
+            "CYBERARM",
+            "CYBERLEG"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "flavor"
+        }
+      ],
+      "desc": "cobertura de pele artificial para cyberlimb."
+    },
+    "SUPERCHROME-COVER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Superchrome Covering",
+      "cyberwareType": "cyberlimb",
+      "install": "mall",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 0,
+      "humanityLossDice": "N/A",
+      "optionSlotsRequired": 0,
+      "requires": [
+        {
+          "type": "requiredParentType",
+          "codes": [
+            "CYBERARM",
+            "CYBERLEG"
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "type": "flatSkillBonus",
+          "value": 2,
+          "appliesTo": [
+            "Wardrobe & Style"
+          ]
+        }
+      ],
+      "desc": "cobertura metalica brilhante para cyberlimb; +2 em Wardrobe & Style."
+    },
+    "ART-SHOULDER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Artificial Shoulder Mount",
+      "cyberwareType": "borgware",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "user can mount 2 cyberarms under first set of arms"
+        }
+      ],
+      "desc": "permite montar 2 cyberarms extras sob o primeiro par de bracos."
+    },
+    "LINEAR-BETA": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Implanted Linear Frame Beta",
+      "cyberwareType": "borgware",
+      "install": "hospital",
+      "cost": 5000,
+      "costCategory": "Luxury",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "requires": [
+        {
+          "type": "requiredStat",
+          "stat": "BODY",
+          "min": 8
+        },
+        {
+          "type": "requiredCyberwareCount",
+          "code": "MUSCLE-LACE",
+          "count": 2
+        }
+      ],
+      "effects": [
+        {
+          "type": "setEffectiveStat",
+          "value": {
+            "stat": "BODY",
+            "value": 14,
+            "affects": [
+              "HP",
+              "Wound Threshold",
+              "Death Save"
+            ]
+          },
+          "appliesTo": [
+            "BODY"
+          ]
+        }
+      ],
+      "desc": "frame implantado que aumenta BODY efetivo para 14; requer BODY 8 e duas Grafted Muscle and Bone Lace."
+    },
+    "LINEAR-SIGMA": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Implanted Linear Frame Sigma",
+      "cyberwareType": "borgware",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "requires": [
+        {
+          "type": "requiredStat",
+          "stat": "BODY",
+          "min": 6
+        },
+        {
+          "type": "requiredCyberware",
+          "code": "MUSCLE-LACE"
+        }
+      ],
+      "effects": [
+        {
+          "type": "setEffectiveStat",
+          "value": {
+            "stat": "BODY",
+            "value": 12,
+            "affects": [
+              "HP",
+              "Wound Threshold",
+              "Death Save"
+            ]
+          },
+          "appliesTo": [
+            "BODY"
+          ]
+        }
+      ],
+      "desc": "frame implantado que aumenta BODY efetivo para 12; requer BODY 6 e Grafted Muscle and Bone Lace."
+    },
+    "MULTIOPTIC": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "MultiOptic Mount",
+      "cyberwareType": "borgware",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "effects": [
+        {
+          "type": "containerSlots",
+          "value": "allows mounting up to 5 additional Cybereyes"
+        }
+      ],
+      "desc": "permite montar ate 5 Cybereyes adicionais."
+    },
+    "SENSOR-ARRAY": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "name": "Sensor Array",
+      "cyberwareType": "borgware",
+      "install": "clinic",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "CYBERAUDIO"
+        }
+      ],
+      "optionSlotsRequired": 0,
+      "effects": [
+        {
+          "type": "containerSlots",
+          "value": "allows up to 5 additional Cyberaudio Options without taking Cyberaudio option slots"
+        }
+      ],
+      "desc": "permite instalar ate 5 opcoes de cyberaudio adicionais; requer Cyberaudio Suite e nao ocupa slot dela."
+    }
+  },
+  "weaponQualities": [
+    "poor",
+    "standard",
+    "excellent"
+  ],
+  "coreWeaponCatalogCorrections": {
+    "MEDIUM-PISTOL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "MEDIUM-PISTOL",
+      "name": "Medium Pistol",
+      "weaponType": "Medium Pistol",
+      "weaponSkill": "Handgun",
+      "damage": "2d6",
+      "rof": 2,
+      "magazine": 12,
+      "ammoType": "M Pistol",
+      "handsRequired": 1,
+      "concealable": true,
+      "cost": 50,
+      "costCategory": "Costly",
+      "desc": "pistola media; usa Handgun, dano 2d6, ROF 2, magazine 12."
+    },
+    "HEAVY-PISTOL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "HEAVY-PISTOL",
+      "name": "Heavy Pistol",
+      "weaponType": "Heavy Pistol",
+      "weaponSkill": "Handgun",
+      "damage": "3d6",
+      "rof": 2,
+      "magazine": 8,
+      "ammoType": "H Pistol",
+      "handsRequired": 1,
+      "concealable": true,
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "pistola pesada; usa Handgun, dano 3d6, ROF 2, magazine 8."
+    },
+    "VERY-HEAVY-PISTOL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "VERY-HEAVY-PISTOL",
+      "name": "Very Heavy Pistol",
+      "weaponType": "Very Heavy Pistol",
+      "weaponSkill": "Handgun",
+      "damage": "4d6",
+      "rof": 1,
+      "magazine": 8,
+      "ammoType": "VH Pistol",
+      "handsRequired": 1,
+      "concealable": false,
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "pistola muito pesada; usa Handgun, dano 4d6, ROF 1, magazine 8."
+    },
+    "SMG": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": {
+        "enabled": true,
+        "multiplier": 3
+      },
+      "suppressiveFire": true,
+      "specialRules": [
+        "Autofire 3",
+        "Suppressive Fire"
+      ],
+      "code": "SMG",
+      "name": "SMG",
+      "weaponType": "SMG",
+      "weaponSkill": "Handgun",
+      "damage": "2d6",
+      "rof": 1,
+      "magazine": 30,
+      "ammoType": "M Pistol",
+      "handsRequired": 1,
+      "concealable": true,
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "submetralhadora; usa Handgun, dano 2d6, magazine 30, Autofire 3 e Suppressive Fire."
+    },
+    "HEAVY-SMG": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": {
+        "enabled": true,
+        "multiplier": 3
+      },
+      "suppressiveFire": true,
+      "specialRules": [
+        "Autofire 3",
+        "Suppressive Fire"
+      ],
+      "code": "HEAVY-SMG",
+      "name": "Heavy SMG",
+      "weaponType": "Heavy SMG",
+      "weaponSkill": "Handgun",
+      "damage": "3d6",
+      "rof": 1,
+      "magazine": 40,
+      "ammoType": "H Pistol",
+      "handsRequired": 1,
+      "concealable": false,
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "submetralhadora pesada; usa Handgun, dano 3d6, magazine 40, Autofire 3 e Suppressive Fire."
+    },
+    "SHOTGUN": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "can fire Shotgun Shells"
+      ],
+      "code": "SHOTGUN",
+      "name": "Shotgun",
+      "weaponType": "Shotgun",
+      "weaponSkill": "Shoulder Arms",
+      "damage": "5d6",
+      "rof": 1,
+      "magazine": 4,
+      "ammoType": "Slug",
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "desc": "shotgun; usa Shoulder Arms, dano 5d6 com slug, magazine 4."
+    },
+    "ASSAULT-RIFLE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": {
+        "enabled": true,
+        "multiplier": 4
+      },
+      "suppressiveFire": true,
+      "specialRules": [
+        "Autofire 4",
+        "Suppressive Fire"
+      ],
+      "code": "ASSAULT-RIFLE",
+      "name": "Assault Rifle",
+      "weaponType": "Assault Rifle",
+      "weaponSkill": "Shoulder Arms",
+      "damage": "5d6",
+      "rof": 1,
+      "magazine": 25,
+      "ammoType": "Rifle",
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "desc": "rifle de assalto; usa Shoulder Arms, dano 5d6, magazine 25, Autofire 4 e Suppressive Fire."
+    },
+    "SNIPER-RIFLE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "SNIPER-RIFLE",
+      "name": "Sniper Rifle",
+      "weaponType": "Sniper Rifle",
+      "weaponSkill": "Shoulder Arms",
+      "damage": "5d6",
+      "rof": 1,
+      "magazine": 4,
+      "ammoType": "Rifle",
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "desc": "rifle sniper; usa Shoulder Arms, dano 5d6, magazine 4."
+    },
+    "BOW-CROSSBOW": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "BOW-CROSSBOW",
+      "name": "Bow / Crossbow",
+      "weaponType": "Bow / Crossbow",
+      "weaponSkill": "Archery",
+      "damage": "4d6",
+      "rof": 1,
+      "magazine": null,
+      "ammoType": "Arrow",
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "arco ou besta; usa Archery, dano 4d6."
+    },
+    "GRENADE-LAUNCHER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "explosive",
+        "area weapon"
+      ],
+      "code": "GRENADE-LAUNCHER",
+      "name": "Grenade Launcher",
+      "weaponType": "Grenade Launcher",
+      "weaponSkill": "Heavy Weapons",
+      "damage": "6d6",
+      "rof": 1,
+      "magazine": 2,
+      "ammoType": "Grenade",
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "desc": "lancador de granadas; usa Heavy Weapons, dano 6d6, magazine 2."
+    },
+    "ROCKET-LAUNCHER": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "explosive",
+        "area weapon"
+      ],
+      "code": "ROCKET-LAUNCHER",
+      "name": "Rocket Launcher",
+      "weaponType": "Rocket Launcher",
+      "weaponSkill": "Heavy Weapons",
+      "damage": "8d6",
+      "rof": 1,
+      "magazine": 1,
+      "ammoType": "Rocket",
+      "handsRequired": 2,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "desc": "lancador de foguete; usa Heavy Weapons, dano 8d6, magazine 1."
+    },
+    "LIGHT-MELEE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "LIGHT-MELEE",
+      "name": "Light Melee Weapon",
+      "weaponType": "Light Melee Weapon",
+      "weaponSkill": "Melee Weapon",
+      "damage": "1d6",
+      "rof": 2,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": "varies",
+      "concealable": true,
+      "cost": 50,
+      "costCategory": "Costly",
+      "desc": "arma melee leve; usa Melee Weapon, dano 1d6, ROF 2."
+    },
+    "MEDIUM-MELEE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "MEDIUM-MELEE",
+      "name": "Medium Melee Weapon",
+      "weaponType": "Medium Melee Weapon",
+      "weaponSkill": "Melee Weapon",
+      "damage": "2d6",
+      "rof": 2,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": "varies",
+      "concealable": false,
+      "cost": 50,
+      "costCategory": "Costly",
+      "desc": "arma melee media; usa Melee Weapon, dano 2d6, ROF 2."
+    },
+    "HEAVY-MELEE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "HEAVY-MELEE",
+      "name": "Heavy Melee Weapon",
+      "weaponType": "Heavy Melee Weapon",
+      "weaponSkill": "Melee Weapon",
+      "damage": "3d6",
+      "rof": 2,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": "varies",
+      "concealable": false,
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "arma melee pesada; usa Melee Weapon, dano 3d6, ROF 2."
+    },
+    "VERY-HEAVY-MELEE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [],
+      "code": "VERY-HEAVY-MELEE",
+      "name": "Very Heavy Melee Weapon",
+      "weaponType": "Very Heavy Melee Weapon",
+      "weaponSkill": "Melee Weapon",
+      "damage": "4d6",
+      "rof": 1,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": "varies",
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "desc": "arma melee muito pesada; usa Melee Weapon, dano 4d6, ROF 1."
+    },
+    "BRAWLING-BODY-LOW": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "system-profile",
+        "not purchasable"
+      ],
+      "code": "BRAWLING-BODY-LOW",
+      "name": "Brawling, BODY 4 or lower",
+      "weaponType": "Brawling",
+      "weaponSkill": "Brawling",
+      "damage": "1d6",
+      "rof": 2,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": 0,
+      "concealable": true,
+      "cost": 0,
+      "costCategory": "N/A",
+      "purchasable": false,
+      "desc": "perfil de sistema para Brawling com BODY 4 ou menor."
+    },
+    "BRAWLING-BODY-MID": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "system-profile",
+        "not purchasable"
+      ],
+      "code": "BRAWLING-BODY-MID",
+      "name": "Brawling, BODY 5-6",
+      "weaponType": "Brawling",
+      "weaponSkill": "Brawling",
+      "damage": "2d6",
+      "rof": 2,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": 0,
+      "concealable": true,
+      "cost": 0,
+      "costCategory": "N/A",
+      "purchasable": false,
+      "desc": "perfil de sistema para Brawling com BODY 5-6."
+    },
+    "BRAWLING-BODY-HIGH": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "system-profile",
+        "not purchasable"
+      ],
+      "code": "BRAWLING-BODY-HIGH",
+      "name": "Brawling, BODY 7-10",
+      "weaponType": "Brawling",
+      "weaponSkill": "Brawling",
+      "damage": "3d6",
+      "rof": 2,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": 0,
+      "concealable": true,
+      "cost": 0,
+      "costCategory": "N/A",
+      "purchasable": false,
+      "desc": "perfil de sistema para Brawling com BODY 7-10."
+    },
+    "BRAWLING-BODY-SUPERHUMAN": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weapon",
+      "quality": "standard",
+      "exotic": false,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "system-profile",
+        "not purchasable"
+      ],
+      "code": "BRAWLING-BODY-SUPERHUMAN",
+      "name": "Brawling, BODY 11+",
+      "weaponType": "Brawling",
+      "weaponSkill": "Brawling",
+      "damage": "4d6",
+      "rof": 2,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": 0,
+      "concealable": true,
+      "cost": 0,
+      "costCategory": "N/A",
+      "purchasable": false,
+      "desc": "perfil de sistema para Brawling com BODY 11+."
+    },
+    "SCOPE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weaponAttachment",
+      "code": "SCOPE",
+      "name": "Sniping Scope",
+      "cost": 100,
+      "costCategory": "Premium",
+      "compatibleWith": "ranged weapons that can accept scope",
+      "effect": {
+        "type": "contextualEffect",
+        "value": "scope for compatible weapons"
+      },
+      "desc": "scope para armas compativeis."
+    },
+    "SMARTGUN-LINK": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weaponAttachment",
+      "code": "SMARTGUN-LINK",
+      "name": "Smartgun Link",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "compatibleWith": "ranged weapons",
+      "effect": {
+        "type": "contextualEffect",
+        "value": "smartgun interface for compatible weapons"
+      },
+      "desc": "interface smartgun para armas compativeis."
+    },
+    "EXTENDED-MAG": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weaponAttachment",
+      "code": "EXTENDED-MAG",
+      "name": "Extended Magazine",
+      "cost": 100,
+      "costCategory": "Premium",
+      "compatibleWith": "magazine-fed ranged weapons",
+      "effect": {
+        "type": "contextualEffect",
+        "value": "extended magazine for compatible weapons"
+      },
+      "desc": "magazine aumentado para armas compativeis."
+    },
+    "DRUM-MAG": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weaponAttachment",
+      "code": "DRUM-MAG",
+      "name": "Drum Magazine",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "compatibleWith": "magazine-fed ranged weapons",
+      "effect": {
+        "type": "contextualEffect",
+        "value": "drum magazine for compatible weapons"
+      },
+      "desc": "drum magazine para armas compativeis."
+    },
+    "UNDERBARREL-SHOTGUN": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weaponAttachment",
+      "code": "UNDERBARREL-SHOTGUN",
+      "name": "Underbarrel Shotgun",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "compatibleWith": "two-handed ranged weapons",
+      "weaponProfile": {
+        "weaponType": "Shotgun",
+        "weaponSkill": "Shoulder Arms",
+        "damage": "5d6",
+        "rof": 1,
+        "magazine": 2,
+        "ammoType": "Slug",
+        "handsRequired": 2,
+        "concealable": false
+      },
+      "desc": "shotgun sob o cano de arma compativel."
+    },
+    "UNDERBARREL-GL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "weaponAttachment",
+      "code": "UNDERBARREL-GL",
+      "name": "Underbarrel Grenade Launcher",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "compatibleWith": "two-handed ranged weapons",
+      "weaponProfile": {
+        "weaponType": "Grenade Launcher",
+        "weaponSkill": "Heavy Weapons",
+        "damage": "6d6",
+        "rof": 1,
+        "magazine": 1,
+        "ammoType": "Grenade",
+        "handsRequired": 2,
+        "concealable": false
+      },
+      "desc": "lancador de granada sob o cano de arma compativel."
+    },
+    "AMMO-M-PISTOL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [],
+      "code": "AMMO-M-PISTOL",
+      "name": "Medium Pistol Ammunition",
+      "ammoType": "M Pistol",
+      "desc": "municao para Medium Pistol."
+    },
+    "AMMO-H-PISTOL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [],
+      "code": "AMMO-H-PISTOL",
+      "name": "Heavy Pistol Ammunition",
+      "ammoType": "H Pistol",
+      "desc": "municao para Heavy Pistol."
+    },
+    "AMMO-VH-PISTOL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [],
+      "code": "AMMO-VH-PISTOL",
+      "name": "Very Heavy Pistol Ammunition",
+      "ammoType": "VH Pistol",
+      "desc": "municao para Very Heavy Pistol."
+    },
+    "AMMO-RIFLE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [],
+      "code": "AMMO-RIFLE",
+      "name": "Rifle Ammunition",
+      "ammoType": "Rifle",
+      "desc": "municao de rifle."
+    },
+    "AMMO-SLUG": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [],
+      "code": "AMMO-SLUG",
+      "name": "Shotgun Slug",
+      "ammoType": "Slug",
+      "desc": "slug para shotgun."
+    },
+    "AMMO-SHELL": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [
+        "cone/area behavior to be resolved in combat phase"
+      ],
+      "code": "AMMO-SHELL",
+      "name": "Shotgun Shell",
+      "ammoType": "Shell",
+      "desc": "shell para shotgun; comportamento de cone/area fica para fase de combate."
+    },
+    "AMMO-ARROW": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [],
+      "code": "AMMO-ARROW",
+      "name": "Arrow",
+      "ammoType": "Arrow",
+      "desc": "flecha para arco ou besta."
+    },
+    "AMMO-GRENADE": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [],
+      "code": "AMMO-GRENADE",
+      "name": "Grenade",
+      "ammoType": "Grenade",
+      "desc": "municao de granada."
+    },
+    "AMMO-ROCKET": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Weapons table",
+      "kind": "ammunition",
+      "cost": null,
+      "costCategory": null,
+      "specialRules": [],
+      "code": "AMMO-ROCKET",
+      "name": "Rocket",
+      "ammoType": "Rocket",
+      "desc": "municao de foguete."
+    }
+  },
+  "coreArmorCatalogCorrections": {
+    "LEATHERS": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Armor tables",
+      "kind": "armor",
+      "code": "LEATHERS",
+      "name": "Leathers",
+      "cost": 20,
+      "costCategory": "Cheap",
+      "desc": "SP 4, sem penalidade de REF/DEX/MOVE."
+    },
+    "KEVLAR": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Armor tables",
+      "kind": "armor",
+      "code": "KEVLAR",
+      "name": "Kevlar",
+      "cost": 50,
+      "costCategory": "Costly",
+      "desc": "SP 7, sem penalidade de REF/DEX/MOVE."
+    },
+    "LIGHT-ARMORJACK": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Armor tables",
+      "kind": "armor",
+      "code": "LIGHT-ARMORJACK",
+      "name": "Light Armorjack",
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "SP 11, sem penalidade de REF/DEX/MOVE."
+    },
+    "BODYWEIGHT-SUIT": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Armor tables",
+      "kind": "armor",
+      "code": "BODYWEIGHT-SUIT",
+      "name": "Bodyweight Suit",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "desc": "SP 11, sem penalidade; suporta Interface Plugs e slots de Cyberdeck."
+    },
+    "MEDIUM-ARMORJACK": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Armor tables",
+      "kind": "armor",
+      "code": "MEDIUM-ARMORJACK",
+      "name": "Medium Armorjack",
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "SP 12, penalidade -2 para REF, DEX e MOVE."
+    },
+    "HEAVY-ARMORJACK": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Armor tables",
+      "kind": "armor",
+      "code": "HEAVY-ARMORJACK",
+      "name": "Heavy Armorjack",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "desc": "SP 13, penalidade -2 para REF, DEX e MOVE."
+    },
+    "FLAK": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Armor tables",
+      "kind": "armor",
+      "code": "FLAK",
+      "name": "Flak",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "desc": "SP 15, penalidade -4 para REF, DEX e MOVE."
+    },
+    "LIGHT-METALGEAR": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "kind": "armor",
+      "code": "LIGHT-METALGEAR",
+      "name": "Light Metalgear",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "desc": "SP 16, penalidade -3 para REF, DEX e MOVE."
+    },
+    "METALGEAR": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Armor tables",
+      "kind": "armor",
+      "code": "METALGEAR",
+      "name": "Metalgear",
+      "cost": 5000,
+      "costCategory": "Luxury",
+      "desc": "SP 18, penalidade -4 para REF, DEX e MOVE."
+    },
+    "BULLETPROOF-SHIELD": {
+      "sourceType": "official-core",
+      "source": "Cyberpunk RED Core Rulebook, Gear tables",
+      "kind": "armor",
+      "code": "BULLETPROOF-SHIELD",
+      "name": "Bulletproof Shield",
+      "cost": 100,
+      "costCategory": "Premium",
+      "desc": "10 HP proprios (nao SP); ocupa um braco; sem penalidade de REF/DEX/MOVE."
+    }
+  },
+  "combatRules": {
+    "attackRoll": {
+      "formula": "STAT + Skill + 1d10 + modifiers",
+      "tieRule": "attacker must beat DV; defender wins ties in opposed melee/evasion contexts"
+    },
+    "meleeCombat": {
+      "formula": "Attacker DEX + Melee/Brawling Skill + 1d10 vs Defender DEX + Evasion + 1d10",
+      "reach": "2m/yds unless weapon says otherwise",
+      "meleeWeaponsIgnoreHalfArmor": true,
+      "meleeArmorRounding": "round up defender armor half ignored; effectiveSP = ceil(SP / 2)"
+    },
+    "brawling": {
+      "skill": "Brawling",
+      "rof": 2,
+      "ignoresHalfArmor": false,
+      "damageByBody": [
+        {
+          "maxBody": 4,
+          "damage": "1d6"
+        },
+        {
+          "minBody": 5,
+          "maxBody": 6,
+          "damage": "2d6"
+        },
+        {
+          "minBody": 7,
+          "maxBody": 10,
+          "damage": "3d6"
+        },
+        {
+          "minBody": 11,
+          "damage": "4d6"
+        }
+      ],
+      "cyberarmMinimumDamage": "2d6"
+    },
+    "damage": {
+      "subtractArmorSPBeforeHP": true,
+      "ablateArmorOnlyIfDamageGetsThrough": true,
+      "ablationAmount": 1,
+      "criticalInjuryBonusDamage": 5,
+      "criticalInjuryBonusDamageBypassesArmor": true,
+      "criticalInjuryBonusDamageNotModifiedByHitLocation": true
+    },
+    "headAimedShot": {
+      "afterArmorMultiplier": 2,
+      "spotWeaknessOrder": "weapon damage + Spot Weakness, subtract SP, then multiply penetrating damage by 2"
+    },
+    "autofire": {
+      "baseDamage": "2d6",
+      "multiplierSource": "attackMargin",
+      "multiplierCap": "weapon.autofire.multiplier",
+      "spotWeaknessOrder": "multiply Autofire damage first, then add Spot Weakness, then subtract SP"
+    },
+    "rangedEvasion": {
+      "evasionCheckSetsDV": true,
+      "evasionDeclaredBeforeAttackRoll": true
+    },
+    "areaAttack": {
+      "cannotTargetHead": true,
+      "armorAblationLocation": "body",
+      "criticalInjuryIfTwoOrMoreSixes": true,
+      "criticalInjuryLocation": "body",
+      "separateCriticalRollPerTarget": true
+    },
+    "rangeDV": {
+      "mode": "explicitDVRequired",
+      "note": "Do not invent full Range DV Table here. Resolver accepts targetDV or evasionDV from context."
+    }
+  },
+  "criticalInjuryRules": {
+    "trigger": {
+      "twoOrMoreSixesOnDamage": true,
+      "appliesTo": [
+        "melee",
+        "ranged",
+        "autofire",
+        "area"
+      ],
+      "bonusDamage": 5,
+      "bonusDamageBypassesArmor": true,
+      "bonusDamageAblatesArmor": false,
+      "bonusDamageModifiedByHitLocation": false,
+      "injuryInflictedEvenIfNoDamagePenetratesArmor": true
+    },
+    "duplicateHandling": {
+      "rerollIfTargetAlreadyHasSameCriticalInjury": true
+    },
+    "tableSelection": {
+      "head": "Use head table only when attack was an Aimed Shot to the head.",
+      "body": "Use body table by default.",
+      "area": "Area attacks always use body table."
+    },
+    "areaAttackCriticals": {
+      "ifDamageRollHasTwoOrMoreSixes": "every target hit receives a Body Critical Injury",
+      "rollCriticalSeparatelyPerTarget": true
+    },
+    "deathSavePenalty": {
+      "baseDeathSavePenaltyField": "baseDeathSavePenalty",
+      "criticalInjuriesCanIncreaseBaseDeathSavePenalty": true
+    }
+  },
+  "criticalInjuryTables": {
+    "body": [
+      {
+        "table": "body",
+        "roll": 2,
+        "id": "BODY-02-DISMEMBERED-ARM",
+        "name": "Dismembered Arm",
+        "location": "body",
+        "effectType": "limbLoss",
+        "effect": "arm lost; drop items held in that arm's hand",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "N/A",
+        "treatment": "Surgery DV17",
+        "canBeQuickFixed": false,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 3,
+        "id": "BODY-03-DISMEMBERED-HAND",
+        "name": "Dismembered Hand",
+        "location": "body",
+        "effectType": "limbLoss",
+        "effect": "hand lost; drop items held in that hand",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "N/A",
+        "treatment": "Surgery DV17",
+        "canBeQuickFixed": false,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 4,
+        "id": "BODY-04-COLLAPSED-LUNG",
+        "name": "Collapsed Lung",
+        "location": "body",
+        "effectType": "movePenalty",
+        "effect": "MOVE -2, minimum 1",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "Paramedic DV15",
+        "treatment": "Surgery DV15",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 5,
+        "id": "BODY-05-BROKEN-RIBS",
+        "name": "Broken Ribs",
+        "location": "body",
+        "effectType": "repeatBonusDamage",
+        "effect": "at end of each turn where character moves more than 4m/yd on foot, suffer this Critical Injury's bonus damage directly to HP again",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "Paramedic DV13",
+        "treatment": "Paramedic DV15 or Surgery DV13",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 6,
+        "id": "BODY-06-BROKEN-ARM",
+        "name": "Broken Arm",
+        "location": "body",
+        "effectType": "armDisabled",
+        "effect": "arm cannot be used; drop items held in that arm's hand",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "Paramedic DV13",
+        "treatment": "Paramedic DV15 or Surgery DV13",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 7,
+        "id": "BODY-07-FOREIGN-OBJECT",
+        "name": "Foreign Object",
+        "location": "body",
+        "effectType": "repeatBonusDamage",
+        "effect": "at end of each turn where character moves more than 4m/yd on foot, suffer this Critical Injury's bonus damage directly to HP again",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "First Aid DV13 or Paramedic DV13",
+        "treatment": "Quick Fix removes the injury effect permanently",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": false,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 8,
+        "id": "BODY-08-BROKEN-LEG",
+        "name": "Broken Leg",
+        "location": "body",
+        "effectType": "movePenalty",
+        "effect": "MOVE -4, minimum 1",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "Paramedic DV13",
+        "treatment": "Paramedic DV15 or Surgery DV13",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 9,
+        "id": "BODY-09-TORN-MUSCLE",
+        "name": "Torn Muscle",
+        "location": "body",
+        "effectType": "meleeAttackPenalty",
+        "effect": "-2 to Melee Attacks",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "First Aid DV13 or Paramedic DV13",
+        "treatment": "Quick Fix removes the injury effect permanently",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": false,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 10,
+        "id": "BODY-10-SPINAL-INJURY",
+        "name": "Spinal Injury",
+        "location": "body",
+        "effectType": "nextTurnActionLock",
+        "effect": "next turn, cannot take an Action but can still take a Move Action",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "Paramedic DV15",
+        "treatment": "Surgery DV15",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 11,
+        "id": "BODY-11-CRUSHED-FINGERS",
+        "name": "Crushed Fingers",
+        "location": "body",
+        "effectType": "handActionPenalty",
+        "effect": "-4 to Actions involving that hand",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "Paramedic DV13",
+        "treatment": "Surgery DV15",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "body",
+        "roll": 12,
+        "id": "BODY-12-DISMEMBERED-LEG",
+        "name": "Dismembered Leg",
+        "location": "body",
+        "effectType": "limbLoss",
+        "effect": "leg lost; MOVE -6, minimum 1; cannot dodge attacks",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "N/A",
+        "treatment": "Surgery DV17",
+        "canBeQuickFixed": false,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      }
+    ],
+    "head": [
+      {
+        "table": "head",
+        "roll": 2,
+        "id": "HEAD-02-LOST-EYE",
+        "name": "Lost Eye",
+        "location": "head",
+        "effectType": "visionPenalty",
+        "effect": "eye lost; -4 to Ranged Attacks and Perception checks involving vision",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "N/A",
+        "treatment": "Surgery DV17",
+        "canBeQuickFixed": false,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 3,
+        "id": "HEAD-03-BRAIN-INJURY",
+        "name": "Brain Injury",
+        "location": "head",
+        "effectType": "actionPenalty",
+        "effect": "-2 to all Actions",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "N/A",
+        "treatment": "Surgery DV17",
+        "canBeQuickFixed": false,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 4,
+        "id": "HEAD-04-DAMAGED-EYE",
+        "name": "Damaged Eye",
+        "location": "head",
+        "effectType": "visionPenalty",
+        "effect": "-2 to Ranged Attacks and Perception checks involving vision",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "Paramedic DV15",
+        "treatment": "Surgery DV13",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 5,
+        "id": "HEAD-05-CONCUSSION",
+        "name": "Concussion",
+        "location": "head",
+        "effectType": "actionPenalty",
+        "effect": "-2 to all Actions",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "First Aid DV13 or Paramedic DV13",
+        "treatment": "Quick Fix removes the injury effect permanently",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": false,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 6,
+        "id": "HEAD-06-BROKEN-JAW",
+        "name": "Broken Jaw",
+        "location": "head",
+        "effectType": "speechActionPenalty",
+        "effect": "-4 to Actions involving speech",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "Paramedic DV13",
+        "treatment": "Paramedic DV13 or Surgery DV13",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 7,
+        "id": "HEAD-07-FOREIGN-OBJECT",
+        "name": "Foreign Object",
+        "location": "head",
+        "effectType": "repeatBonusDamage",
+        "effect": "at end of each turn where character moves more than 4m/yd on foot, suffer this Critical Injury's bonus damage directly to HP again",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "First Aid DV13 or Paramedic DV13",
+        "treatment": "Quick Fix removes the injury effect permanently",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": false,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 8,
+        "id": "HEAD-08-WHIPLASH",
+        "name": "Whiplash",
+        "location": "head",
+        "effectType": "deathSavePenalty",
+        "effect": "base Death Save penalty increases",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "Paramedic DV13",
+        "treatment": "Paramedic DV13 or Surgery DV13",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 9,
+        "id": "HEAD-09-CRACKED-SKULL",
+        "name": "Cracked Skull",
+        "location": "head",
+        "effectType": "headshotMultiplier",
+        "effect": "Aimed Shots to the head multiply penetrating damage by 3 instead of 2",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "Paramedic DV15",
+        "treatment": "Paramedic DV15 or Surgery DV15",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 10,
+        "id": "HEAD-10-DAMAGED-EAR",
+        "name": "Damaged Ear",
+        "location": "head",
+        "effectType": "hearingPenalty",
+        "effect": "if character moves more than 4m/yd on foot in a turn, they cannot take a Move Action on the next turn; also -2 to Perception checks involving hearing",
+        "baseDeathSavePenaltyDelta": 0,
+        "quickFix": "Paramedic DV13",
+        "treatment": "Surgery DV13",
+        "canBeQuickFixed": true,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 11,
+        "id": "HEAD-11-CRUSHED-WINDPIPE",
+        "name": "Crushed Windpipe",
+        "location": "head",
+        "effectType": "speechBlocked",
+        "effect": "cannot speak",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "N/A",
+        "treatment": "Surgery DV15",
+        "canBeQuickFixed": false,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      },
+      {
+        "table": "head",
+        "roll": 12,
+        "id": "HEAD-12-LOST-EAR",
+        "name": "Lost Ear",
+        "location": "head",
+        "effectType": "hearingPenalty",
+        "effect": "ear lost; if character moves more than 4m/yd on foot in a turn, they cannot take a Move Action on the next turn; also -4 to Perception checks involving hearing",
+        "baseDeathSavePenaltyDelta": 1,
+        "quickFix": "N/A",
+        "treatment": "Surgery DV17",
+        "canBeQuickFixed": false,
+        "canBeTreated": true,
+        "permanentUntilTreatment": true,
+        "notes": []
+      }
+    ]
+  },
+  "criticalInjuryAliases": {
+    "spinal_injury": "BODY-10-SPINAL-INJURY",
+    "SPINAL-INJURY": "BODY-10-SPINAL-INJURY",
+    "crit_body_10": "BODY-10-SPINAL-INJURY",
+    "crit_body_7": "BODY-10-SPINAL-INJURY"
+  },
+  "redmasCatalogCorrections": {
+    "THERMAL-DAGGER": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "weapon",
+      "quality": "excellent",
+      "exotic": true,
+      "attachmentSlots": null,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "Excellent Quality",
+        "Sets target Strongly On Fire on hit"
+      ],
+      "code": "THERMAL-DAGGER",
+      "name": "Centurion Essentials Thermal Dagger",
+      "weaponType": "Exotic Medium Melee Weapon",
+      "weaponSkill": "Melee Weapon",
+      "damage": "2d6",
+      "rof": 2,
+      "magazine": null,
+      "ammoType": null,
+      "handsRequired": 1,
+      "concealable": true,
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "effects": [
+        {
+          "type": "weaponMode",
+          "value": "sets targets Strongly On Fire on hit"
+        }
+      ],
+      "desc": "adaga termica exotica de excelente qualidade; arma melee media concealable que deixa o alvo Strongly On Fire ao acertar."
+    },
+    "NATS-LONG-BARRELED-PISTOL": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "weapon",
+      "quality": "excellent",
+      "exotic": false,
+      "attachmentSlots": 3,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "Excellent Quality",
+        "Unique Range Table",
+        "3 attachment slots"
+      ],
+      "code": "NATS-LONG-BARRELED-PISTOL",
+      "name": "Nat's Long-Barreled Pistol",
+      "weaponType": "Very Heavy Pistol",
+      "weaponSkill": "Handgun",
+      "damage": "4d6",
+      "rof": 1,
+      "magazine": 8,
+      "ammoType": "VH Pistol",
+      "handsRequired": 1,
+      "concealable": false,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "rangeTable": {
+        "custom": true,
+        "rows": [
+          {
+            "range": "0-6m/yds",
+            "dv": 14
+          },
+          {
+            "range": "7-12m/yds",
+            "dv": 13
+          },
+          {
+            "range": "13-25m/yds",
+            "dv": 14
+          },
+          {
+            "range": "26-50m/yds",
+            "dv": 20
+          },
+          {
+            "range": "51-100m/yds",
+            "dv": 25
+          },
+          {
+            "range": "101-200m/yds",
+            "dv": 28
+          },
+          {
+            "range": "201-400m/yds",
+            "dv": 30
+          },
+          {
+            "range": "401-800m/yds",
+            "dv": null
+          }
+        ]
+      },
+      "desc": "pistola muito pesada de excelente qualidade com cano longo, range table unica e 3 slots de attachment."
+    },
+    "E-TACK-RAPID-RESPONDER": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "weapon",
+      "quality": "poor",
+      "exotic": false,
+      "attachmentSlots": 1,
+      "autofire": null,
+      "suppressiveFire": false,
+      "specialRules": [
+        "Poor Quality",
+        "Extended Magazine installed",
+        "Non-removable Stun Bayonet installed",
+        "Burst Mode"
+      ],
+      "code": "E-TACK-RAPID-RESPONDER",
+      "name": "Pursuit Security E-TACK Rapid Responder",
+      "weaponType": "Medium Pistol",
+      "weaponSkill": "Handgun",
+      "damage": "2d6",
+      "rof": 2,
+      "magazine": 18,
+      "ammoType": "M Pistol",
+      "handsRequired": 1,
+      "concealable": true,
+      "cost": 500,
+      "costCategory": "Expensive",
+      "installedAttachments": [
+        "EXTENDED-MAG",
+        "STUN-BAYONET"
+      ],
+      "weaponModes": [
+        {
+          "mode": "standard",
+          "damage": "2d6",
+          "ammoCost": 1,
+          "rof": 2
+        },
+        {
+          "mode": "burst",
+          "damage": "3d6",
+          "ammoCost": 3,
+          "rof": 2,
+          "specialRules": [
+            "deals damage as Heavy Pistol",
+            "treats non-Armor Piercing Ammunition as Armor Piercing",
+            "automatically disabled while fewer than 3 bullets are in magazine"
+          ]
+        }
+      ],
+      "desc": "pistola media de baixa qualidade com magazine estendido e Stun Bayonet nao removivel; possui burst mode que gasta 3 balas e causa dano como Heavy Pistol."
+    },
+    "STUN-BAYONET": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "code": "STUN-BAYONET",
+      "name": "Stun Bayonet",
+      "kind": "weaponAttachment",
+      "cost": 100,
+      "costCategory": "Premium",
+      "eligible": [
+        "All Non-Exotic Ranged Weapons fired with Shoulder Arms"
+      ],
+      "compatibleWith": [
+        "non-exotic Shoulder Arms ranged weapons"
+      ],
+      "effect": {
+        "type": "weaponMode",
+        "value": "firearm can also be wielded as a Stun Baton"
+      },
+      "effects": [
+        {
+          "type": "weaponMode",
+          "value": "firearm can also be wielded as a Stun Baton"
+        }
+      ],
+      "specialRules": [
+        "weapon attachment",
+        "allows firearm to be used as a Stun Baton"
+      ],
+      "desc": "attachment para armas ranged nao exoticas usadas com Shoulder Arms; permite usar a arma como Stun Baton."
+    },
+    "SMART-GLOVE": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "gear",
+      "code": "SMART-GLOVE",
+      "name": "CyberDude Smart Glove",
+      "cost": 750,
+      "costCategory": "Expensive",
+      "concealable": false,
+      "container": true,
+      "containerType": "smartGlove",
+      "builtIn": [
+        "Subdermal Grip"
+      ],
+      "optionSlotsProvided": 2,
+      "allowedContainedTypes": [
+        "Cyberarm Option",
+        "Cyberlimb Option"
+      ],
+      "actionRules": {
+        "equipOrRemove": "Action",
+        "installOrUninstallOption": "1 hour"
+      },
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "grants access to Subdermal Grip and installed glove options while worn"
+        },
+        {
+          "type": "containerSlots",
+          "value": "2 Cyberarm/Cyberlimb option slots"
+        }
+      ],
+      "restrictions": [
+        "non-finger cyberware options stored in cyberhand or meat hand under the glove are inaccessible while glove is worn",
+        "finger-based cyberware remains usable",
+        "cannot be concealed"
+      ],
+      "desc": "luva smart sem dedos com Subdermal Grip embutido e 2 slots para opcoes de Cyberarm/Cyberlimb; opcoes ficam acessiveis enquanto a luva e usada."
+    },
+    "HIGH-DENSITY-SHIELD": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "gear",
+      "code": "HIGH-DENSITY-SHIELD",
+      "name": "High-Density Bulletproof Shield",
+      "cost": 200,
+      "costCategory": "Expensive",
+      "shieldHp": 15,
+      "maxHp": 15,
+      "cannotBeInstalledInPopupShield": true,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "shield with 15 HP; cannot be installed in Popup Shield"
+        }
+      ],
+      "desc": "bulletproof shield com 15 HP; nao pode ser instalado em Popup Shield."
+    },
+    "LIGHT-METALGEAR": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "code": "LIGHT-METALGEAR",
+      "name": "Light Metalgear",
+      "kind": "armor",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "armor": {
+        "headSP": 16,
+        "bodySP": 16,
+        "ablates": true,
+        "armorPenalty": {
+          "REF": -3,
+          "DEX": -3,
+          "MOVE": -3
+        }
+      },
+      "effects": [
+        {
+          "type": "armorLayer",
+          "value": {
+            "sp": 16,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": -3,
+              "DEX": -3,
+              "MOVE": -3
+            },
+            "ablates": true
+          }
+        }
+      ],
+      "desc": "versao leve de Metalgear; SP 16 e penalidade de -3 para REF, DEX e MOVE."
+    },
+    "SMART-EARS": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "gear",
+      "code": "SMART-EARS",
+      "name": "Smart Ears",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "container": true,
+      "containerType": "smartEars",
+      "uniqueWorn": true,
+      "builtIn": [
+        "RADIO-SCAN-MUSIC"
+      ],
+      "optionSlotsProvided": 2,
+      "allowedContainedTypes": [
+        "Cyberaudio Option"
+      ],
+      "actionRules": {
+        "installOrUninstallCyberaudioOption": "1 hour"
+      },
+      "effects": [
+        {
+          "type": "containerSlots",
+          "value": "2 Cyberaudio Option slots"
+        },
+        {
+          "type": "contextualEffect",
+          "value": "grants access to non-removable Radio Scanner/Music Player and installed Cyberaudio Options while worn"
+        }
+      ],
+      "restrictions": [
+        "Radio Scanner/Music Player cannot be removed",
+        "user can only wear one set of Smart Ears at a time"
+      ],
+      "desc": "equipamento auditivo com Radio Scanner/Music Player nao removivel e 2 slots para Cyberaudio Options; apenas um conjunto pode ser usado por vez."
+    },
+    "FACE-QC": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "cyberware",
+      "code": "FACE-QC",
+      "name": "Quick Change Faceplate Mount",
+      "cyberwareType": "internal",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 1,
+      "effects": [
+        {
+          "type": "contextualEffect",
+          "value": "replaces meat face with mount; Faceplate can be installed or uninstalled with an Action"
+        }
+      ],
+      "included": [
+        "one personalized Faceplate"
+      ],
+      "additionalFaceplateCost": 100,
+      "additionalFaceplateCostCategory": "Premium",
+      "desc": "montagem facial interna para trocar Faceplates com uma Action; vem com uma Faceplate personalizada, e Faceplates extras custam 100eb."
+    },
+    "QUICK-DIGITS": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "cyberware",
+      "code": "QUICK-DIGITS",
+      "name": "Rocklin Augmentics Quick Digits",
+      "cyberwareType": "cyberarm",
+      "install": "clinic",
+      "cost": 250,
+      "costCategory": "Premium",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "parentType": "cyberarm",
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "permitsMultiple": true,
+      "countMode": "multiple",
+      "bodyLocation": "finger",
+      "effects": [
+        {
+          "type": "conditionalSkillBonus",
+          "value": 1,
+          "stackingRule": "requiresMultipleInstances",
+          "condition": "two or more Quick Digits installed; finger-based dexterity task",
+          "appliesTo": [
+            "Conceal/Reveal Object",
+            "Contortionist",
+            "First Aid",
+            "Forgery",
+            "Paramedic",
+            "Pick Lock",
+            "Pick Pocket"
+          ]
+        },
+        {
+          "type": "contextualEffect",
+          "value": "also applies to Language (Sign) if the engine supports that language specialization; otherwise keep as contextual note, not fake skill"
+        }
+      ],
+      "specialRules": [
+        "Cyberhand",
+        "Can be installed as only piece of cyberware in meat arm",
+        "Two or more Quick Digits grant +1 Complimentary Skill Check bonus to listed finger-based dexterity skills",
+        "Complimentary Skill bonuses do not stack"
+      ],
+      "desc": "cyberdedos Rocklin; com dois ou mais instalados, concede +1 como Complimentary Skill Check para tarefas de destreza com dedos nas skills listadas. Nao stacka."
+    },
+    "SKYDRIVERS": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "cyberware",
+      "code": "SKYDRIVERS",
+      "name": "Rocklin Augmentics Skydrivers",
+      "cyberwareType": "cyberleg",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "paired": true,
+      "countMode": "paired",
+      "requires": [
+        {
+          "type": "requiredPairedLocation",
+          "parentType": "cyberleg",
+          "count": 2
+        }
+      ],
+      "optionSlotsProvided": 2,
+      "optionSlotsProvidedPerLeg": 2,
+      "allowedContainedTypes": [
+        "Cyberleg Option",
+        "Cyberlimb Option"
+      ],
+      "builtIn": [
+        "JUMP-BOOSTER"
+      ],
+      "specialRules": [
+        "Paired Cyberlegs",
+        "Must be installed together",
+        "Count as one item for Cost and Humanity Loss",
+        "Do not count as one item for Critical Injuries or repair",
+        "Each Cyberleg has 2 Option Slots for Cyberleg or Cyberlimb Options",
+        "Each comes with non-removable Jump Boosters",
+        "Built-in Jump Boosters cause no Humanity Loss and take no Cyberleg Option Slot",
+        "Removing Jump Boosters destroys the Cyberlegs beyond repair"
+      ],
+      "effects": [
+        {
+          "type": "movementMode",
+          "value": "built-in Jump Boosters negate jump movement penalty"
+        },
+        {
+          "type": "damageVsCover",
+          "value": {
+            "bonusDamage": "3d6",
+            "condition": "user moved at least 4m/yds this Turn and makes Brawling or Martial Arts Attack against cover using legs",
+            "targetRestriction": "cover only"
+          }
+        }
+      ],
+      "desc": "par de cyberlegs com Jump Boosters embutidos e 2 slots por perna; ataques de Brawling/Martial Arts com as pernas contra cover causam +3d6 se o usuario moveu pelo menos 4m/yds no turno."
+    },
+    "CYBERSPINE": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "cyberware",
+      "code": "CYBERSPINE",
+      "name": "Sycust Cyberspine",
+      "cyberwareType": "internal",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 7,
+      "humanityLossDice": "2d6",
+      "optionSlotsRequired": 3,
+      "effects": [
+        {
+          "type": "criticalInjuryImmunity",
+          "value": {
+            "injuryIds": [
+              "BODY-10-SPINAL-INJURY"
+            ],
+            "blocksEffect": true,
+            "blocksBonusDamage": true,
+            "doesNotBlockOtherCriticalInjuries": true
+          }
+        },
+        {
+          "type": "empProtection",
+          "scope": "self",
+          "value": {
+            "hardenedAgainstEmp": true,
+            "globalEmpImmunity": false
+          }
+        },
+        {
+          "type": "flatSkillBonus",
+          "appliesTo": [
+            "Contortionist"
+          ],
+          "value": 1
+        },
+        {
+          "type": "contextualEffect",
+          "value": "can serve as compatible orifice/mount point for Cybersnake"
+        }
+      ],
+      "desc": "cybercoluna reforcada; bloqueia apenas Spinal Injury e seu bonus de dano, e hardened contra EMP em si mesma, concede +1 em Contortionist e pode servir como ponto compativel para Cybersnake."
+    },
+    "CYBER-COND": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "gear",
+      "code": "CYBER-COND",
+      "name": "Zetatech CyberConductor",
+      "cyberwareType": "cyberdeck-hardware",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "container": true,
+      "containerType": "cyberConductor",
+      "cyberdeckSlotsProvided": 3,
+      "humanityLossAverage": 0,
+      "humanityLossDice": "N/A",
+      "effects": [
+        {
+          "type": "containerSlots",
+          "value": "up to 3 Cyberdecks"
+        },
+        {
+          "type": "contextualEffect",
+          "value": "as a Meat Action while Jacked In to a NET Architecture, switch from one installed Cyberdeck to another"
+        },
+        {
+          "type": "contextualEffect",
+          "value": "when switching, all active programs Derezz, including Black ICE, and user takes 3 HP damage directly"
+        }
+      ],
+      "specialRules": [
+        "Up to three Cyberdecks may be installed",
+        "Switching Cyberdecks is a Meat Action while Jacked In",
+        "Switching derezzes all active programs including Black ICE",
+        "Switching causes 3 direct HP damage",
+        "Cyberdecks installed in the CyberConductor do not share Programs or Hardware",
+        "Installing or uninstalling a Cyberdeck takes one hour"
+      ],
+      "desc": "hardware Zetatech que comporta ate 3 cyberdecks; troca como Meat Action enquanto Jacked In, derezza programas ativos e causa 3 HP diretos."
+    },
+    "CYBER-COND-INTEGRATED": {
+      "sourceType": "official-dlc",
+      "source": "12 Days of REDmas",
+      "requiresGmApproval": false,
+      "kind": "cyberware",
+      "code": "CYBER-COND-INTEGRATED",
+      "name": "Zetatech CyberConductor, Integrated",
+      "cyberwareType": "borgware",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 3,
+      "requiresFBC": true,
+      "unique": true,
+      "container": true,
+      "containerType": "integratedCyberConductor",
+      "cyberdeckSlotsProvided": 3,
+      "effects": [
+        {
+          "type": "containerSlots",
+          "value": "up to 3 Cyberdecks plus compatible FBC-integrated cyberdecks"
+        },
+        {
+          "type": "contextualEffect",
+          "value": "switch between connected cyberdecks using CyberConductor without taking the 3 HP damage"
+        }
+      ],
+      "specialRules": [
+        "Borgware/Internal Body Cyberware",
+        "Requires 3 Option Slots",
+        "May only be installed in a Full Body Conversion",
+        "User can only have one CyberConductor installed",
+        "No 3 HP damage when switching Cyberdecks",
+        "Connects other cyberdecks installed as cyberware in the FBC",
+        "Cyberdecks installed in the Integrated CyberConductor count as integrated via cyberware into the FBC body"
+      ],
+      "desc": "CyberConductor integrado para FBC; comporta cyberdecks e permite troca sem sofrer 3 HP diretos."
+    }
+  },
+  "homebrewLimiarCatalogCorrections": {
+    "MANTIS-BLADE": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "name": "Mantis Blade",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 2,
+      "parentType": "cyberarm",
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "weaponProfile": {
+        "weaponType": "Exotic Heavy Melee Cyberweapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "3d6",
+        "rof": 2,
+        "magazine": null,
+        "ammoType": null,
+        "handsRequired": 1,
+        "concealable": true,
+        "quality": "standard",
+        "exotic": true,
+        "specialRules": [
+          "hidden retractable blade",
+          "follows melee armor rules",
+          "does not ignore full armor by default"
+        ]
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "sourceCode": "MANTIS-BLADE",
+          "scope": "weapon",
+          "value": {
+            "retractable": true,
+            "concealedWhileRetracted": true
+          }
+        },
+        {
+          "type": "weaponMode",
+          "sourceCode": "MANTIS-BLADE",
+          "scope": "weapon",
+          "value": {
+            "drawOrRetract": "part of attack declaration"
+          }
+        }
+      ],
+      "specialRules": [
+        "hidden retractable blade",
+        "follows melee armor rules",
+        "does not ignore full armor by default"
+      ],
+      "balanceNotes": [
+        "balanced as a concealable Heavy Melee Cyberweapon",
+        "higher cost and HL than Wolvers because it is explicitly hidden/retractable and homebrew",
+        "does not ignore armor unless a specific upgrade modifies ablation"
+      ],
+      "desc": "lamina retratil escondida no braco; funciona como cyberweapon melee pesada exotica, 3d6 ROF 2, usando Melee Weapon."
+    },
+    "MONOWIRE": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "name": "Monowire",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 2,
+      "parentType": "cyberarm",
+      "allowedParentTypes": [
+        "Cyberarm",
+        "meat arm special case"
+      ],
+      "weaponProfile": {
+        "weaponType": "Exotic Very Heavy Melee Cyberweapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "4d6",
+        "rof": 1,
+        "magazine": null,
+        "ammoType": null,
+        "handsRequired": 1,
+        "concealable": true,
+        "quality": "standard",
+        "exotic": true,
+        "reachMeters": 4,
+        "specialRules": [
+          "acts like a short flexible whip/line",
+          "concealable only while retracted",
+          "cannot grapple by default",
+          "cannot disarm by default",
+          "does not ignore full armor by default"
+        ]
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "sourceCode": "MONOWIRE",
+          "scope": "weapon",
+          "value": {
+            "reachMeters": 4,
+            "retractable": true,
+            "concealedWhileRetracted": true
+          }
+        },
+        {
+          "type": "weaponMode",
+          "sourceCode": "MONOWIRE",
+          "scope": "weapon",
+          "value": {
+            "flexibleLine": true
+          }
+        }
+      ],
+      "specialRules": [
+        "acts like a short flexible whip/line",
+        "concealable only while retracted",
+        "cannot grapple by default",
+        "cannot disarm by default",
+        "does not ignore full armor by default"
+      ],
+      "balanceNotes": [
+        "4d6 is balanced by ROF 1",
+        "no automatic armor ignore",
+        "reach is short and must be supported by combat context"
+      ],
+      "desc": "fio monomolecular retratil usado como chicote curto; cyberweapon melee muito pesada exotica, 4d6 ROF 1, usando Melee Weapon."
+    },
+    "COMBAT-TAIL": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "name": "Combat Tail",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "optionSlotsRequired": 1,
+      "cyberwareTypeSecondary": "external",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "NEURAL-LINK",
+          "name": "Neural Link"
+        }
+      ],
+      "weaponProfile": {
+        "weaponType": "Exotic Heavy Melee Cyberweapon",
+        "weaponSkill": "Melee Weapon",
+        "damage": "3d6",
+        "rof": 2,
+        "magazine": null,
+        "ammoType": null,
+        "handsRequired": 0,
+        "concealable": false,
+        "quality": "standard",
+        "exotic": true,
+        "specialRules": [
+          "can attack while hands are occupied",
+          "does not grant extra action",
+          "attack still consumes normal Attack Action"
+        ]
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "sourceCode": "COMBAT-TAIL",
+          "scope": "weapon",
+          "value": {
+            "handsRequired": 0,
+            "canAttackWithHandsOccupied": true,
+            "grantsExtraAction": false
+          }
+        },
+        {
+          "type": "conditionalSkillBonus",
+          "sourceCode": "COMBAT-TAIL",
+          "appliesTo": [
+            "Athletics",
+            "Contortionist"
+          ],
+          "value": 1,
+          "condition": "balance, climbing, hanging, resisting falls, or tail-assisted movement",
+          "stackingRule": "highestOnly",
+          "enabledByDefault": true
+        }
+      ],
+      "specialRules": [
+        "can attack while hands are occupied",
+        "does not grant extra action",
+        "attack still consumes normal Attack Action"
+      ],
+      "balanceNotes": [
+        "hands-free attack is strong, so it is not concealable and does not grant extra action",
+        "uses the normal action economy"
+      ],
+      "desc": "cauda cybernetica de combate; arma melee pesada exotica 3d6 ROF 2, pode atacar com as maos ocupadas, mas nao concede acao extra."
+    },
+    "GORILLA-ARMS": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "name": "Gorilla Arms",
+      "install": "hospital",
+      "cost": 1000,
+      "costCategory": "Very Expensive",
+      "humanityLossAverage": 14,
+      "humanityLossDice": "4d6",
+      "paired": true,
+      "countMode": "paired",
+      "requires": [
+        {
+          "type": "requiredCyberwareCount",
+          "code": "CYBERARM",
+          "name": "Cyberarm",
+          "count": 2
+        },
+        {
+          "type": "requiredPairedLocation",
+          "parentType": "cyberarm",
+          "count": 2
+        }
+      ],
+      "optionSlotsRequired": 2,
+      "slotCost": {
+        "perCyberarm": 2
+      },
+      "weaponProfile": {
+        "weaponType": "Exotic Brawling Cyberweapon",
+        "weaponSkill": "Brawling",
+        "damage": "dynamic",
+        "rof": 2,
+        "magazine": null,
+        "ammoType": null,
+        "handsRequired": 1,
+        "concealable": false,
+        "quality": "standard",
+        "exotic": true,
+        "damageScale": [
+          {
+            "maxEffectiveBody": 4,
+            "damage": "1d6"
+          },
+          {
+            "minEffectiveBody": 5,
+            "maxEffectiveBody": 6,
+            "damage": "2d6"
+          },
+          {
+            "minEffectiveBody": 7,
+            "maxEffectiveBody": 10,
+            "damage": "3d6"
+          },
+          {
+            "minEffectiveBody": 11,
+            "damage": "4d6"
+          }
+        ],
+        "specialRules": [
+          "treats BODY as +2 only for Gorilla Arms raw strength checks and Gorilla Arms brawling damage scale",
+          "does not alter real BODY",
+          "does not alter HP",
+          "does not alter Death Save",
+          "does not satisfy Linear Frame requirements"
+        ]
+      },
+      "effects": [
+        {
+          "type": "cyberweapon",
+          "sourceCode": "GORILLA-ARMS",
+          "scope": "weapon",
+          "value": {
+            "brawlingCyberweapon": true,
+            "bodyModifierForThisWeaponOnly": 2,
+            "doesNotAffectRealBody": true
+          }
+        },
+        {
+          "type": "conditionalSkillBonus",
+          "sourceCode": "GORILLA-ARMS",
+          "appliesTo": [
+            "Athletics"
+          ],
+          "value": 2,
+          "condition": "raw strength only, including lifting, pushing, forcing doors, bending bars, breaking objects, holding someone, or similar GM-approved strength exertion",
+          "stackingRule": "highestOnly",
+          "enabledByDefault": true
+        },
+        {
+          "type": "contextualEffect",
+          "sourceCode": "GORILLA-ARMS",
+          "value": "BODY is treated as +2 only for raw strength contexts and Gorilla Arms damage scale; this never changes HP, Death Save, Wound Threshold, Linear Frame requirements, or actual BODY."
+        }
+      ],
+      "specialRules": [
+        "treats BODY as +2 only for Gorilla Arms raw strength checks and Gorilla Arms brawling damage scale",
+        "does not alter real BODY",
+        "does not alter HP",
+        "does not alter Death Save",
+        "does not satisfy Linear Frame requirements"
+      ],
+      "balanceNotes": [
+        "not a real BODY increase",
+        "no HP increase",
+        "no Death Save increase",
+        "paired cyberarm requirement prevents cheap stacking",
+        "bonus is limited to raw strength contexts"
+      ],
+      "desc": "par de cyberarms reforcados; concede +2 em Athletics apenas para forca bruta e usa BODY +2 somente para dano dos proprios Gorilla Arms, sem alterar BODY real, HP ou Death Save."
+    },
+    "ENH-HYD-RAM": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "name": "Hydraulic Ram",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "GORILLA-ARMS",
+          "name": "Gorilla Arms"
+        }
+      ],
+      "attachesTo": [
+        "GORILLA-ARMS"
+      ],
+      "effects": [
+        {
+          "type": "damageVsCover",
+          "sourceCode": "ENH-HYD-RAM",
+          "scope": "weapon",
+          "value": {
+            "bonusDamage": "3d6",
+            "targetRestriction": "cover_or_object_only",
+            "requiredWeaponCode": "GORILLA-ARMS",
+            "attackSkill": [
+              "Brawling",
+              "Martial Arts"
+            ],
+            "condition": "Gorilla Arms attack against cover/object"
+          }
+        }
+      ],
+      "specialRules": [
+        "adds +3d6 only against cover or objects",
+        "never applies against living targets"
+      ],
+      "balanceNotes": [
+        "keeps the upgrade cinematic without increasing character damage"
+      ],
+      "desc": "pistoes hidraulicos para Gorilla Arms; adiciona +3d6 apenas contra cover ou objetos, nunca contra personagens."
+    },
+    "ENH-PNEU-ACT": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "name": "Pneumatic Actuation",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "GORILLA-ARMS",
+          "name": "Gorilla Arms"
+        }
+      ],
+      "attachesTo": [
+        "GORILLA-ARMS"
+      ],
+      "effects": [
+        {
+          "type": "weaponMode",
+          "sourceCode": "ENH-PNEU-ACT",
+          "scope": "weapon",
+          "value": {
+            "requiredWeaponCode": "GORILLA-ARMS",
+            "onCritical": {
+              "extraDirectDamage": 5,
+              "appliesOnlyToNormalGorillaArmsAttack": true,
+              "notMultipliedByHeadshot": true,
+              "doesNotAblateArmor": true
+            }
+          }
+        }
+      ],
+      "specialRules": [
+        "when Gorilla Arms causes a Critical Injury, add +5 direct HP damage",
+        "this extra damage is not multiplied by headshot and does not ablate armor"
+      ],
+      "balanceNotes": [
+        "mirrors the logic of Critical Injury bonus damage but only on Gorilla Arms criticals"
+      ],
+      "desc": "atuadores pneumaticos para Gorilla Arms; quando o ataque causa Critical Injury, adiciona +5 HP direto sem ablar armor."
+    },
+    "ENH-TUNG-REIN": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "name": "Tungsten Reinforcement",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "GORILLA-ARMS",
+          "name": "Gorilla Arms"
+        }
+      ],
+      "attachesTo": [
+        "GORILLA-ARMS"
+      ],
+      "effects": [
+        {
+          "type": "weaponMode",
+          "sourceCode": "ENH-TUNG-REIN",
+          "scope": "weapon",
+          "value": {
+            "requiredWeaponCode": "GORILLA-ARMS",
+            "modes": [
+              {
+                "mode": "reinforcedFast",
+                "damage": "3d6",
+                "rof": 2,
+                "skill": "Brawling"
+              },
+              {
+                "mode": "reinforcedHeavy",
+                "damage": "4d6",
+                "rof": 1,
+                "skill": "Brawling"
+              }
+            ]
+          }
+        }
+      ],
+      "specialRules": [
+        "user may choose reinforcedFast 3d6 ROF 2 or reinforcedHeavy 4d6 ROF 1",
+        "does not stack with BODY-based Gorilla Arms damage; selected mode replaces normal Gorilla Arms damage profile"
+      ],
+      "balanceNotes": [
+        "gives mode flexibility but not free extra damage"
+      ],
+      "desc": "reforco de tungstenio para Gorilla Arms; permite escolher modo 3d6 ROF 2 ou 4d6 ROF 1."
+    },
+    "ENH-DBL-EDGE": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "name": "Double-Edged Actuator",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "MANTIS-BLADE",
+          "name": "Mantis Blade"
+        }
+      ],
+      "attachesTo": [
+        "MANTIS-BLADE"
+      ],
+      "effects": [
+        {
+          "type": "weaponMode",
+          "sourceCode": "ENH-DBL-EDGE",
+          "scope": "weapon",
+          "value": {
+            "requiredWeaponCode": "MANTIS-BLADE",
+            "criticalRollAdvantage": {
+              "rollCount": 2,
+              "choose": 1
+            }
+          }
+        }
+      ],
+      "specialRules": [
+        "when Mantis Blade causes a Critical Injury, roll twice on the applicable Critical Injury table and choose one result"
+      ],
+      "balanceNotes": [
+        "increases critical control, not base damage"
+      ],
+      "desc": "atuador duplo para Mantis Blade; ao causar Critical Injury, role duas vezes na tabela e escolha um resultado."
+    },
+    "ENH-MONO-EDG": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "name": "Monomolecular Edge",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "MANTIS-BLADE",
+          "name": "Mantis Blade"
+        }
+      ],
+      "attachesTo": [
+        "MANTIS-BLADE"
+      ],
+      "effects": [
+        {
+          "type": "armorAblation",
+          "sourceCode": "ENH-MONO-EDG",
+          "scope": "weapon",
+          "value": {
+            "requiredWeaponCode": "MANTIS-BLADE",
+            "additionalAblation": 1,
+            "condition": "damage penetrates armor"
+          }
+        }
+      ],
+      "specialRules": [
+        "Mantis Blade ablates 1 additional SP when damage penetrates armor",
+        "does not ignore armor",
+        "does not apply if no damage penetrates"
+      ],
+      "balanceNotes": [
+        "sharpness is represented as extra ablation, not armor bypass"
+      ],
+      "desc": "fio monomolecular para Mantis Blade; quando o dano atravessa armor, causa +1 ablation adicional."
+    },
+    "ENH-BARB-LIN": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "name": "Barbed Line",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "MONOWIRE",
+          "name": "Monowire"
+        }
+      ],
+      "attachesTo": [
+        "MONOWIRE"
+      ],
+      "effects": [
+        {
+          "type": "weaponMode",
+          "sourceCode": "ENH-BARB-LIN",
+          "scope": "weapon",
+          "value": {
+            "requiredWeaponCode": "MONOWIRE",
+            "criticalRollAdvantage": {
+              "rollCount": 3,
+              "choose": 1
+            }
+          }
+        }
+      ],
+      "specialRules": [
+        "when Monowire causes a Critical Injury, roll three times on the applicable Critical Injury table and choose one result"
+      ],
+      "balanceNotes": [
+        "high critical control balanced by Monowire ROF 1 and GM approval"
+      ],
+      "desc": "farpas microscopicas para Monowire; ao causar Critical Injury, role tres vezes na tabela e escolha um resultado."
+    },
+    "ENH-ELECTRO": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "name": "Electro-Line",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "MONOWIRE",
+          "name": "Monowire"
+        }
+      ],
+      "attachesTo": [
+        "MONOWIRE"
+      ],
+      "effects": [
+        {
+          "type": "nonLethalMode",
+          "sourceCode": "ENH-ELECTRO",
+          "scope": "weapon",
+          "value": {
+            "requiredWeaponCode": "MONOWIRE",
+            "mode": "electroLine",
+            "damage": "3d6",
+            "rof": 1,
+            "lethal": false,
+            "doesNotCauseCriticalInjury": true,
+            "specialRules": [
+              "non-lethal shock mode",
+              "no full stun system implemented yet"
+            ]
+          }
+        },
+        {
+          "type": "weaponMode",
+          "sourceCode": "ENH-ELECTRO",
+          "scope": "weapon",
+          "value": {
+            "selectedMode": "electroLine",
+            "damage": "3d6",
+            "rof": 1,
+            "nonLethal": true
+          }
+        }
+      ],
+      "specialRules": [
+        "optional non-lethal mode for Monowire",
+        "deals 3d6 ROF 1",
+        "does not trigger Critical Injury unless GM overrides"
+      ],
+      "balanceNotes": [
+        "utility/control option, not a damage upgrade"
+      ],
+      "desc": "modulo eletrocondutivo para Monowire; permite modo nao letal 3d6 ROF 1, sem Critical Injury por padrao."
+    },
+    "ENH-THERMAL": {
+      "kind": "cyberware",
+      "cyberwareType": "cyberweapon",
+      "sourceType": "homebrew-limiar",
+      "source": "Limiar OS Homebrew",
+      "requiresGmApproval": true,
+      "install": "clinic",
+      "cost": 500,
+      "costCategory": "Expensive",
+      "humanityLossAverage": 3,
+      "humanityLossDice": "1d6",
+      "optionSlotsRequired": 1,
+      "name": "Thermal Edge",
+      "requires": [
+        {
+          "type": "requiredCyberware",
+          "code": "MONOWIRE",
+          "name": "Monowire"
+        }
+      ],
+      "attachesTo": [
+        "MONOWIRE"
+      ],
+      "effects": [
+        {
+          "type": "armorAblation",
+          "sourceCode": "ENH-THERMAL",
+          "scope": "weapon",
+          "value": {
+            "requiredWeaponCode": "MONOWIRE",
+            "additionalAblation": 1,
+            "condition": "damage penetrates armor"
+          }
+        },
+        {
+          "type": "weaponMode",
+          "sourceCode": "ENH-THERMAL",
+          "scope": "weapon",
+          "value": {
+            "heatSignature": "visible_when_active"
+          }
+        }
+      ],
+      "specialRules": [
+        "Monowire ablates 1 additional SP when damage penetrates armor",
+        "does not set targets on fire by default",
+        "visible heat signature when active"
+      ],
+      "balanceNotes": [
+        "extra ablation but no additional damage and no automatic fire condition"
+      ],
+      "desc": "fio termico para Monowire; quando o dano atravessa armor, causa +1 ablation adicional e fica visivelmente aquecido enquanto ativo."
+    }
+  }
+}

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+./scripts/test-backend-postgres.sh
+python3 scripts/check-architecture.py
+
+cd frontend
+npm test
+npm run typecheck
+npm run build

@@ -1,0 +1,937 @@
+{
+  "generatedAt": "2026-07-02T14:20:15.382Z",
+  "source": "data/seed/limiar-seed.json",
+  "canonicalRules": "data/canonical/cpr-canonical-rules.json",
+  "report": "data/audit/limiar-catalog-audit.json",
+  "engineReferences": {
+    "stats": [
+      "INT",
+      "REF",
+      "DEX",
+      "TECH",
+      "COOL",
+      "WILL",
+      "LUCK",
+      "MOVE",
+      "BODY",
+      "EMP"
+    ],
+    "skills": [
+      "Accounting",
+      "Acting",
+      "Air Vehicle Tech",
+      "Animal Handling",
+      "Archery",
+      "Athletics",
+      "Autofire",
+      "Basic Tech",
+      "Brawling",
+      "Bribery",
+      "Bureaucracy",
+      "Business",
+      "Composition",
+      "Conceal/Reveal Object",
+      "Concentration",
+      "Contortionist",
+      "Conversation",
+      "Criminology",
+      "Cryptography",
+      "Cybertech",
+      "Dance",
+      "Deduction",
+      "Demolitions",
+      "Drive Land Vehicle",
+      "Education",
+      "Electronics/Security Tech",
+      "Endurance",
+      "Evasion",
+      "First Aid",
+      "Forgery",
+      "Gamble",
+      "Handgun",
+      "Heavy Weapons",
+      "Human Perception",
+      "Interrogation",
+      "Land Vehicle Tech",
+      "Language (Streetslang)",
+      "Library Search",
+      "Lip Reading",
+      "Local Expert (Your Home)",
+      "Martial Arts",
+      "Melee Weapon",
+      "Paint/Draw/Sculpt",
+      "Paramedic",
+      "Perception",
+      "Personal Grooming",
+      "Persuasion",
+      "Photography/Film",
+      "Pick Lock",
+      "Pick Pocket",
+      "Pilot Air Vehicle",
+      "Pilot Sea Vehicle",
+      "Play Instrument",
+      "Resist Torture/Drugs",
+      "Riding",
+      "Science",
+      "Sea Vehicle Tech",
+      "Shoulder Arms",
+      "Stealth",
+      "Streetwise",
+      "Tactics",
+      "Tracking",
+      "Trading",
+      "Wardrobe & Style",
+      "Weaponstech",
+      "Wilderness Survival"
+    ],
+    "bonusTypes": [
+      "armorAblation",
+      "critDamage",
+      "critRoll",
+      "damageVsCover",
+      "deafenImmunity",
+      "empImmunity",
+      "flashImmunity",
+      "healingRate",
+      "ignoreArmor",
+      "nonLethalOption",
+      "rangedBonus",
+      "spinalInjuryImmunity",
+      "weaponMode"
+    ],
+    "sourceTypes": [
+      "official-core",
+      "official-dlc",
+      "official-supplement",
+      "homebrew-limiar",
+      "unvalidated"
+    ],
+    "skillAliases": {
+      "Local Expert (Home)": "Local Expert (Your Home)",
+      "Melee Weapons": "Melee Weapon",
+      "Weapon Tech": "Weaponstech",
+      "Weapons Tech": "Weaponstech",
+      "Photograph/Film": "Photography/Film",
+      "Street Slang": "Streetslang",
+      "Language (Street Slang)": "Language (Streetslang)"
+    },
+    "invalidSkillLikeFields": [
+      "Athletics (natacao)",
+      "Disguise",
+      "Evidence Collection",
+      "MOVE_ao_patinar",
+      "Perception (as cegas/no escuro)",
+      "Perception (deteccao por radar/sonar)",
+      "Pericia Selecionada (definir na instalacao)"
+    ],
+    "canonicalItemCodes": [
+      "AIR-SUPP",
+      "AMMO-ARROW",
+      "AMMO-GRENADE",
+      "AMMO-H-PISTOL",
+      "AMMO-M-PISTOL",
+      "AMMO-RIFLE",
+      "AMMO-ROCKET",
+      "AMMO-SHELL",
+      "AMMO-SLUG",
+      "AMMO-VH-PISTOL",
+      "AMP-HEARING",
+      "ANTI-DAZ",
+      "ART-SHOULDER",
+      "ASSAULT-RIFLE",
+      "AUD-REC",
+      "AUDIOVOX",
+      "BD-REC",
+      "BIG-KNUCKS",
+      "BOW-CROSSBOW",
+      "BRAWLING-BODY-HIGH",
+      "BRAWLING-BODY-LOW",
+      "BRAWLING-BODY-MID",
+      "BRAWLING-BODY-SUPERHUMAN",
+      "BUG-DET",
+      "CHAINRIPP",
+      "CHEM-ANAL",
+      "CHIP-SOCKET",
+      "CHYRON",
+      "COLOR-SH",
+      "COMBAT-TAIL",
+      "CONC-SLEEVE",
+      "CONTRACEPTIVE",
+      "CYBER-COND",
+      "CYBER-COND-INTEGRATED",
+      "CYBERARM",
+      "CYBERAUDIO",
+      "CYBERDECK-ARM",
+      "CYBEREYE",
+      "CYBERLEG",
+      "CYBERSPINE",
+      "DARTGUN-EYE",
+      "DRUM-MAG",
+      "E-TACK-RAPID-RESPONDER",
+      "ENH-ANTI",
+      "ENH-BARB-LIN",
+      "ENH-DBL-EDGE",
+      "ENH-ELECTRO",
+      "ENH-HYD-RAM",
+      "ENH-MONO-EDG",
+      "ENH-PNEU-ACT",
+      "ENH-THERMAL",
+      "ENH-TUNG-REIN",
+      "EXTENDED-MAG",
+      "FACE-QC",
+      "GILLS",
+      "GORILLA-ARMS",
+      "GRAPPLE-HAND",
+      "GRENADE-LAUNCHER",
+      "GRIP-FOOT",
+      "HARD-SHIELD",
+      "HEAVY-MELEE",
+      "HEAVY-PISTOL",
+      "HEAVY-SMG",
+      "HIDDEN-HOLSTER",
+      "HIGH-DENSITY-SHIELD",
+      "HOM-TRAC",
+      "IMAGE-ENH",
+      "INT-AGENT",
+      "INTERFACE-PLUGS",
+      "JUMP-BOOSTER",
+      "KERENZIKOV",
+      "LEVEL-DAMP",
+      "LIGHT-MELEE",
+      "LIGHT-METALGEAR",
+      "LINEAR-BETA",
+      "LINEAR-SIGMA",
+      "LOWLIGHT-UV",
+      "MANTIS-BLADE",
+      "MEDIUM-MELEE",
+      "MEDIUM-PISTOL",
+      "MEDSCAN",
+      "MEM-CHIP",
+      "MICRO-OPT",
+      "MICRO-VID",
+      "MONOWIRE",
+      "MULTIOPTIC",
+      "MUSCLE-LACE",
+      "NASAL-FILTER",
+      "NATS-LONG-BARRELED-PISTOL",
+      "NEURAL-LINK",
+      "OLF-BOOST",
+      "PAIN-EDITOR",
+      "PLASTIC-COVER",
+      "POP-MELEE",
+      "POP-RANGED",
+      "POP-SHIELD",
+      "POPUP-GL",
+      "QUICK-DIGITS",
+      "QUICK-MOUNT",
+      "RAD-DET-OPT",
+      "RAD-SON-INT",
+      "RADAR-DET",
+      "RADIO-COMM",
+      "RADIO-SCAN-MUSIC",
+      "REALSKINN-COVER",
+      "REFLEX-CO",
+      "RIPPERS",
+      "ROCKET-LAUNCHER",
+      "SANDEVISTAN",
+      "SCOPE",
+      "SCRAM-DESC",
+      "SCRATCHERS",
+      "SENSOR-ARRAY",
+      "SEX-IMPL",
+      "SH-CAM",
+      "SHOTGUN",
+      "SKATE-FOOT",
+      "SKILL-CHIP",
+      "SKIN-WEAVE",
+      "SKYDRIVERS",
+      "SLICE-DICE",
+      "SMART-EARS",
+      "SMART-GLASSES",
+      "SMART-GLOVE",
+      "SMARTGUN-LINK",
+      "SMG",
+      "SNAKE",
+      "SNIPER-RIFLE",
+      "STD-FOOT",
+      "STD-HAND",
+      "STUN-BAYONET",
+      "SUB-GRIP",
+      "SUB-POCKET",
+      "SUBDERMAL-ARMOR",
+      "SUPERCHROME-COVER",
+      "TACT-BOOST",
+      "TALON-FOOT",
+      "TARGET-SCOPE",
+      "TECHSCANNER",
+      "TELE-OPT",
+      "THERMAL-DAGGER",
+      "TOOL-HAND",
+      "TOX-BIND",
+      "UNDERBARREL-GL",
+      "UNDERBARREL-SHOTGUN",
+      "VAMPYRES",
+      "VERY-HEAVY-MELEE",
+      "VERY-HEAVY-PISTOL",
+      "VIRTUALITY",
+      "VOICE-STRESS",
+      "WEB-FOOT",
+      "WOLVERS"
+    ]
+  },
+  "totals": {
+    "collections": {
+      "items": 175,
+      "gear": 4,
+      "characters": 3
+    },
+    "issues": 36,
+    "bySeverity": {
+      "warning": 33,
+      "error": 2,
+      "info": 1
+    },
+    "byType": {
+      "cyberware_missing_source": 14,
+      "requirements_free_text": 5,
+      "cyberware_missing_slots": 2,
+      "installed_slot_parent_missing": 9,
+      "installed_cyberware_parent_missing_legacy": 3,
+      "installed_required_cyberware_missing": 2,
+      "effect_legacy_bonus_not_applied": 1
+    },
+    "byCollection": {
+      "items": 21,
+      "characters": 15
+    }
+  },
+  "issues": [
+    {
+      "id": "0001-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[0]",
+      "code": "BIOMON",
+      "name": "Biomonitor",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.4",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0002-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[1]",
+      "code": "CHEMSKIN",
+      "name": "Chemskin",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.4",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0003-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[2]",
+      "code": "LIGHT-TAT",
+      "name": "Light Tattoo",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.4",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0004-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[36].requirements",
+      "code": "BACKUP-DRIVE",
+      "name": "Backup Drive",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "2 hardware slots"
+      }
+    },
+    {
+      "id": "0005-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[36]",
+      "code": "BACKUP-DRIVE",
+      "name": "Backup Drive",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.11",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0006-cyberware_missing_slots",
+      "severity": "warning",
+      "type": "cyberware_missing_slots",
+      "collection": "items",
+      "path": "items[36]",
+      "code": "BACKUP-DRIVE",
+      "name": "Backup Drive",
+      "message": "cyberware mentions slots but has no structured slots, slotCost, or slotCapacity field.",
+      "evidence": {
+        "requirements": "2 hardware slots",
+        "desc": "Salva programas nao-Black ICE destruidos e permite restaurar em outro deck.",
+        "normalized": {
+          "optionSlotsProvided": null,
+          "optionSlotsRequired": null,
+          "legacyRequirements": "2 hardware slots"
+        }
+      }
+    },
+    {
+      "id": "0007-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[37].requirements",
+      "code": "DNA-LOCK",
+      "name": "DNA Lock",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "2 hardware slots"
+      }
+    },
+    {
+      "id": "0008-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[37]",
+      "code": "DNA-LOCK",
+      "name": "DNA Lock",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.11",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0009-cyberware_missing_slots",
+      "severity": "warning",
+      "type": "cyberware_missing_slots",
+      "collection": "items",
+      "path": "items[37]",
+      "code": "DNA-LOCK",
+      "name": "DNA Lock",
+      "message": "cyberware mentions slots but has no structured slots, slotCost, or slotCapacity field.",
+      "evidence": {
+        "requirements": "2 hardware slots",
+        "desc": "Trava e destrava o cyberdeck por biometria.",
+        "normalized": {
+          "optionSlotsProvided": null,
+          "optionSlotsRequired": null,
+          "legacyRequirements": "2 hardware slots"
+        }
+      }
+    },
+    {
+      "id": "0010-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[38]",
+      "code": "HARD-CIRCUIT",
+      "name": "Hardened Circuitry",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.11",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0011-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[39]",
+      "code": "RANGE-UPGRADE",
+      "name": "Range Upgrade",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.11",
+        "sourceType": "",
+        "cat": "DECK",
+        "normalized": {
+          "cyberwareType": "cyberdeck-hardware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0012-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[40].requirements",
+      "code": "CHAINRIPP",
+      "name": "ChainRipp",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Validar suplemento"
+      }
+    },
+    {
+      "id": "0013-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[40]",
+      "code": "CHAINRIPP",
+      "name": "ChainRipp",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.13",
+        "sourceType": "",
+        "cat": "LIMBS",
+        "normalized": {
+          "cyberwareType": "cyberweapon"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0014-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[43].requirements",
+      "code": "REFLEX-CO",
+      "name": "Reflex Co-Processor",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Validar suplemento"
+      }
+    },
+    {
+      "id": "0015-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[43]",
+      "code": "REFLEX-CO",
+      "name": "Reflex Co-Processor",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.15",
+        "sourceType": "",
+        "cat": "NEURAL",
+        "normalized": {
+          "cyberwareType": "neuralware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0016-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[45]",
+      "code": "SMART-GLASSES",
+      "name": "Smart Glasses",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware compilado p.19",
+        "sourceType": "",
+        "cat": "OPTICS",
+        "normalized": {
+          "cyberwareType": "cyberoptics"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0017-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[46]",
+      "code": "EMP-THREAD",
+      "name": "EMP Threading",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0018-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[47]",
+      "code": "SKINWATCH",
+      "name": "Skinwatch",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0019-requirements_free_text",
+      "severity": "warning",
+      "type": "requirements_free_text",
+      "collection": "items",
+      "path": "items[48].requirements",
+      "code": "TECHHAIR",
+      "name": "Techhair",
+      "message": "requirements is free text; the engine cannot validate or enforce it structurally.",
+      "evidence": {
+        "requirements": "Chemskin recomendado"
+      }
+    },
+    {
+      "id": "0020-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[48]",
+      "code": "TECHHAIR",
+      "name": "Techhair",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "FASHION",
+        "normalized": {
+          "cyberwareType": "fashionware"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0021-cyberware_missing_source",
+      "severity": "warning",
+      "type": "cyberware_missing_source",
+      "collection": "items",
+      "path": "items[100]",
+      "code": "CONC-SLEEVE",
+      "name": "Concealment Sleeve",
+      "message": "cyberware is missing sourceType provenance field(s).",
+      "evidence": {
+        "source": "cyberware DLC compilado",
+        "sourceType": "",
+        "cat": "EXTERNAL",
+        "normalized": {
+          "cyberwareType": "external"
+        },
+        "validationIssues": []
+      }
+    },
+    {
+      "id": "0022-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[0].equipped",
+      "code": "vesper",
+      "name": "VESPER",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "INTERFACE-PLUGS",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0023-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[0].equipped",
+      "code": "vesper",
+      "name": "VESPER",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "SKIN-WEAVE",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0024-installed_cyberware_parent_missing_legacy",
+      "severity": "warning",
+      "type": "installed_cyberware_parent_missing_legacy",
+      "collection": "characters",
+      "path": "characters[0].equipped",
+      "code": "vesper",
+      "name": "VESPER",
+      "message": "Cyberware option requires a parent instance, but legacy install has no parentInstanceId.",
+      "evidence": {
+        "itemCode": "INTERFACE-PLUGS",
+        "detail": {
+          "requiredParentCode": "NEURAL-LINK"
+        }
+      }
+    },
+    {
+      "id": "0025-installed_required_cyberware_missing",
+      "severity": "error",
+      "type": "installed_required_cyberware_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Required cyberware is not installed.",
+      "evidence": {
+        "itemCode": "KERENZIKOV",
+        "detail": {
+          "requiredCode": "NEURAL-LINK",
+          "requirement": {
+            "type": "requiredCyberware",
+            "code": "NEURAL-LINK"
+          }
+        }
+      }
+    },
+    {
+      "id": "0026-installed_required_cyberware_missing",
+      "severity": "error",
+      "type": "installed_required_cyberware_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Required cyberware is not installed.",
+      "evidence": {
+        "itemCode": "TARGET-SCOPE",
+        "detail": {
+          "requiredCode": "CYBEREYE",
+          "requirement": {
+            "type": "requiredCyberware",
+            "code": "CYBEREYE"
+          }
+        }
+      }
+    },
+    {
+      "id": "0027-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "KERENZIKOV",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0028-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "TARGET-SCOPE",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0029-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "SUBDERMAL-ARMOR",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0030-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "BIG-KNUCKS",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0031-installed_cyberware_parent_missing_legacy",
+      "severity": "warning",
+      "type": "installed_cyberware_parent_missing_legacy",
+      "collection": "characters",
+      "path": "characters[1].equipped",
+      "code": "rook",
+      "name": "ROOK",
+      "message": "Cyberware option requires a parent instance, but legacy install has no parentInstanceId.",
+      "evidence": {
+        "itemCode": "TARGET-SCOPE",
+        "detail": {
+          "requiredParentCode": "CYBEREYE"
+        }
+      }
+    },
+    {
+      "id": "0032-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "NASAL-FILTER",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0033-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "AUDIOVOX",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0034-installed_slot_parent_missing",
+      "severity": "warning",
+      "type": "installed_slot_parent_missing",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Cyberware option has slot cost but no matching slot pool.",
+      "evidence": {
+        "itemCode": "TECHSCANNER",
+        "detail": {
+          "parentInstanceId": null,
+          "location": null
+        }
+      }
+    },
+    {
+      "id": "0035-installed_cyberware_parent_missing_legacy",
+      "severity": "warning",
+      "type": "installed_cyberware_parent_missing_legacy",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Cyberware option requires a parent instance, but legacy install has no parentInstanceId.",
+      "evidence": {
+        "itemCode": "TECHSCANNER",
+        "detail": {
+          "requiredParentCode": "CYBERARM"
+        }
+      }
+    },
+    {
+      "id": "0036-effect_legacy_bonus_not_applied",
+      "severity": "info",
+      "type": "effect_legacy_bonus_not_applied",
+      "collection": "characters",
+      "path": "characters[2].equipped",
+      "code": "mira",
+      "name": "MIRA",
+      "message": "Legacy/fake effect was preserved but not applied as automatic bonus.",
+      "evidence": {
+        "itemCode": "NASAL-FILTER",
+        "detail": {
+          "effectType": "contextualEffect",
+          "condition": null
+        }
+      }
+    }
+  ]
+}

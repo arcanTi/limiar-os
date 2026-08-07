@@ -1,0 +1,14 @@
+.git
+.env*
+.docx-qa
+frontend/node_modules
+dist
+tailwind-sheet.css
+graphify-out
+data/*.db
+data/*.db-*
+uploads/*
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache

@@ -1,0 +1,644 @@
+[
+  {
+    "n": "0",
+    "name": "The Fool",
+    "color": "#ff6b4a",
+    "effect": "Todo o Cyberware do alvo fica inoperante por 1h. Sem Cyberware: Foreign Object + 3d6 de Perda de Humanidade.",
+    "img": "./assets/tarot/00-the-fool.webp",
+    "fx": "void",
+    "fxLabel": "Fluxo caotico",
+    "glyph": "◇",
+    "discard": "rift-collapse",
+    "effects": [
+      {
+        "type": "condition",
+        "when": {
+          "flag": "targetHasCyberware",
+          "equals": true
+        },
+        "then": [
+          {
+            "type": "cyberware",
+            "action": "disable",
+            "scope": "all",
+            "repairable": true,
+            "duration": {
+              "value": 1,
+              "unit": "hour"
+            },
+            "target": "victim"
+          }
+        ],
+        "else": [
+          {
+            "type": "criticalInjury",
+            "injury": "foreign_object",
+            "target": "victim"
+          },
+          {
+            "type": "humanity",
+            "amount": "3d6",
+            "direction": "loss",
+            "target": "victim"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "n": "I",
+    "name": "The Magician",
+    "color": "#ff4242",
+    "effect": "Uma peca de Cyberware e destruida (reparavel). O alvo fica Deadly On Fire.",
+    "img": "./assets/tarot/01-the-magician.webp",
+    "fx": "matrix",
+    "fxLabel": "Chuva de codigo",
+    "glyph": "⌁",
+    "discard": "code-burn",
+    "effects": [
+      {
+        "type": "cyberware",
+        "action": "destroy",
+        "scope": "one",
+        "repairable": true,
+        "target": "victim"
+      },
+      {
+        "type": "status",
+        "id": "deadly_on_fire",
+        "label_pt": "Deadly On Fire",
+        "duration": null,
+        "scope": "victim"
+      }
+    ]
+  },
+  {
+    "n": "II",
+    "name": "The High Priestess",
+    "color": "#ff5170",
+    "effect": "Foreign Object; falhar DV15 Resistir Tortura/Drogas causa 3d6 direto no HP.",
+    "img": "./assets/tarot/02-the-high-priestess.webp",
+    "fx": "psychic",
+    "fxLabel": "Pulso neural",
+    "glyph": "◐",
+    "discard": "neural-fade",
+    "effects": [
+      {
+        "type": "criticalInjury",
+        "injury": "foreign_object",
+        "target": "victim"
+      },
+      {
+        "type": "special",
+        "id": "priestess_dv_check",
+        "note_pt": "Falhar DV 15 Resistir Tortura/Drogas causa 3d6 de dano direto no HP",
+        "helperRoll": "3d6"
+      }
+    ]
+  },
+  {
+    "n": "III",
+    "name": "The Empress",
+    "color": "#38d0ff",
+    "effect": "Os proximos 3 ataques bem-sucedidos contra o mesmo alvo causam Critico garantido.",
+    "img": "./assets/tarot/03-the-empress.webp",
+    "fx": "biome",
+    "fxLabel": "Circuito vivo",
+    "glyph": "✿",
+    "discard": "petal-disperse",
+    "effects": [
+      {
+        "type": "status",
+        "id": "empress_crit_mark",
+        "label_pt": "Proximos 3 ataques bem-sucedidos contra este alvo garantem Critico",
+        "duration": null,
+        "scope": "victim",
+        "modifiers": {
+          "guaranteedCrit": 3
+        }
+      }
+    ]
+  },
+  {
+    "n": "IV",
+    "name": "The Emperor",
+    "color": "#ffe23d",
+    "effect": "Um jogador escolhe 1 Critico de Cabeca e 1 de Corpo; o alvo sofre ambos.",
+    "img": "./assets/tarot/04-the-emperor.webp",
+    "fx": "solar-grid",
+    "fxLabel": "Grade imperial",
+    "glyph": "▣",
+    "discard": "grid-lock",
+    "effects": [
+      {
+        "type": "criticalInjury",
+        "injury": null,
+        "pool": "head",
+        "chooser": "player",
+        "target": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": null,
+        "pool": "body",
+        "chooser": "player",
+        "target": "victim"
+      }
+    ]
+  },
+  {
+    "n": "V",
+    "name": "The Hierophant",
+    "color": "#ff4d6d",
+    "effect": "O ataque causa o dobro do dano pos-armadura. A arma usada e destruida sem reparo.",
+    "img": "./assets/tarot/05-the-hierophant.webp",
+    "fx": "sacred",
+    "fxLabel": "Fogo sacramental",
+    "glyph": "†",
+    "discard": "sacred-ash",
+    "effects": [
+      {
+        "type": "damage",
+        "amount": "2x",
+        "timing": "postArmor",
+        "multiplier": 2,
+        "target": "victim"
+      },
+      {
+        "type": "weapon",
+        "action": "destroy",
+        "repairable": false,
+        "target": "attacker"
+      }
+    ]
+  },
+  {
+    "n": "VI",
+    "name": "The Lovers",
+    "color": "#ff8a3d",
+    "effect": "O ataque acerta a cabeca. Se foi corpo a corpo, o alvo entra em grapple como defensor.",
+    "img": "./assets/tarot/06-the-lovers.webp",
+    "fx": "lovers",
+    "fxLabel": "Orbitas duplas",
+    "glyph": "∞",
+    "discard": "orbit-split",
+    "effects": [
+      {
+        "type": "locationOverride",
+        "location": "head",
+        "target": "victim"
+      },
+      {
+        "type": "condition",
+        "when": {
+          "flag": "wasMelee",
+          "equals": true
+        },
+        "then": [
+          {
+            "type": "status",
+            "id": "grapple_defender",
+            "label_pt": "Em grapple como defensor",
+            "duration": null,
+            "scope": "victim"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "n": "VII",
+    "name": "The Chariot",
+    "color": "#a05cff",
+    "effect": "A armadura do local atingido perde 5 de SP extra, mesmo sem penetracao.",
+    "img": "./assets/tarot/07-the-chariot.webp",
+    "fx": "chariot",
+    "fxLabel": "Linhas de fuga",
+    "glyph": "➤",
+    "discard": "speed-recall",
+    "effects": [
+      {
+        "type": "sp",
+        "action": "ablate",
+        "location": "hit",
+        "amount": 5,
+        "ignorePenetration": true,
+        "target": "victim"
+      }
+    ]
+  },
+  {
+    "n": "VIII",
+    "name": "Strength",
+    "color": "#ff7a2e",
+    "effect": "+25 de dano, somado antes da SP e antes dos multiplicadores.",
+    "img": "./assets/tarot/08-strength.webp",
+    "fx": "impact",
+    "fxLabel": "Impacto cinetico",
+    "glyph": "✹",
+    "discard": "kinetic-crush",
+    "effects": [
+      {
+        "type": "damage",
+        "amount": 25,
+        "timing": "preArmor",
+        "target": "victim"
+      }
+    ]
+  },
+  {
+    "n": "IX",
+    "name": "The Hermit",
+    "color": "#ffae3d",
+    "effect": "Lost Eye duas vezes; a penalidade e aplicada uma so vez.",
+    "img": "./assets/tarot/09-the-hermit.webp",
+    "fx": "lantern",
+    "fxLabel": "Lanterna isolada",
+    "glyph": "☉",
+    "discard": "lantern-snuff",
+    "effects": [
+      {
+        "type": "criticalInjury",
+        "injury": "lost_eye",
+        "count": 2,
+        "stackPenalty": false,
+        "target": "victim"
+      }
+    ]
+  },
+  {
+    "n": "X",
+    "name": "Wheel of Fortune",
+    "color": "#46e08a",
+    "effect": "Ataque descontrola: novo alvo aleatorio ou atacante cai e erra. Arma trava.",
+    "img": "./assets/tarot/10-wheel-of-fortune.webp",
+    "fx": "wheel",
+    "fxLabel": "Roda fractal",
+    "glyph": "◎",
+    "discard": "wheel-reversal",
+    "effects": [
+      {
+        "type": "special",
+        "id": "wheel_chaos",
+        "note_pt": "Novo alvo aleatorio OU atacante cai e erra (GM decide)",
+        "helperRoll": "1d6"
+      },
+      {
+        "type": "weapon",
+        "action": "jam",
+        "repairable": true,
+        "target": "attacker"
+      }
+    ]
+  },
+  {
+    "n": "XI",
+    "name": "Justice",
+    "color": "#ff3fa0",
+    "effect": "Por 1 min: -5 em Evasao contra melee e nao pode esquivar de ataques a distancia.",
+    "img": "./assets/tarot/11-justice.webp",
+    "fx": "verdict",
+    "fxLabel": "Sentenca glitch",
+    "glyph": "⚖",
+    "discard": "sentence-cut",
+    "effects": [
+      {
+        "type": "status",
+        "id": "justice_penalty",
+        "label_pt": "Por 1 min: -5 em Evasao contra melee; sem esquiva contra ataques a distancia",
+        "duration": {
+          "value": 1,
+          "unit": "min"
+        },
+        "scope": "victim",
+        "modifiers": {
+          "evasionVsMelee": -5,
+          "noEvasionVsRanged": true
+        }
+      }
+    ]
+  },
+  {
+    "n": "XII",
+    "name": "The Hanged Man",
+    "color": "#f0b429",
+    "effect": "Alvo derrubado; sofre Spinal Injury e Whiplash.",
+    "img": "./assets/tarot/12-the-hanged-man.webp",
+    "fx": "suspension",
+    "fxLabel": "Gravidade suspensa",
+    "glyph": "⌖",
+    "discard": "chain-drop",
+    "effects": [
+      {
+        "type": "status",
+        "id": "prone",
+        "label_pt": "Derrubado (Prone)",
+        "duration": null,
+        "scope": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": "spinal_injury",
+        "target": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": "whiplash",
+        "target": "victim"
+      }
+    ]
+  },
+  {
+    "n": "XIII",
+    "name": "Death",
+    "color": "#ffd60a",
+    "effect": "Alvo faz 1 Death Save. Se falhar: 0 HP + inconsciente 1 min; ao acordar recupera 3d6 de Humanidade.",
+    "img": "./assets/tarot/13-death.webp",
+    "fx": "smoke",
+    "fxLabel": "Foice de sombra",
+    "glyph": "☠",
+    "discard": "smoke-reap",
+    "effects": [
+      {
+        "type": "deathSave",
+        "target": "victim",
+        "onFail": [
+          {
+            "type": "status",
+            "id": "hp_zero",
+            "label_pt": "0 HP",
+            "duration": null,
+            "scope": "victim"
+          },
+          {
+            "type": "status",
+            "id": "unconscious",
+            "label_pt": "Inconsciente",
+            "duration": {
+              "value": 1,
+              "unit": "min"
+            },
+            "scope": "victim"
+          },
+          {
+            "type": "humanity",
+            "amount": "3d6",
+            "direction": "gain",
+            "target": "victim"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "n": "XIV",
+    "name": "Temperance",
+    "color": "#c84dff",
+    "effect": "Alvo escolhe 1 membro para Dismembered e outro para Broken.",
+    "img": "./assets/tarot/14-temperance.webp",
+    "fx": "alchemy",
+    "fxLabel": "Mistura alquimica",
+    "glyph": "⚗",
+    "discard": "dual-distill",
+    "effects": [
+      {
+        "type": "criticalInjury",
+        "injury": "dismembered_limb",
+        "chooser": "target",
+        "target": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": "broken_limb",
+        "chooser": "target",
+        "target": "victim"
+      }
+    ]
+  },
+  {
+    "n": "XV",
+    "name": "The Devil",
+    "color": "#ff2e2e",
+    "effect": "Acerta a cabeca; alvo sofre Brain Injury e Lost Ear.",
+    "img": "./assets/tarot/15-the-devil.webp",
+    "fx": "hellfire",
+    "fxLabel": "Brasa infernal",
+    "glyph": "♆",
+    "discard": "hell-ash",
+    "effects": [
+      {
+        "type": "locationOverride",
+        "location": "head",
+        "target": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": "brain_injury",
+        "target": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": "lost_ear",
+        "target": "victim"
+      }
+    ]
+  },
+  {
+    "n": "XVI",
+    "name": "The Tower",
+    "color": "#b59cff",
+    "effect": "Cracked Skull + Crushed Windpipe + Whiplash. Por 1h ignora dor e Seriously Wounded.",
+    "img": "./assets/tarot/16-the-tower.webp",
+    "fx": "lightning",
+    "fxLabel": "Colapso vertical",
+    "glyph": "ϟ",
+    "discard": "tower-collapse",
+    "effects": [
+      {
+        "type": "criticalInjury",
+        "injury": "cracked_skull",
+        "target": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": "crushed_windpipe",
+        "target": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": "whiplash",
+        "target": "victim"
+      },
+      {
+        "type": "status",
+        "id": "tower_endure",
+        "label_pt": "Por 1h: ignora dor e estado Seriously Wounded",
+        "duration": {
+          "value": 1,
+          "unit": "hour"
+        },
+        "scope": "victim",
+        "modifiers": {
+          "ignorePain": true,
+          "ignoreSeriouslyWounded": true
+        }
+      }
+    ]
+  },
+  {
+    "n": "XVII",
+    "name": "The Star",
+    "color": "#d46bff",
+    "effect": "Distancia: ricocheteia para 2o inimigo. Melee: Broken Ribs + Collapsed Lung.",
+    "img": "./assets/tarot/17-the-star.webp",
+    "fx": "starfield",
+    "fxLabel": "Constelacoes",
+    "glyph": "✦",
+    "discard": "constellation-collapse",
+    "effects": [
+      {
+        "type": "condition",
+        "when": {
+          "flag": "wasRanged",
+          "equals": true
+        },
+        "then": [
+          {
+            "type": "special",
+            "id": "star_ricochet",
+            "note_pt": "Projetil ricocheteia para 2o inimigo (GM determina alvo)",
+            "helperRoll": "1d6"
+          }
+        ],
+        "else": [
+          {
+            "type": "criticalInjury",
+            "injury": "broken_ribs",
+            "target": "victim"
+          },
+          {
+            "type": "criticalInjury",
+            "injury": "collapsed_lung",
+            "target": "victim"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "n": "XVIII",
+    "name": "The Moon",
+    "color": "#ff3fb0",
+    "effect": "Foreign Object duas vezes. Arma branca fica cravada; atacante desarmado.",
+    "img": "./assets/tarot/18-the-moon.webp",
+    "fx": "moon",
+    "fxLabel": "Eclipse psiquico",
+    "glyph": "☾",
+    "discard": "lunar-dissolve",
+    "effects": [
+      {
+        "type": "criticalInjury",
+        "injury": "foreign_object",
+        "count": 2,
+        "target": "victim"
+      },
+      {
+        "type": "weapon",
+        "action": "lodge",
+        "repairable": true,
+        "target": "attacker"
+      },
+      {
+        "type": "weapon",
+        "action": "disarm",
+        "repairable": true,
+        "target": "attacker"
+      }
+    ]
+  },
+  {
+    "n": "XIX",
+    "name": "The Sun",
+    "color": "#ffd24d",
+    "effect": "Uma granada/explosivo do alvo detona. Sem explosivos: um item nao-arma e destruido.",
+    "img": "./assets/tarot/19-the-sun.webp",
+    "fx": "solar",
+    "fxLabel": "Explosao solar",
+    "glyph": "☀",
+    "discard": "solar-implode",
+    "effects": [
+      {
+        "type": "condition",
+        "when": {
+          "flag": "targetHasExplosive",
+          "equals": true
+        },
+        "then": [
+          {
+            "type": "special",
+            "id": "sun_detonate",
+            "note_pt": "Granada/explosivo do alvo detona (usar regras de explosao normais)"
+          }
+        ],
+        "else": [
+          {
+            "type": "special",
+            "id": "sun_destroy_item",
+            "note_pt": "Um item nao-arma do alvo e destruido (GM escolhe)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "n": "XX",
+    "name": "Judgement",
+    "color": "#b04dff",
+    "effect": "Crushed Fingers numa mao e Dismembered Hand em outra.",
+    "img": "./assets/tarot/20-judgement.webp",
+    "fx": "judgement",
+    "fxLabel": "Julgamento digital",
+    "glyph": "☇",
+    "discard": "data-absolution",
+    "effects": [
+      {
+        "type": "criticalInjury",
+        "injury": "crushed_fingers",
+        "target": "victim"
+      },
+      {
+        "type": "criticalInjury",
+        "injury": "dismembered_hand",
+        "target": "victim"
+      }
+    ]
+  },
+  {
+    "n": "XXI",
+    "name": "The World",
+    "color": "#ffca3a",
+    "effect": "Quem causou ganha turno extra: +5 em testes, ignora Wound States e sem Death Save se Mortally Wounded.",
+    "img": "./assets/tarot/21-the-world.webp",
+    "fx": "world",
+    "fxLabel": "Rede orbital",
+    "glyph": "◉",
+    "discard": "orbital-seal",
+    "effects": [
+      {
+        "type": "status",
+        "id": "world_extra_turn",
+        "label_pt": "Turno extra: +5 em testes, ignora Wound States, sem Death Save se Mortally Wounded",
+        "duration": {
+          "value": 1,
+          "unit": "round"
+        },
+        "scope": "attacker",
+        "modifiers": {
+          "checkBonus": 5,
+          "ignoreWoundState": true,
+          "skipDeathSave": true
+        }
+      }
+    ]
+  }
+]

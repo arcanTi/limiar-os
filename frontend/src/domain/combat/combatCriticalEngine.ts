@@ -1,0 +1,17 @@
+export {
+  applyCriticalInjuryToTarget,
+  calculateBaseDeathSavePenalty,
+  detectCriticalInjuryFromDamageRoll,
+  getCriticalInjuryById,
+  getCriticalInjuryByRoll,
+  getCriticalInjuryTable,
+  isCriticalInjuryBlockedByImmunity,
+  normalizeCriticalInjuryId,
+  resolveCriticalInjuryEffects,
+  resolveCriticalInjuryForDamage,
+  resolveCriticalInjuryWithImmunity,
+  resolveHeadshotDamageMultiplier,
+  rollCriticalInjury,
+  rollCriticalInjuryAvoidingDuplicates,
+  selectCriticalInjuryTable,
+} from './criticalInjuryEngine.ts';

@@ -1,0 +1,273 @@
+[
+  [
+    "Concentration",
+    "WILL"
+  ],
+  [
+    "Conceal/Reveal Object",
+    "INT"
+  ],
+  [
+    "Lip Reading",
+    "INT"
+  ],
+  [
+    "Perception",
+    "INT"
+  ],
+  [
+    "Tracking",
+    "INT"
+  ],
+  [
+    "Athletics",
+    "DEX"
+  ],
+  [
+    "Contortionist",
+    "DEX"
+  ],
+  [
+    "Dance",
+    "DEX"
+  ],
+  [
+    "Endurance",
+    "WILL"
+  ],
+  [
+    "Resist Torture/Drugs",
+    "WILL"
+  ],
+  [
+    "Stealth",
+    "DEX"
+  ],
+  [
+    "Drive Land Vehicle",
+    "REF"
+  ],
+  [
+    "Pilot Air Vehicle",
+    "REF",
+    true
+  ],
+  [
+    "Pilot Sea Vehicle",
+    "REF"
+  ],
+  [
+    "Riding",
+    "REF"
+  ],
+  [
+    "Accounting",
+    "INT"
+  ],
+  [
+    "Animal Handling",
+    "INT"
+  ],
+  [
+    "Bureaucracy",
+    "INT"
+  ],
+  [
+    "Business",
+    "INT"
+  ],
+  [
+    "Composition",
+    "INT"
+  ],
+  [
+    "Criminology",
+    "INT"
+  ],
+  [
+    "Cryptography",
+    "INT"
+  ],
+  [
+    "Deduction",
+    "INT"
+  ],
+  [
+    "Education",
+    "INT"
+  ],
+  [
+    "Gamble",
+    "INT"
+  ],
+  [
+    "Language (Streetslang)",
+    "INT"
+  ],
+  [
+    "Library Search",
+    "INT"
+  ],
+  [
+    "Local Expert (Your Home)",
+    "INT"
+  ],
+  [
+    "Science",
+    "INT"
+  ],
+  [
+    "Tactics",
+    "INT"
+  ],
+  [
+    "Wilderness Survival",
+    "INT"
+  ],
+  [
+    "Brawling",
+    "DEX"
+  ],
+  [
+    "Evasion",
+    "DEX"
+  ],
+  [
+    "Martial Arts",
+    "DEX",
+    true
+  ],
+  [
+    "Melee Weapon",
+    "DEX"
+  ],
+  [
+    "Acting",
+    "COOL"
+  ],
+  [
+    "Play Instrument",
+    "TECH"
+  ],
+  [
+    "Archery",
+    "REF"
+  ],
+  [
+    "Autofire",
+    "REF",
+    true
+  ],
+  [
+    "Handgun",
+    "REF"
+  ],
+  [
+    "Heavy Weapons",
+    "REF",
+    true
+  ],
+  [
+    "Shoulder Arms",
+    "REF"
+  ],
+  [
+    "Bribery",
+    "COOL"
+  ],
+  [
+    "Conversation",
+    "EMP"
+  ],
+  [
+    "Human Perception",
+    "EMP"
+  ],
+  [
+    "Interrogation",
+    "COOL"
+  ],
+  [
+    "Persuasion",
+    "COOL"
+  ],
+  [
+    "Personal Grooming",
+    "COOL"
+  ],
+  [
+    "Streetwise",
+    "COOL"
+  ],
+  [
+    "Trading",
+    "COOL"
+  ],
+  [
+    "Wardrobe & Style",
+    "COOL"
+  ],
+  [
+    "Air Vehicle Tech",
+    "TECH"
+  ],
+  [
+    "Basic Tech",
+    "TECH"
+  ],
+  [
+    "Cybertech",
+    "TECH"
+  ],
+  [
+    "Demolitions",
+    "TECH",
+    true
+  ],
+  [
+    "Electronics/Security Tech",
+    "TECH",
+    true
+  ],
+  [
+    "First Aid",
+    "TECH"
+  ],
+  [
+    "Forgery",
+    "TECH"
+  ],
+  [
+    "Land Vehicle Tech",
+    "TECH"
+  ],
+  [
+    "Paint/Draw/Sculpt",
+    "TECH"
+  ],
+  [
+    "Paramedic",
+    "TECH",
+    true
+  ],
+  [
+    "Photography/Film",
+    "TECH"
+  ],
+  [
+    "Pick Lock",
+    "TECH"
+  ],
+  [
+    "Pick Pocket",
+    "TECH"
+  ],
+  [
+    "Sea Vehicle Tech",
+    "TECH"
+  ],
+  [
+    "Weaponstech",
+    "TECH"
+  ]
+]

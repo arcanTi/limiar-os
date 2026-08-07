@@ -1,0 +1,55 @@
+name: limiar-os
+
+services:
+  postgres:
+    image: postgres:18.4-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: limiar
+      POSTGRES_USER: limiar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD in .env}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - limiar-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U limiar -d limiar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8765
+      LIMIAR_DATABASE_URL: postgresql+psycopg://limiar:${POSTGRES_PASSWORD}@postgres:5432/limiar
+      LIMIAR_GM_USER: ${LIMIAR_GM_USER:-mestre}
+      LIMIAR_GM_PASSWORD: ${LIMIAR_GM_PASSWORD:?define LIMIAR_GM_PASSWORD in .env}
+      LIMIAR_SESSION_TTL: ${LIMIAR_SESSION_TTL:-28800}
+      LIMIAR_SESSION_TOUCH_INTERVAL: ${LIMIAR_SESSION_TOUCH_INTERVAL:-900}
+      LIMIAR_MAX_UPLOAD_MB: ${LIMIAR_MAX_UPLOAD_MB:-64}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    ports:
+      - "${LIMIAR_PORT:-8765}:8765"
+    volumes:
+      - limiar-uploads:/app/uploads
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  # This is the only PostgreSQL data store. `docker compose down --volumes`
+  # intentionally destroys it; there is no SQLite import or hidden DB volume.
+  limiar-postgres:
+  limiar-uploads:

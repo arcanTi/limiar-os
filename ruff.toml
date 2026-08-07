@@ -1,0 +1,40 @@
+line-length = 100
+
+[lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade (modernize syntax)
+    "S",        # bandit security
+    "B",        # bugbear
+    "SIM",      # simplify
+    "RET",      # return statements
+    "TRY",      # exception handling
+    "EM",       # exception messages (no f-strings in raise)
+    "ANN",      # type annotations
+    "RUF",      # ruff-specific
+    "LOG",      # logging
+    "D100",     # missing module docstring
+    "D101",     # missing class docstring
+    "D211",     # no blank line before class docstring
+    "D212",     # multi-line summary on first line
+]
+ignore = [
+    "D102",   # method docstrings — noise on 50+ handler methods
+    "D103",   # function docstrings — noise on internal helpers
+    "D107",   # __init__ docstrings
+    "LOG015", # root logger OK for single-file server script
+]
+
+[lint.per-file-ignores]
+"backend/tests/**/*.py" = [
+    "ANN",  # pytest fixtures/params are clearer without full test-only typing
+    "D100", # test module names describe the covered surface
+    "D101", # fake handlers are local test scaffolding
+    "S101", # pytest uses assert rewriting
+    "S105", # test credentials are inert fixtures
+    "S106", # test credentials are inert fixtures
+    "S107", # test credentials are inert fixtures
+]
