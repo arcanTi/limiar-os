@@ -18,6 +18,7 @@ export interface CombatState {
   order: string[];
   combatants: Record<string, CombatantEntry>;
   updatedAt: string;
+  revision?: number;
 }
 
 export function defaultCombatState(now: string = new Date().toISOString()): CombatState {
@@ -52,6 +53,9 @@ export function normalizeCombatState(payload: unknown, roster: { id?: string }[]
     order,
     combatants,
     updatedAt: src.updatedAt || now,
+    ...(Number.isInteger(src.revision) && Number(src.revision) >= 0
+      ? { revision: Number(src.revision) }
+      : {}),
   };
 }
 

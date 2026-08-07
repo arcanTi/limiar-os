@@ -17,8 +17,15 @@ export default class PersistCharacter {
     return characters.upsert(character);
   }
 
-  async patchNotes(id: string, patch: Record<string, unknown>): Promise<unknown> {
+  async patchNotes(
+    id: string,
+    patch: Record<string, unknown>,
+    expectedRevision?: number,
+  ): Promise<unknown> {
     if (!this.api?.characters?.patchNotes) return patch;
-    return this.api.characters.patchNotes(id, patch);
+    return this.api.characters.patchNotes(
+      id,
+      expectedRevision === undefined ? patch : { ...patch, expectedRevision },
+    );
   }
 }

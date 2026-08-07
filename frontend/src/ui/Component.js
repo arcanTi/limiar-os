@@ -1063,6 +1063,20 @@ class Component extends DCLogic {
   applyCharacterPatch(characterId, patch) {
     const current = (this.state.characters || []).find(c => c.id === characterId) || this.activeCharacter();
     const next = this.normalizeCharacter({ ...current, ...patch });
+    const applySaved = (savedRaw) => {
+      const saved = this.normalizeCharacter(savedRaw);
+      this.setState(s => ({
+        characters: (s.characters || []).map(c => c.id === saved.id ? saved : c),
+        credits: saved.id === s.activeCharacterId ? (saved.credits ?? s.credits) : s.credits,
+        base: saved.id === s.activeCharacterId ? (saved.base || s.base) : s.base,
+        equipped: saved.id === s.activeCharacterId ? this.normalizeEquipped(saved.equipped || s.equipped) : s.equipped,
+        owned: saved.id === s.activeCharacterId ? this.equippedCodes(saved.equipped || s.equipped) : s.owned,
+        health: saved.id === s.activeCharacterId ? (saved.health || s.health) : s.health,
+        ramUsed: saved.id === s.activeCharacterId ? (saved.ramUsed ?? s.ramUsed) : s.ramUsed,
+        gearItems: saved.id === s.activeCharacterId ? (saved.gear || s.gearItems) : s.gearItems,
+      }));
+      return saved;
+    };
     this._charactersTouched = true;
     this.setState(s => ({
       characters: (s.characters || []).map(c => c.id === next.id ? next : c),
@@ -1078,7 +1092,20 @@ class Component extends DCLogic {
       const writer = this.state.gmAuthenticated
         ? this.api().characters.upsert
         : (this.api().characters.createPlayer || this.api().characters.upsert);
-      return writer(next);
+      const persist = async (candidate) => applySaved(await writer(candidate));
+      return persist(next).catch(async (error) => {
+        if (!error || error.code !== 'REVISION_CONFLICT') throw error;
+        const latest = this.normalizeCharacter(await this.api().characters.get(characterId));
+        try {
+          const retried = await persist(this.normalizeCharacter({ ...latest, ...patch }));
+          this.flash('Ficha atualizada após mudança remota');
+          return retried;
+        } catch (retryError) {
+          applySaved(latest);
+          this.flash('A ficha mudou em outra sessão; recarregamos a versão atual');
+          throw retryError;
+        }
+      });
     }
     return Promise.resolve(next);
   }

@@ -5,7 +5,7 @@ import type { SessionSnapshot } from '../domain/auth/policies.ts';
 
 interface CombatStateApi {
   set: (state: CombatState & { updatedAt: string }) => Promise<unknown>;
-  endTurn?: (currentId: string) => Promise<CombatState>;
+  endTurn?: (currentId: string, expectedRevision: number) => Promise<CombatState>;
 }
 
 export interface EndTurnApi {
@@ -63,7 +63,9 @@ export default class EndTurn {
       return { ok: false, error: 'Backend de combate indisponivel' };
     }
     try {
-      const saved = await this.api.combat.state.endTurn(currentId as string);
+      const saved = await this.api.combat.state.endTurn(
+        currentId as string, combatState.revision ?? 0,
+      );
       return {
         ok: true,
         combatState: saved,

@@ -41,7 +41,7 @@ describe('application/EndTurn', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.path).toBe('player');
-    expect(api.combat.state.endTurn).toHaveBeenCalledWith('a');
+    expect(api.combat.state.endTurn).toHaveBeenCalledWith('a', 0);
     expect(result.chatMessage).toBe('FIM DE TURNO :: Rook');
   });
 

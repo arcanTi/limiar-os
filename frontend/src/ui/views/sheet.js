@@ -882,8 +882,28 @@ export function sheetHandlers(component) {
       component.setState(s => ({
         characters: (s.characters || []).map(c => c.id === characterId ? { ...c, ...patch } : c),
       }));
-      await component.app().persistCharacter.patchNotes(characterId, patch);
-      component.setState({ sheetNotesAutosave: 'saved' });
+      const current = (component.state.characters || []).find(c => c.id === characterId);
+      try {
+        const savedRaw = await component.app().persistCharacter.patchNotes(
+          characterId, patch, current && current.revision,
+        );
+        const saved = component.normalizeCharacter(savedRaw);
+        component.setState(s => ({
+          characters: (s.characters || []).map(c => c.id === saved.id ? saved : c),
+          sheetNotesAutosave: 'saved',
+        }));
+      } catch (error) {
+        if (error && error.code === 'REVISION_CONFLICT') {
+          const latest = component.normalizeCharacter(await component.api().characters.get(characterId));
+          component.setState(s => ({
+            characters: (s.characters || []).map(c => c.id === latest.id ? latest : c),
+            notesDraft: component.sheetHandlers().notesFieldsFrom(latest),
+          }));
+          component.flash('As notas mudaram em outra sessão; a versão atual foi recarregada');
+        }
+        component.setState({ sheetNotesAutosave: 'error' });
+        return;
+      }
       clearTimeout(component._notesAutosaveClearTimer);
       component._notesAutosaveClearTimer = setTimeout(() => {
         component.setState(s => s.sheetNotesAutosave === 'saved' ? { sheetNotesAutosave: null } : null);
