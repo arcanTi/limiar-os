@@ -2,7 +2,7 @@ import pytest
 from conftest import seed_fixture_campaigns, seed_session_users
 
 from backend.repositories import campaign_maps as maps
-from backend.repositories.records import set_setting, upsert_record
+from backend.repositories.records import set_campaign_setting, upsert_record
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +27,7 @@ def test_map_state_combat_block_reflects_active_turn(db_path):
     it is without a parallel fetch — active/round/turnCharacterId, no more
     (NPC secrecy is a token-visibility concern, unrelated to this block)."""
     campaign_id = "camp-1"
-    set_setting("combat-state", {
+    set_campaign_setting(campaign_id, "combat-state", {
         "active": True,
         "round": 3,
         "turnIndex": 1,
@@ -44,7 +44,7 @@ def test_map_state_combat_block_reflects_active_turn(db_path):
 
 def test_map_state_combat_block_skips_defeated_current_combatant(db_path):
     campaign_id = "camp-1"
-    set_setting("combat-state", {
+    set_campaign_setting(campaign_id, "combat-state", {
         "active": True,
         "round": 1,
         "turnIndex": 0,
@@ -207,7 +207,7 @@ def test_resolve_template_denies_non_owner_non_staff(db_path):
 def test_resolve_template_stays_dimmed_for_gm_one_round_then_prunes(db_path):
     campaign_id = "camp-1"
     gm = {"username": "gm", "role": "gm"}
-    set_setting("combat-state", {
+    set_campaign_setting(campaign_id, "combat-state", {
         "active": True, "round": 1, "turnIndex": 0,
         "order": ["ganger"], "combatants": {"ganger": {"side": "enemy", "acted": False, "defeated": False}},
     })
@@ -218,14 +218,14 @@ def test_resolve_template_stays_dimmed_for_gm_one_round_then_prunes(db_path):
     assert [t["id"] for t in maps.list_templates(campaign_id, tpl["sceneId"], gm)] == [tpl["id"]]
 
     # One round later: still visible per the "one extra round" grace window.
-    set_setting("combat-state", {
+    set_campaign_setting(campaign_id, "combat-state", {
         "active": True, "round": 2, "turnIndex": 0,
         "order": ["ganger"], "combatants": {"ganger": {"side": "enemy", "acted": False, "defeated": False}},
     })
     assert [t["id"] for t in maps.list_templates(campaign_id, tpl["sceneId"], gm)] == [tpl["id"]]
 
     # Two rounds later: stale, lazily pruned even for the GM.
-    set_setting("combat-state", {
+    set_campaign_setting(campaign_id, "combat-state", {
         "active": True, "round": 3, "turnIndex": 0,
         "order": ["ganger"], "combatants": {"ganger": {"side": "enemy", "acted": False, "defeated": False}},
     })

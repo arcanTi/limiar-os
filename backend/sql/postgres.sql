@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS assets (
 );
 CREATE TABLE IF NOT EXISTS chat_messages (
   id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL,
   kind TEXT NOT NULL DEFAULT 'text',
   role TEXT NOT NULL DEFAULT 'player',
   sender TEXT,
@@ -96,6 +97,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at, id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_campaign_created ON chat_messages(campaign_id, created_at, id);
 CREATE TABLE IF NOT EXISTS campaigns (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -107,6 +109,14 @@ CREATE TABLE IF NOT EXISTS campaigns (
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS campaign_settings (
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  data JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (campaign_id, key)
 );
 CREATE TABLE IF NOT EXISTS campaign_members (
   campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,

@@ -56,12 +56,12 @@ def catalog() -> CatalogService:
 
 @lru_cache
 def chat() -> ChatService:
-    return ChatService(PostgresChatRepository())
+    return ChatService(PostgresChatRepository(), campaign_repository)
 
 
 @lru_cache
 def game_state() -> GameStateService:
-    return GameStateService(settings(), records())
+    return GameStateService(settings(), records(), campaign_repository)
 
 
 @lru_cache

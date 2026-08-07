@@ -78,6 +78,31 @@ def set_setting(key: str, payload: object) -> object:
     return payload
 
 
+def get_campaign_setting(campaign_id: str, key: str) -> object:
+    with db() as conn:
+        row = conn.execute(
+            "SELECT data FROM campaign_settings WHERE campaign_id = %s AND key = %s",
+            (campaign_id, key),
+        ).fetchone()
+    if not row or row["data"] is None:
+        return None
+    return row["data"] if isinstance(row["data"], dict | list) else json.loads(row["data"])
+
+
+def set_campaign_setting(campaign_id: str, key: str, payload: object) -> object:
+    data = None if payload is None else json.dumps(payload, ensure_ascii=False)
+    with db() as conn:
+        conn.execute(
+            """
+            INSERT INTO campaign_settings(campaign_id, key, data) VALUES (%s, %s, %s)
+            ON CONFLICT(campaign_id, key) DO UPDATE
+            SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+            """,
+            (campaign_id, key, data),
+        )
+    return payload
+
+
 def get_reference(name: str) -> object:
     """Serve a static reference JSON file from data/seed/<name>.json."""
     path = REFERENCE_DIR / f"{name}.json"

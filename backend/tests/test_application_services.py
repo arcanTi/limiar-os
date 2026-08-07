@@ -35,12 +35,24 @@ class MemorySettings:
     def __init__(self, rows=None):
         self.rows = rows or {}
 
-    def get(self, key):
-        return self.rows.get(key)
+    def get(self, campaign_id, key):
+        return self.rows.get((campaign_id, key))
 
-    def set(self, key, payload):
-        self.rows[key] = payload
+    def set(self, campaign_id, key, payload):
+        self.rows[(campaign_id, key)] = payload
         return payload
+
+
+class MemoryCampaigns:
+    def __init__(self, campaign_ids=("mesa",)):
+        self.campaign_ids = set(campaign_ids)
+
+    def get_campaign(self, campaign_id):
+        return {"id": campaign_id} if campaign_id in self.campaign_ids else None
+
+    @staticmethod
+    def is_campaign_member(_campaign_id, _session):
+        return True
 
 
 class MemoryIdentity:
@@ -104,24 +116,25 @@ def test_character_service_stamps_schema_and_owner():
 
 def test_end_turn_policy_advances_owned_combatant():
     records = MemoryRecords({"characters": {"ana": {"id": "ana", "ownerUsername": "ana"}}})
-    settings = MemorySettings({"combat-state": {
+    settings = MemorySettings({("mesa", "combat-state"): {
         "active": True,
         "round": 1,
         "turnIndex": 0,
         "order": ["ana"],
         "combatants": {"ana": {"defeated": False}},
     }})
-    service = GameStateService(settings, records)
-    result = service.end_turn("ana", {"username": "ana", "role": "player"})
+    service = GameStateService(settings, records, MemoryCampaigns())
+    result = service.end_turn("mesa", "ana", {"username": "ana", "role": "player"})
     assert result["round"] == 2
     assert result["turnIndex"] == 0
 
 
 def test_end_turn_rejects_another_players_character():
     records = MemoryRecords({"characters": {"ana": {"id": "ana", "ownerUsername": "ana"}}})
-    service = GameStateService(MemorySettings({"combat-state": {}}), records)
+    settings = MemorySettings({("mesa", "combat-state"): {}})
+    service = GameStateService(settings, records, MemoryCampaigns())
     with pytest.raises(ApplicationError, match="Not your combatant"):
-        service.end_turn("ana", {"username": "bruno", "role": "player"})
+        service.end_turn("mesa", "ana", {"username": "bruno", "role": "player"})
 
 
 def test_campaign_map_service_checks_membership_and_editor_role():
@@ -176,7 +189,7 @@ def test_session_service_renews_once_inside_touch_window():
 
 
 def test_campaign_event_service_authorizes_and_hides_adapters():
-    now = datetime(2026, 8, 6, 12, tzinfo=UTC)
+    now = datetime.now(UTC)
     identity = MemoryIdentity({"token": {
         "token": "token",
         "username": "ana",

@@ -69,5 +69,5 @@ def map_state(campaign_id: str, session: dict[str, str]) -> dict[str, Any]:
         "canEdit": staff,
         "username": session["username"],
         "mapVersion": map_update_version(campaign_id),
-        "combat": _combat_summary(),
+        "combat": _combat_summary(campaign_id),
     }

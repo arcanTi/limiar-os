@@ -4,10 +4,10 @@ from ..config import UPLOAD_DIR
 from .chat import append_chat, clear_chat, list_chat
 from .records import (
     delete_record,
+    get_campaign_setting,
     get_record,
-    get_setting,
     list_records,
-    set_setting,
+    set_campaign_setting,
     upsert_record,
 )
 
@@ -21,9 +21,9 @@ class PostgresRecordRepository:
 
 
 class PostgresSettingRepository:
-    """Adapter over PostgreSQL settings."""
-    get = staticmethod(get_setting)
-    set = staticmethod(set_setting)
+    """Adapter over campaign-scoped PostgreSQL settings."""
+    get = staticmethod(get_campaign_setting)
+    set = staticmethod(set_campaign_setting)
 
 
 class PostgresChatRepository:

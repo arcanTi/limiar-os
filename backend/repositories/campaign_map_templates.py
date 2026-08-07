@@ -13,7 +13,7 @@ from .campaign_map_common import (
     touch_map_update,
 )
 from .campaign_map_scenes import active_scene
-from .records import get_setting
+from .records import get_campaign_setting
 
 TEMPLATE_KINDS = ("circle", "cone", "rectangle", "ray")
 TEMPLATE_LIFECYCLES = ("manual", "untilResolved", "untilTurnEnd")
@@ -53,7 +53,7 @@ def _prune_resolved_templates(conn: Any, campaign_id: str, scene_id: str, combat
 
 
 def list_templates(campaign_id: str, scene_id: str, session: dict[str, str] | None = None) -> list[dict[str, Any]]:
-    combat = _combat_summary()
+    combat = _combat_summary(campaign_id)
     with db() as conn:
         _prune_resolved_templates(conn, campaign_id, scene_id, combat)
         rows = conn.execute(
@@ -152,8 +152,8 @@ def delete_template(campaign_id: str, template_id: str, session: dict[str, str])
     return cur.rowcount > 0
 
 
-def _combat_summary() -> dict[str, Any]:
-    state = get_setting("combat-state") or {}
+def _combat_summary(campaign_id: str) -> dict[str, Any]:
+    state = get_campaign_setting(campaign_id, "combat-state") or {}
     order = state.get("order") if isinstance(state.get("order"), list) else []
     combatants = state.get("combatants") if isinstance(state.get("combatants"), dict) else {}
     turn_index = state.get("turnIndex") if isinstance(state.get("turnIndex"), int) else -1
@@ -169,7 +169,7 @@ def _combat_summary() -> dict[str, Any]:
 
 def resolve_template(campaign_id: str, template_id: str, expected_revision: Any, session: dict[str, str]) -> dict[str, Any] | None:
     """None: not found or caller isn't the owner/staff — route maps that to 403/404."""
-    combat = _combat_summary()
+    combat = _combat_summary(campaign_id)
     with db() as conn:
         row = conn.execute(
             "SELECT * FROM campaign_map_templates WHERE id = %s AND campaign_id = %s",

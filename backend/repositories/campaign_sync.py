@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from ..db import db
 
-TOPICS = ("map", "chat", "combat", "roster")
+TOPICS = ("map", "chat", "combat", "roster", "tarot", "hq", "nexus")
 _LOG_LIMIT = 200
 _POLL_SECONDS = 0.1
 

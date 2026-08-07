@@ -4,41 +4,56 @@ from ..domain.access import is_staff, owns_character
 from ..domain.validation import validate_hq
 from ..util import utc_now_iso
 from .errors import ApplicationError
-from .ports import Record, RecordRepository, Session, SettingRepository
+from .ports import CampaignAccessRepository, Record, RecordRepository, Session, SettingRepository
 
 
 class GameStateService:
     """Coordinate the shared state machines stored in PostgreSQL."""
-    def __init__(self, settings: SettingRepository, records: RecordRepository) -> None:
+    def __init__(
+        self,
+        settings: SettingRepository,
+        records: RecordRepository,
+        campaigns: CampaignAccessRepository,
+    ) -> None:
         self.settings = settings
         self.records = records
+        self.campaigns = campaigns
 
-    def get(self, key: str, default: object = None) -> object:
-        return self.settings.get(key) or default
+    def get(self, campaign_id: str, key: str, session: Session, default: object = None) -> object:
+        self._member(campaign_id, session)
+        return self.settings.get(campaign_id, key) or default
 
-    def report_nexus(self, payload: Record) -> object:
-        return self.settings.set("nexusResult", {**payload, "reportedAt": utc_now_iso()})
+    def report_nexus(self, campaign_id: str, payload: Record, session: Session) -> object:
+        self._member(campaign_id, session)
+        result = {**payload, "reportedAt": utc_now_iso()}
+        return self.settings.set(campaign_id, "nexusResult", result)
 
-    def set_nexus(self, payload: Record) -> object:
-        self.settings.set("nexusResult", None)
-        return self.settings.set("nexusChallenge", {**payload, "updatedAt": utc_now_iso()})
+    def set_nexus(self, campaign_id: str, payload: Record, session: Session) -> object:
+        self._member(campaign_id, session)
+        self.settings.set(campaign_id, "nexusResult", None)
+        challenge = {**payload, "updatedAt": utc_now_iso()}
+        return self.settings.set(campaign_id, "nexusChallenge", challenge)
 
-    def set_hq(self, payload: Record) -> object:
-        return self.settings.set("hqIp", validate_hq(payload))
+    def set_hq(self, campaign_id: str, payload: Record, session: Session) -> object:
+        self._member(campaign_id, session)
+        return self.settings.set(campaign_id, "hqIp", validate_hq(payload))
 
-    def set_tarot(self, payload: Record) -> object:
-        return self.settings.set("tarot-state", payload)
+    def set_tarot(self, campaign_id: str, payload: Record, session: Session) -> object:
+        self._member(campaign_id, session)
+        return self.settings.set(campaign_id, "tarot-state", payload)
 
-    def set_combat(self, payload: Record) -> object:
-        return self.settings.set("combat-state", payload)
+    def set_combat(self, campaign_id: str, payload: Record, session: Session) -> object:
+        self._member(campaign_id, session)
+        return self.settings.set(campaign_id, "combat-state", payload)
 
-    def end_turn(self, target_id: str, session: Session) -> object:
+    def end_turn(self, campaign_id: str, target_id: str, session: Session) -> object:
+        self._member(campaign_id, session)
         if not is_staff(session):
             character = self.records.get("characters", target_id)
             if not owns_character(character, session):
                 raise ApplicationError(403, "Not your combatant", "NOT_YOUR_COMBATANT")
 
-        state = self.settings.get("combat-state") or {}
+        state = self.settings.get(campaign_id, "combat-state") or {}
         if not isinstance(state, dict):
             state = {}
         combatants = state.get("combatants") if isinstance(state.get("combatants"), dict) else {}
@@ -88,6 +103,7 @@ class GameStateService:
             next_turn_index = first_active
 
         return self.settings.set(
+            campaign_id,
             "combat-state",
             {
                 **state,
@@ -97,3 +113,9 @@ class GameStateService:
                 "updatedAt": utc_now_iso(),
             },
         )
+
+    def _member(self, campaign_id: str, session: Session) -> None:
+        if not self.campaigns.get_campaign(campaign_id):
+            raise ApplicationError(404, "Campaign not found")
+        if not self.campaigns.is_campaign_member(campaign_id, dict(session)):
+            raise ApplicationError(403, "Campaign access denied")

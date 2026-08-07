@@ -8,10 +8,11 @@ from ..db import db
 from ..domain.validation import sanitize_payload, sanitize_text
 
 
-def list_chat() -> list[dict[str, object]]:
+def list_chat(campaign_id: str) -> list[dict[str, object]]:
     with db() as conn:
         rows = conn.execute(
-            "SELECT * FROM chat_messages ORDER BY created_at, id",
+            "SELECT * FROM chat_messages WHERE campaign_id = %s ORDER BY created_at, id",
+            (campaign_id,),
         ).fetchall()
     result: list[dict[str, object]] = []
     for row in rows:
@@ -19,6 +20,7 @@ def list_chat() -> list[dict[str, object]]:
         extra: dict[str, object] = raw_extra if isinstance(raw_extra, dict) else json.loads(raw_extra)
         msg: dict[str, object] = {
             "id": row["id"],
+            "campaignId": row["campaign_id"],
             "kind": row["kind"],
             "role": row["role"],
             "sender": row["sender"],
@@ -34,7 +36,7 @@ def list_chat() -> list[dict[str, object]]:
     return result
 
 
-def append_chat(message: dict[str, object], role: str) -> dict[str, object]:
+def append_chat(campaign_id: str, message: dict[str, object], role: str) -> dict[str, object]:
     kind_raw = message.get("kind")
     kind: str = kind_raw if kind_raw in ("text", "roll", "request") else "text"
     msg_id = secrets.token_hex(8)
@@ -52,6 +54,7 @@ def append_chat(message: dict[str, object], role: str) -> dict[str, object]:
     }
     entry: dict[str, object] = {
         "id": msg_id,
+        "campaignId": campaign_id,
         "role": db_role,
         "sender": sender,
         "kind": kind,
@@ -63,10 +66,11 @@ def append_chat(message: dict[str, object], role: str) -> dict[str, object]:
     }
     with db() as conn:
         conn.execute(
-            "INSERT INTO chat_messages(id, kind, role, sender, text, at, targetId, extra)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            "INSERT INTO chat_messages(id, campaign_id, kind, role, sender, text, at, targetId, extra)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 msg_id,
+                campaign_id,
                 kind,
                 db_role,
                 sender,
@@ -76,16 +80,20 @@ def append_chat(message: dict[str, object], role: str) -> dict[str, object]:
                 json.dumps(extra, ensure_ascii=False),
             ),
         )
-        excess = conn.execute("SELECT COUNT(*) AS count FROM chat_messages").fetchone()["count"] - CHAT_LIMIT
+        excess = conn.execute(
+            "SELECT COUNT(*) AS count FROM chat_messages WHERE campaign_id = %s",
+            (campaign_id,),
+        ).fetchone()["count"] - CHAT_LIMIT
         if excess > 0:
             conn.execute(
-                "DELETE FROM chat_messages WHERE id IN"
-                " (SELECT id FROM chat_messages ORDER BY created_at ASC, id ASC LIMIT %s)",
-                (excess,),
+                "DELETE FROM chat_messages WHERE id IN ("
+                "SELECT id FROM chat_messages WHERE campaign_id = %s "
+                "ORDER BY created_at ASC, id ASC LIMIT %s)",
+                (campaign_id, excess),
             )
     return entry
 
 
-def clear_chat() -> None:
+def clear_chat(campaign_id: str) -> None:
     with db() as conn:
-        conn.execute("DELETE FROM chat_messages")
+        conn.execute("DELETE FROM chat_messages WHERE campaign_id = %s", (campaign_id,))
