@@ -12,10 +12,10 @@ resolving a route, and this module proves it two ways:
    cannot quietly skip the check above.
 """
 
+import re
 from http import HTTPStatus
 
 import pytest
-from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from backend.asgi import create_app
@@ -35,18 +35,21 @@ PUBLIC_ROUTES = {
 
 
 def route_probes() -> list[tuple[str, str, str]]:
-    """Discover every HTTP API route; newly added routes are tested automatically."""
+    """Discover API routes through the public OpenAPI contract.
+
+    FastAPI 0.141 keeps included routers nested instead of flattening every
+    ``APIRoute`` into ``app.routes``.  OpenAPI is the stable public inventory
+    of HTTP operations and keeps this security test independent of FastAPI's
+    internal router representation.
+    """
     probes: list[tuple[str, str, str]] = []
-    for route in create_app().routes:
-        if not isinstance(route, APIRoute) or not route.path.startswith("/api/"):
+    http_methods = {"get", "post", "put", "patch", "delete", "trace"}
+    for path, path_item in create_app().openapi()["paths"].items():
+        if not path.startswith("/api/"):
             continue
-        path = route.path
-        concrete = path
-        for parameter in route.param_convertors:
-            concrete = concrete.replace("{" + parameter + "}", "probe-id")
-        for method in sorted(route.methods or ()):
-            if method not in {"HEAD", "OPTIONS"}:
-                probes.append((method, path, concrete))
+        concrete = re.sub(r"\{[^{}]+\}", "probe-id", path)
+        for method in sorted(http_methods.intersection(path_item)):
+            probes.append((method.upper(), path, concrete))
     return probes
 
 

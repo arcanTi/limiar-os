@@ -14,6 +14,17 @@ The technical roadmap and acceptance criteria live in [`docs/ROADMAP.md`](./docs
 The latest evidence-based repository score lives in
 [`docs/REPOSITORY-HEALTH.md`](./docs/REPOSITORY-HEALTH.md).
 
+## Contribution and automation policy
+
+Before changing this repository, read [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+and [`AGENTS.md`](./AGENTS.md). Work must happen on a dedicated branch and pass
+the protected `main` gates. Agents and controllers must not commit, push,
+create or merge pull requests, deploy, change GitHub settings, or bypass hooks,
+architecture tests and CI policies without explicit authorization.
+
+The enforced checks and branch protection contract are documented in
+[`docs/CI-PIPELINE.md`](./docs/CI-PIPELINE.md).
+
 ## Screenshots
 
 | Login | Character sheet | Tactical Mesa |
@@ -314,6 +325,10 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Para producao em uma VM Linux no Proxmox, nao use `--build` na VM. A CI publica
+uma imagem imutavel no GHCR e o workflow faz backup, migration, deploy e health
+check seguindo o [runbook de producao](docs/DEPLOY-PROXMOX-VM.md).
+
 Use a URL-safe PostgreSQL password such as `openssl rand -hex 32`; Compose
 constructs `LIMIAR_DATABASE_URL` from that same value, so database credentials
 cannot drift between the two services.
@@ -430,7 +445,7 @@ these artifacts from source; they must not be committed.
 Backend:
 
 ```bash
-python3 -m pip install -r requirements-dev.txt
+python3 -m pip install --require-hashes -r requirements-dev.txt
 ./scripts/test-backend-postgres.sh
 ```
 
