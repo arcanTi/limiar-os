@@ -8,6 +8,11 @@ Ao participar, você concorda com o [Código de Conduta](CODE_OF_CONDUCT.md).
 Vulnerabilidades devem seguir a [Política de Segurança](SECURITY.md), nunca uma
 issue pública.
 
+Agentes de código, assistentes e controladores automatizados também devem
+seguir as [regras operacionais do repositório](AGENTS.md). Uma autorização para
+editar arquivos não autoriza implicitamente commit, push, pull request, merge,
+deploy ou alteração de configurações externas.
+
 ## Antes de começar
 
 1. Procure uma issue existente antes de abrir outra.

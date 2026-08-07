@@ -14,6 +14,17 @@ The technical roadmap and acceptance criteria live in [`docs/ROADMAP.md`](./docs
 The latest evidence-based repository score lives in
 [`docs/REPOSITORY-HEALTH.md`](./docs/REPOSITORY-HEALTH.md).
 
+## Contribution and automation policy
+
+Before changing this repository, read [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+and [`AGENTS.md`](./AGENTS.md). Work must happen on a dedicated branch and pass
+the protected `main` gates. Agents and controllers must not commit, push,
+create or merge pull requests, deploy, change GitHub settings, or bypass hooks,
+architecture tests and CI policies without explicit authorization.
+
+The enforced checks and branch protection contract are documented in
+[`docs/CI-PIPELINE.md`](./docs/CI-PIPELINE.md).
+
 ## Screenshots
 
 | Login | Character sheet | Tactical Mesa |
