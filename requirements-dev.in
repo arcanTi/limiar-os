@@ -1,7 +1,7 @@
 -r requirements.in
 pytest
-# Required by Starlette's TestClient, used throughout backend/tests.
-httpx>=0.27,<0.29
+# Preferred transport for Starlette's TestClient, used throughout backend/tests.
+httpx2>=2.9,<3
 # Collect an honest backend baseline in CI before enforcing a minimum.
 pytest-cov>=7,<8
 # Usado por scripts/ruff-baseline.py, que roda no CI. A versao fica fixada
