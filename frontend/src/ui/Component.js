@@ -341,6 +341,7 @@ class Component extends DCLogic {
   async applyCampaignSyncTopics(topics) {
     if (topics.includes('chat')) await this.refreshChat();
     if (topics.includes('roster') || topics.includes('combat')) await this.refreshRoster();
+    if (topics.some(topic => ['tarot', 'hq', 'nexus'].includes(topic))) await this.reloadRemoteData();
   }
 
   get products() {
@@ -451,16 +452,17 @@ class Component extends DCLogic {
 
   async reloadRemoteData() {
     if (!this.api()) return;
+    const hasCampaign = Boolean(this.state.activeCampaignId);
     try {
       const [characters, products, mapLocations, nexusChallenge, nexusResult, hqIp, tarotStateRaw, combatStateRaw] = await Promise.all([
         this.api().characters.list(),
         this.api().items.list(),
         this.api().map.list(),
-        this.api().nexus ? this.api().nexus.get() : Promise.resolve(null),
-        this.api().nexus ? this.api().nexus.getResult() : Promise.resolve(null),
-        this.api().hq ? this.api().hq.get() : Promise.resolve(null),
-        this.api().tarot && this.api().tarot.state ? this.api().tarot.state.get() : Promise.resolve(null),
-        this.api().combat && this.api().combat.state ? this.api().combat.state.get() : Promise.resolve(null),
+        hasCampaign && this.api().nexus ? this.api().nexus.get() : Promise.resolve(null),
+        hasCampaign && this.api().nexus ? this.api().nexus.getResult() : Promise.resolve(null),
+        hasCampaign && this.api().hq ? this.api().hq.get() : Promise.resolve(null),
+        hasCampaign && this.api().tarot && this.api().tarot.state ? this.api().tarot.state.get() : Promise.resolve(null),
+        hasCampaign && this.api().combat && this.api().combat.state ? this.api().combat.state.get() : Promise.resolve(null),
       ]);
       this._catalogProducts = products || [];
       const tarotState = await this.tarotHandlers().ensureTarotState(tarotStateRaw);
@@ -1443,6 +1445,7 @@ class Component extends DCLogic {
   }
   async postChat(message) {
     if (!(this.api() && this.api().chat)) return;
+    if (!this.state.activeCampaignId) return;
     const active = this.activeCharacter();
     const payload = {
       sender: this.state.gm ? 'MESTRE' : (active.name || 'OPERATIVO'),
@@ -1455,6 +1458,7 @@ class Component extends DCLogic {
   }
   async refreshChat() {
     if (!(this.api() && this.api().chat)) return;
+    if (!this.state.activeCampaignId) return;
     try {
       const list = await this.api().chat.list();
       if (!Array.isArray(list)) return;
@@ -1482,7 +1486,9 @@ class Component extends DCLogic {
     try {
       const [characters, combatStateRaw] = await Promise.all([
         this.api().characters.list(),
-        this.api().combat && this.api().combat.state ? this.api().combat.state.get() : Promise.resolve(null),
+        this.state.activeCampaignId && this.api().combat && this.api().combat.state
+          ? this.api().combat.state.get()
+          : Promise.resolve(null),
       ]);
       if (!Array.isArray(characters)) return;
       const normalizedCharacters = this.normalizeCharacterList(characters);

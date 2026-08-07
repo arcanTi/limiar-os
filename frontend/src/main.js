@@ -13,11 +13,11 @@ import { mountOnboardingWizard } from './ui/views/onboarding.js';
 import { createApplication } from './application/createApplication.ts';
 
 // Defaults previously declared via the script tag's data-props attribute.
-const api = createLimiarAPI();
-const app = createApplication({ api });
 const params = new URLSearchParams(location.search);
 const activeCampaignId = params.get('campaign') || '';
 const wantsToJoin = params.get('join') === '1';
+const api = createLimiarAPI({ campaignId: activeCampaignId });
+const app = createApplication({ api });
 
 mountComponent(Component, {
   scanlines: true,

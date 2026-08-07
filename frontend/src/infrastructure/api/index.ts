@@ -15,10 +15,15 @@ import { createCommsApi } from './comms.ts';
 import { createUploadsApi } from './uploads.ts';
 import { createUsersApi } from './users.ts';
 
-export function createLimiarAPI(options: HttpClientOptions = {}) {
+export interface LimiarApiOptions extends HttpClientOptions {
+  campaignId?: string;
+}
+
+export function createLimiarAPI(options: LimiarApiOptions = {}) {
   const http = createHttpClient(options);
+  const campaignId = options.campaignId || '';
   const catalog = createCatalogApi(http.request);
-  const comms = createCommsApi(http.request);
+  const comms = createCommsApi(http.request, campaignId);
   const waitForCampaignEvent = createCampaignEventWaiter({
     remoteBaseUrl: http.remoteBaseUrl,
     token: http.token,
@@ -34,10 +39,10 @@ export function createLimiarAPI(options: HttpClientOptions = {}) {
     catalog,
     items: catalog,
     map: createMapApi(http.request),
-    nexus: createNexusApi(http.request),
-    hq: createHqApi(http.request),
-    tarot: createTarotApi(http.request),
-    combat: createCombatApi(http.request),
+    nexus: createNexusApi(http.request, campaignId),
+    hq: createHqApi(http.request, campaignId),
+    tarot: createTarotApi(http.request, campaignId),
+    combat: createCombatApi(http.request, campaignId),
     comms,
     chat: comms,
     uploads: createUploadsApi(http),

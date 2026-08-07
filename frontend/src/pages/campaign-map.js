@@ -29,9 +29,9 @@ import { createMapDataRuntime } from './campaignMapDataRuntime.js';
 import * as selectors from './campaignMapSelectors.js';
 
 "use strict";
-const limiarApi = createLimiarAPI();
 const params = new URLSearchParams(location.search);
 const campaignId = params.get("campaign") || "";
+const limiarApi = createLimiarAPI({ campaignId });
 const state = { session:null, canEdit:false, scene:null, scenes:[], tokens:[], fogAreas:[], reveals:[], templates:[], walls:[], props:[], lights:[], drawings:[], pins:[], mapVersion:0, selected:null, selectedIds:[], hoverTokenId:null, selectedTemplateId:null, selectedPropId:null, templateDraft:null, wallDraft:null, propDraft:null, lightDraft:null, drawingDraft:null, tool:"select", showGrid:true, snap:false, runMode:false, camera:{x:0,y:0,zoom:1}, mapImage:null, tokenImages:new Map(), measure:null, fogDraft:null, difficultCells:new Set(), characterMoveCache:new Map(), selectedMoveCells:null, pingAnims:new Map(), combat:{active:false,roundNumber:0,turnCharacterId:null} };
 const PING_ANIM_MS = 3000, PING_KEEP_MS = 20000;
 const canvas = byId("canvas"), ctx = canvas.getContext("2d");
