@@ -69,9 +69,21 @@ def upsert_revisioned_record(
             if expected_revision not in {None, 0}:
                 _raise_revision_conflict("character", record_id, expected_revision, None)
             row = conn.execute(
-                f"INSERT INTO {table}({column_sql}) VALUES ({placeholders}) RETURNING *",  # noqa: S608
+                f"INSERT INTO {table}({column_sql}) VALUES ({placeholders}) "  # noqa: S608
+                "ON CONFLICT(id) DO NOTHING RETURNING *",
                 params,
             ).fetchone()
+            if row is None:
+                raced = conn.execute(
+                    f"SELECT revision FROM {table} WHERE id = %s",  # noqa: S608
+                    (record_id,),
+                ).fetchone()
+                _raise_revision_conflict(
+                    "character",
+                    record_id,
+                    expected_revision,
+                    int(raced["revision"]) if raced else None,
+                )
         else:
             current_revision = int(current["revision"])
             if expected_revision is None:
@@ -88,8 +100,15 @@ def upsert_revisioned_record(
                 {**params, "expected_revision": expected_revision},
             ).fetchone()
             if row is None:
+                latest = conn.execute(
+                    f"SELECT revision FROM {table} WHERE id = %s",  # noqa: S608
+                    (record_id,),
+                ).fetchone()
                 _raise_revision_conflict(
-                    "character", record_id, expected_revision, current_revision
+                    "character",
+                    record_id,
+                    expected_revision,
+                    int(latest["revision"]) if latest else current_revision,
                 )
 
     return _row_to_dict(row, cfg["typed"])
