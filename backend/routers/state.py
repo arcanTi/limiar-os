@@ -71,4 +71,4 @@ def set_combat(campaign_id: str, payload: Document, session: Staff, service: Sta
 def end_turn(
     campaign_id: str, payload: EndTurnRequest, session: Authenticated, service: State
 ) -> object:
-    return service.end_turn(campaign_id, payload.target_id, session)
+    return service.end_turn(campaign_id, payload.target_id, payload.expected_revision, session)

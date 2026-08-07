@@ -56,7 +56,12 @@ def test_chat_state_and_events_do_not_cross_campaigns(db_path, make_session):
         assert denied.status_code == HTTPStatus.FORBIDDEN
 
         for suffix, payload_a, payload_b, field in (
-            ("combat-state", {"active": True, "round": 1}, {"active": True, "round": 2}, "round"),
+            (
+                "combat-state",
+                {"active": True, "round": 1, "expectedRevision": 0},
+                {"active": True, "round": 2, "expectedRevision": 0},
+                "round",
+            ),
             ("tarot-state", {"drawn": "a"}, {"drawn": "b"}, "drawn"),
             ("hq", {"ip": 1, "log": []}, {"ip": 2, "log": []}, "ip"),
             ("nexus-challenge", {"id": "a"}, {"id": "b"}, "id"),

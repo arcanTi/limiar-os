@@ -9,6 +9,7 @@ from .records import (
     list_records,
     set_campaign_setting,
     upsert_record,
+    upsert_revisioned_record,
 )
 
 
@@ -17,6 +18,7 @@ class PostgresRecordRepository:
     list = staticmethod(list_records)
     get = staticmethod(get_record)
     upsert = staticmethod(upsert_record)
+    upsert_revisioned = staticmethod(upsert_revisioned_record)
     delete = staticmethod(delete_record)
 
 

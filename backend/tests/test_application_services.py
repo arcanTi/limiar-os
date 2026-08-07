@@ -27,6 +27,14 @@ class MemoryRecords:
         self.rows.setdefault(kind, {})[payload["id"]] = payload
         return payload
 
+    def upsert_revisioned(self, kind, payload, expected_revision):
+        current = self.get(kind, payload["id"])
+        if current and expected_revision != current.get("revision", 0):
+            raise ApplicationError(409, "stale", "REVISION_CONFLICT")
+        saved = {**payload, "revision": (current or {}).get("revision", -1) + 1}
+        self.rows.setdefault(kind, {})[payload["id"]] = saved
+        return saved
+
     def delete(self, kind, record_id):
         return self.rows.get(kind, {}).pop(record_id, None) is not None
 
@@ -38,9 +46,20 @@ class MemorySettings:
     def get(self, campaign_id, key):
         return self.rows.get((campaign_id, key))
 
-    def set(self, campaign_id, key, payload):
-        self.rows[(campaign_id, key)] = payload
-        return payload
+    def set(self, campaign_id, key, payload, expected_revision=None):
+        current = self.get(campaign_id, key)
+        if (
+            expected_revision is not None
+            and expected_revision != (current or {}).get("revision", 0)
+        ):
+            raise ApplicationError(409, "stale", "REVISION_CONFLICT")
+        saved = (
+            {**payload, "revision": (current or {}).get("revision", -1) + 1}
+            if isinstance(payload, dict)
+            else payload
+        )
+        self.rows[(campaign_id, key)] = saved
+        return saved
 
 
 class MemoryCampaigns:
@@ -124,7 +143,7 @@ def test_end_turn_policy_advances_owned_combatant():
         "combatants": {"ana": {"defeated": False}},
     }})
     service = GameStateService(settings, records, MemoryCampaigns())
-    result = service.end_turn("mesa", "ana", {"username": "ana", "role": "player"})
+    result = service.end_turn("mesa", "ana", 0, {"username": "ana", "role": "player"})
     assert result["round"] == 2
     assert result["turnIndex"] == 0
 
@@ -134,7 +153,7 @@ def test_end_turn_rejects_another_players_character():
     settings = MemorySettings({("mesa", "combat-state"): {}})
     service = GameStateService(settings, records, MemoryCampaigns())
     with pytest.raises(ApplicationError, match="Not your combatant"):
-        service.end_turn("mesa", "ana", {"username": "bruno", "role": "player"})
+        service.end_turn("mesa", "ana", 0, {"username": "bruno", "role": "player"})
 
 
 def test_campaign_map_service_checks_membership_and_editor_role():

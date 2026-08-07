@@ -20,6 +20,7 @@ class EndTurnRequest(BaseModel):
     """Command selecting the combatant whose turn ends."""
 
     target_id: str = Field(alias="targetId", min_length=1, max_length=200)
+    expected_revision: int = Field(alias="expectedRevision", ge=0)
 
 
 class ErrorBody(BaseModel):

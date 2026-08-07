@@ -44,9 +44,17 @@ class GameStateService:
 
     def set_combat(self, campaign_id: str, payload: Record, session: Session) -> object:
         self._member(campaign_id, session)
-        return self.settings.set(campaign_id, "combat-state", payload)
+        expected_revision = self._expected_revision(payload)
+        state = {
+            key: value
+            for key, value in payload.items()
+            if key not in {"revision", "expectedRevision"}
+        }
+        return self.settings.set(campaign_id, "combat-state", state, expected_revision)
 
-    def end_turn(self, campaign_id: str, target_id: str, session: Session) -> object:
+    def end_turn(
+        self, campaign_id: str, target_id: str, expected_revision: int, session: Session
+    ) -> object:
         self._member(campaign_id, session)
         if not is_staff(session):
             character = self.records.get("characters", target_id)
@@ -112,7 +120,17 @@ class GameStateService:
                 "turnIndex": next_turn_index,
                 "updatedAt": utc_now_iso(),
             },
+            expected_revision,
         )
+
+    @staticmethod
+    def _expected_revision(payload: Record) -> int:
+        value = payload.get("expectedRevision")
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ApplicationError(
+                400, "expectedRevision must be a non-negative integer", "VALIDATION_ERROR"
+            )
+        return value
 
     def _member(self, campaign_id: str, session: Session) -> None:
         if not self.campaigns.get_campaign(campaign_id):

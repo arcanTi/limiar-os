@@ -3,6 +3,7 @@ settings, and static reference files."""
 
 import json
 
+from ..application.errors import ApplicationError
 from ..config import REFERENCE_DIR
 from ..db import _ALLOWED_TABLES, _DOMAIN, _dict_to_upsert, _row_to_dict, db
 from ..domain.validation import sanitize_payload
@@ -38,6 +39,60 @@ def upsert_record(kind: str, payload: dict[str, object]) -> dict[str, object]:
         conn.execute(sql, params)
     payload["id"] = record_id
     return payload
+
+
+def upsert_revisioned_record(
+    kind: str,
+    payload: dict[str, object],
+    expected_revision: int | None,
+) -> dict[str, object]:
+    """Atomically save a record only when its revision still matches."""
+    if kind != "characters":
+        msg = f"revisioned writes are not supported for {kind}"
+        raise RuntimeError(msg)
+    payload = sanitize_payload(dict(payload or {}))
+    cfg = _DOMAIN[kind]
+    record_id, params, _ = _dict_to_upsert(payload, cfg)
+    table = cfg["table"]
+    typed = cfg["typed"]
+    columns = [*typed, "extra"]
+    column_sql = ", ".join(columns)
+    placeholders = ", ".join(f"%({column})s" for column in columns)
+    updates = ", ".join(f"{column} = %({column})s" for column in columns if column != "id")
+
+    with db() as conn:
+        current = conn.execute(
+            f"SELECT revision FROM {table} WHERE id = %s",  # noqa: S608
+            (record_id,),
+        ).fetchone()
+        if current is None:
+            if expected_revision not in {None, 0}:
+                _raise_revision_conflict("character", record_id, expected_revision, None)
+            row = conn.execute(
+                f"INSERT INTO {table}({column_sql}) VALUES ({placeholders}) RETURNING *",  # noqa: S608
+                params,
+            ).fetchone()
+        else:
+            current_revision = int(current["revision"])
+            if expected_revision is None:
+                raise ApplicationError(
+                    400,
+                    "expectedRevision is required when updating a character",
+                    "EXPECTED_REVISION_REQUIRED",
+                )
+            row = conn.execute(
+                f"UPDATE {table} SET {updates}, revision = revision + 1, "  # noqa: S608
+                "updated_at = CURRENT_TIMESTAMP WHERE id = %(id)s "
+                "AND revision = %(expected_revision)s "
+                "RETURNING *",
+                {**params, "expected_revision": expected_revision},
+            ).fetchone()
+            if row is None:
+                _raise_revision_conflict(
+                    "character", record_id, expected_revision, current_revision
+                )
+
+    return _row_to_dict(row, cfg["typed"])
 
 
 def delete_record(kind: str, record_id: str) -> bool:
@@ -81,26 +136,92 @@ def set_setting(key: str, payload: object) -> object:
 def get_campaign_setting(campaign_id: str, key: str) -> object:
     with db() as conn:
         row = conn.execute(
-            "SELECT data FROM campaign_settings WHERE campaign_id = %s AND key = %s",
+            "SELECT data, revision FROM campaign_settings WHERE campaign_id = %s AND key = %s",
             (campaign_id, key),
         ).fetchone()
     if not row or row["data"] is None:
         return None
-    return row["data"] if isinstance(row["data"], dict | list) else json.loads(row["data"])
+    payload = row["data"] if isinstance(row["data"], dict | list) else json.loads(row["data"])
+    if isinstance(payload, dict):
+        return {**payload, "revision": int(row["revision"])}
+    return payload
 
 
-def set_campaign_setting(campaign_id: str, key: str, payload: object) -> object:
+def set_campaign_setting(
+    campaign_id: str,
+    key: str,
+    payload: object,
+    expected_revision: int | None = None,
+) -> object:
     data = None if payload is None else json.dumps(payload, ensure_ascii=False)
     with db() as conn:
-        conn.execute(
-            """
-            INSERT INTO campaign_settings(campaign_id, key, data) VALUES (%s, %s, %s)
-            ON CONFLICT(campaign_id, key) DO UPDATE
-            SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
-            """,
-            (campaign_id, key, data),
-        )
-    return payload
+        if expected_revision is None:
+            row = conn.execute(
+                """
+                INSERT INTO campaign_settings(campaign_id, key, data) VALUES (%s, %s, %s)
+                ON CONFLICT(campaign_id, key) DO UPDATE
+                SET data = excluded.data, updated_at = CURRENT_TIMESTAMP,
+                    revision = campaign_settings.revision + 1
+                RETURNING data, revision
+                """,
+                (campaign_id, key, data),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """
+                INSERT INTO campaign_settings(campaign_id, key, data) VALUES (%s, %s, %s)
+                ON CONFLICT(campaign_id, key) DO NOTHING
+                RETURNING data, revision
+                """,
+                (campaign_id, key, data),
+            ).fetchone()
+            if row is None:
+                row = conn.execute(
+                    """
+                    UPDATE campaign_settings
+                    SET data = %s, updated_at = CURRENT_TIMESTAMP, revision = revision + 1
+                    WHERE campaign_id = %s AND key = %s AND revision = %s
+                    RETURNING data, revision
+                    """,
+                    (data, campaign_id, key, expected_revision),
+                ).fetchone()
+            if row is None:
+                current = conn.execute(
+                    "SELECT revision FROM campaign_settings WHERE campaign_id = %s AND key = %s",
+                    (campaign_id, key),
+                ).fetchone()
+                _raise_revision_conflict(
+                    "campaign-setting",
+                    f"{campaign_id}:{key}",
+                    expected_revision,
+                    int(current["revision"]) if current else None,
+                )
+
+    if row["data"] is None:
+        return None
+    saved = row["data"] if isinstance(row["data"], dict | list) else json.loads(row["data"])
+    if isinstance(saved, dict):
+        return {**saved, "revision": int(row["revision"])}
+    return saved
+
+
+def _raise_revision_conflict(
+    resource: str,
+    resource_id: str,
+    expected_revision: int | None,
+    current_revision: int | None,
+) -> None:
+    raise ApplicationError(
+        409,
+        "This record was changed by another user. Reload and try again.",
+        "REVISION_CONFLICT",
+        {
+            "resource": resource,
+            "id": resource_id,
+            "expectedRevision": expected_revision,
+            "currentRevision": current_revision,
+        },
+    )
 
 
 def get_reference(name: str) -> object:

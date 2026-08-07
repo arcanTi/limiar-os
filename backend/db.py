@@ -127,6 +127,9 @@ def _row_to_dict(row: Mapping[str, object], typed_cols: tuple[str, ...]) -> dict
     extra_data: dict[str, object] = (
         raw_extra if isinstance(raw_extra, dict) else json.loads(str(raw_extra))
     )
+    revision = row.get("revision")
+    if revision is not None:
+        data["revision"] = int(revision)
     return {**data, **extra_data}
 
 
@@ -141,7 +144,11 @@ def _dict_to_upsert(
         if column != "id":
             params[column] = payload.get(column)
     params["extra"] = json.dumps(
-        {key: value for key, value in payload.items() if key not in set(typed)},
+        {
+            key: value
+            for key, value in payload.items()
+            if key not in {*typed, "revision", "expectedRevision"}
+        },
         ensure_ascii=False,
     )
     columns = [*list(typed), "extra"]

@@ -34,7 +34,7 @@ class CharacterService:
         }
         if not stamped.get("ownerUsername"):
             stamped["ownerUsername"] = session["username"]
-        return self._save(stamped)
+        return self._save(stamped, self._expected_revision(payload))
 
     def save_as_player(self, payload: Record, session: Session) -> Record:
         validate_character(payload)
@@ -47,7 +47,7 @@ class CharacterService:
             "ownerUsername": session["username"],
             "createdBy": current.get("createdBy") if current else session["username"],
         }
-        return self._save(stamped)
+        return self._save(stamped, self._expected_revision(payload))
 
     def patch_notes(self, record_id: str, payload: Record, session: Session) -> Record:
         current = self.records.get("characters", record_id)
@@ -56,10 +56,21 @@ class CharacterService:
         if not is_staff(session) and not owns_character(current, session):
             raise ApplicationError(403, "Character access denied")
         patch = {key: payload[key] for key in NOTES_FIELDS if key in payload}
-        return self._save({**current, **patch})
+        return self._save({**current, **patch}, self._expected_revision(payload))
 
     def delete(self, record_id: str) -> bool:
         return self.records.delete("characters", record_id)
 
-    def _save(self, payload: Record) -> Record:
-        return self.records.upsert("characters", payload)
+    @staticmethod
+    def _expected_revision(payload: Record) -> int | None:
+        value = payload.get("expectedRevision")
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ApplicationError(
+                400, "expectedRevision must be a non-negative integer", "VALIDATION_ERROR"
+            )
+        return value
+
+    def _save(self, payload: Record, expected_revision: int | None) -> Record:
+        return self.records.upsert_revisioned("characters", payload, expected_revision)

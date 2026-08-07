@@ -42,12 +42,12 @@ def combat_table(db_path, make_session):
     return campaign_id
 
 
-def end_turn(campaign_id: str, token: str, target_id: str):
+def end_turn(campaign_id: str, token: str, target_id: str, expected_revision: int = 0):
     with TestClient(create_app()) as client:
         return client.post(
             f"/api/campaigns/{campaign_id}/combat-state/end-turn",
             headers={"Authorization": f"Bearer {token}"},
-            json={"targetId": target_id},
+            json={"targetId": target_id, "expectedRevision": expected_revision},
         )
 
 
@@ -78,3 +78,21 @@ def test_gm_can_end_any_combatants_turn(combat_table, make_session):
 def test_unknown_character_is_rejected(combat_table, make_session):
     response = end_turn(combat_table, make_session("ana", role="player")["token"], "pc-ghost")
     assert response.status_code == HTTPStatus.FORBIDDEN
+
+
+def test_end_turn_rejects_a_stale_combat_revision(combat_table, make_session):
+    token = make_session("ana", role="player")["token"]
+    gm_token = make_session("mestre", role="gm")["token"]
+    assert end_turn(combat_table, token, "pc-ana", expected_revision=0).status_code == HTTPStatus.OK
+    response = end_turn(combat_table, gm_token, "pc-bruno", expected_revision=0)
+    assert response.status_code == HTTPStatus.CONFLICT
+    assert response.json()["error"] == {
+        "code": "REVISION_CONFLICT",
+        "message": "This record was changed by another user. Reload and try again.",
+        "details": {
+            "resource": "campaign-setting",
+            "id": f"{combat_table}:combat-state",
+            "expectedRevision": 0,
+            "currentRevision": 1,
+        },
+    }
