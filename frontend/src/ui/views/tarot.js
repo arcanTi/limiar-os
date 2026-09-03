@@ -590,7 +590,7 @@ export function tarotHandlers(component) {
     if (atom.type === 'deathSave') {
       const victim = tarotVictim();
       const target = (victim.derived && victim.derived.deathSave || 0) + (Number(atom.modifier) || 0);
-      component.roll({ label: 'TARO DEATH SAVE', sides: 10, count: 1, mod: 0, deathSaveTarget: target, skipActionPenalty: true, onResolved: (result) => {
+      component.roll({ label: 'TARO DEATH SAVE', sides: 10, count: 1, mod: 0, deathSaveTarget: target, skipActionPenalty: true, skipDeathSaveStreak: true, onResolved: (result) => {
         if (result.deathSavePassed) {
           updateTarotRow(rowId, { status: 'rolled', rolledTotal: result.total, note: row.note + ' // sucesso' });
           return;

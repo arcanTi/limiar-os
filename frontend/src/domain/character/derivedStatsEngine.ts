@@ -22,6 +22,7 @@ export type DerivedStatsInputStats = Partial<Record<CpredStat | string, unknown>
 export interface DerivedStatsCharacter {
   base?: DerivedStatsInputStats;
   humanityLoss?: unknown;
+  deathSavesPassed?: unknown;
   armor?: Partial<CharacterArmor> | null;
   shield?: Partial<CharacterShield> | null;
   equipped?: unknown[] | Record<string, unknown>;
@@ -37,11 +38,28 @@ export interface DeriveStatsInput {
   installedCyberware?: InstalledCyberwareItem[];
 }
 
+export type WoundState = 'healthy' | 'seriouslyWounded' | 'mortallyWounded';
+
+/** RAW wound state (CPR wound states): HP < 1 is Mortally Wounded. */
+export function woundStateFor(hpMax: number, healthCur: number): WoundState {
+  if (healthCur < 1) return 'mortallyWounded';
+  if (healthCur <= Math.ceil(hpMax / 2)) return 'seriouslyWounded';
+  return 'healthy';
+}
+
+export const CPRED_MORTAL_ACTION_PENALTY = 4;
+export const CPRED_SERIOUS_ACTION_PENALTY = 2;
+export const CPRED_MORTAL_MOVE_PENALTY = 6;
+export const CPRED_MORTAL_MOVE_MIN = 1;
+
 export interface DerivedStats {
   hpMax: number;
   seriouslyWounded: number;
+  woundState: WoundState;
   deathSave: number;
   deathSaveModifier: number;
+  /** Death Saves passed while Mortally Wounded; each adds +1 to the penalty. */
+  deathSavesPassed: number;
   humanityMax: number;
   humanityCurrent: number;
   cyberpsychosisActive: boolean;
@@ -57,6 +75,8 @@ export interface DerivedStats {
   actionPenalty: number;
   conditionActionPenalty: number;
   woundActionPenalty: number;
+  /** -6 MOVE (min 1) while Mortally Wounded. Included in `movePenalty`. */
+  woundMovePenalty: number;
   movePenalty: number;
   statPenalties: Record<string, number>;
   evasionMod: number;
@@ -72,8 +92,9 @@ export interface DerivedStats {
   effectiveStats: Record<CpredStat, number>;
 }
 
+/** CPR p.80: EMP is the tens digit of Humanity — 44 gives 4, 39 gives 3. */
 export function deriveEffectiveEmp(humanityCurrent: unknown): number {
-  return Math.max(0, Math.ceil((Number(humanityCurrent) || 0) / 10));
+  return Math.max(0, Math.floor((Number(humanityCurrent) || 0) / 10));
 }
 
 export function deriveStats({ stats, character, installedCyberware = [] }: DeriveStatsInput): DerivedStats {
@@ -98,18 +119,30 @@ export function deriveStats({ stats, character, installedCyberware = [] }: Deriv
   Object.keys(aggregate.statPenalties).forEach(k => { adjusted[k as CpredStat] = Math.max(0, (adjusted[k as CpredStat] || 0) - aggregate.statPenalties[k]); });
   const seriouslyWounded = Math.ceil(hpMax / 2);
   const healthCur = c.health && c.health.cur != null ? asNumber(c.health.cur, hpMax, 0, hpMax) : hpMax;
-  const woundStateActive = healthCur > 0 && healthCur <= seriouslyWounded;
-  const ignoresWoundPenalty = aggregate.ignoreSeriouslyWounded || aggregate.ignoreWoundState;
-  const woundActionPenalty = woundStateActive && !ignoresWoundPenalty ? 2 : 0;
+  const woundState = woundStateFor(hpMax, healthCur);
+  const mortal = woundState === 'mortallyWounded';
+  // "Ignore Seriously Wounded" (Tower) only covers that state; Mortally
+  // Wounded needs the broader ignoreWoundState.
+  const ignoresWoundPenalty = aggregate.ignoreWoundState || (!mortal && aggregate.ignoreSeriouslyWounded);
+  let woundActionPenalty = 0;
+  if (!ignoresWoundPenalty && mortal) woundActionPenalty = CPRED_MORTAL_ACTION_PENALTY;
+  else if (!ignoresWoundPenalty && woundState === 'seriouslyWounded') woundActionPenalty = CPRED_SERIOUS_ACTION_PENALTY;
+  const woundMovePenalty = mortal && !aggregate.ignoreWoundState ? CPRED_MORTAL_MOVE_PENALTY : 0;
+  if (woundMovePenalty) adjusted.MOVE = Math.max(CPRED_MORTAL_MOVE_MIN, (adjusted.MOVE || 0) - woundMovePenalty);
   const actionPenalty = aggregate.actionPenalty + woundActionPenalty;
-  const deathSaveModifier = -aggregate.deathSavePenalty;
+  // Each Death Save passed adds +1 to the penalty until stabilized;
+  // the counter lives on the record and only bites while Mortally Wounded.
+  const deathSavesPassed = mortal ? asNumber(c.deathSavesPassed, 0, 0, 50) : 0;
+  const deathSaveModifier = -(aggregate.deathSavePenalty + deathSavesPassed);
   const healingBody = applyCyberwareStatMods(base, installedCyberware).BODY || 0;
   const naturalHealing = naturalHealingPerRest(installedCyberware, healingBody);
   return {
     hpMax,
     seriouslyWounded,
+    woundState,
     deathSave: Math.max(0, (base.BODY || 0) + deathSaveModifier),
     deathSaveModifier,
+    deathSavesPassed,
     humanityMax,
     humanityCurrent,
     cyberpsychosisActive,
@@ -125,7 +158,8 @@ export function deriveStats({ stats, character, installedCyberware = [] }: Deriv
     actionPenalty,
     conditionActionPenalty: aggregate.actionPenalty,
     woundActionPenalty,
-    movePenalty: aggregate.movePenalty,
+    woundMovePenalty,
+    movePenalty: aggregate.movePenalty + woundMovePenalty,
     statPenalties: aggregate.statPenalties,
     evasionMod: aggregate.evasionMod,
     spAblation: aggregate.spAblation,
@@ -148,6 +182,7 @@ export function deriveStats({ stats, character, installedCyberware = [] }: Deriv
 // tactical map cares about: base MOVE, armor penalty, condition movePenalty.
 export function effectiveMoveStat(character: {
   base?: DerivedStatsInputStats;
+  health?: { cur?: unknown; max?: unknown } | null;
   armor?: Partial<CharacterArmor> | null;
   criticalInjuries?: CriticalInjuryInstance[];
   statusEffects?: StatusEffectInstance[];
@@ -160,5 +195,12 @@ export function effectiveMoveStat(character: {
   const armorPenalty = Math.max(armor.head.penalty || 0, armor.body.penalty || 0);
   const aggregate = aggregateConditions(c);
   const movePenalty = aggregate.statPenalties.MOVE || 0;
-  return Math.max(0, base - armorPenalty - movePenalty);
+  const move = Math.max(0, base - armorPenalty - movePenalty);
+  const stats = normalizeStats(c.base);
+  const hpMax = 10 + (5 * Math.ceil(((stats.BODY || 0) + (stats.WILL || 0)) / 2));
+  const healthCur = c.health && c.health.cur != null ? asNumber(c.health.cur, hpMax, 0, hpMax) : hpMax;
+  if (woundStateFor(hpMax, healthCur) === 'mortallyWounded' && !aggregate.ignoreWoundState) {
+    return Math.max(CPRED_MORTAL_MOVE_MIN, move - CPRED_MORTAL_MOVE_PENALTY);
+  }
+  return move;
 }

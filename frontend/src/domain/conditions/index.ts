@@ -212,6 +212,26 @@ export function aggregateConditions(character: {
     const modifiers = (status && status.modifiers) || {};
     out.actionPenalty -= (Number(modifiers.actionBonus) || Number(modifiers.checkBonus) || 0);
     out.evasionMod += Number(modifiers.evasionMod) || Number(modifiers.evasionVsMelee) || 0;
+    // Statuses express modifiers as signed bonuses (positive helps), unlike
+    // injuries, which list penalties as positive magnitudes. These three go
+    // straight into the accumulators rather than through addStatPenalty: that
+    // helper clamps to positive, which is right for an injury but would
+    // silently swallow a GM-authored buff.
+    const moveBonus = Number(modifiers.moveBonus) || 0;
+    if (moveBonus) {
+      out.movePenalty -= moveBonus;
+      out.statPenalties.MOVE = (out.statPenalties.MOVE || 0) - moveBonus;
+    }
+    out.deathSavePenalty -= Number(modifiers.deathSaveBonus) || 0;
+    const statBonus = modifiers.statBonus as Record<string, unknown> | undefined;
+    if (statBonus && typeof statBonus === 'object') {
+      Object.entries(statBonus).forEach(([stat, raw]) => {
+        const key = String(stat).toUpperCase();
+        if (!(CPRED_STAT_ORDER as string[]).includes(key)) return;
+        const bonus = Number(raw) || 0;
+        if (bonus) out.statPenalties[key] = (out.statPenalties[key] || 0) - bonus;
+      });
+    }
     if (modifiers.ignoreSeriouslyWounded) out.ignoreSeriouslyWounded = true;
     if (modifiers.ignoreWoundState) out.ignoreWoundState = true;
     if (modifiers.skipDeathSave) out.skipDeathSave = true;
