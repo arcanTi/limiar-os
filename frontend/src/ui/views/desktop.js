@@ -504,6 +504,16 @@ export function desktopRenderVals(state = {}, deps = {}) {
     triggerGmCharacterUpload: () => deps.triggerFileInput('gm-character-upload'),
     onGmCharacterImageUpload: (e) => deps.onGmCharacterImageUpload(e),
     createGmCharacter: () => deps.createGmCharacter(),
+    // Roster with a delete on every row: a fresh deployment ships the demo
+    // sheets (NOVA/BYTE/IRIS) and a table usually wants them gone once it
+    // actually starts playing.
+    gmCharacterRows: (S.characters || []).map((character) => ({
+      id: character.id,
+      name: character.name || character.id,
+      owner: character.ownerUsername || character.createdBy || 'sem dono',
+      onDelete: () => deps.deleteGmCharacter(character.id),
+    })),
+    noGmCharacterRows: (S.characters || []).length === 0,
     gmItemCode: gmItemDraft.code, gmItemName: gmItemDraft.name, gmItemCat: gmItemDraft.cat, gmItemPrice: gmItemDraft.price, gmItemDesc: gmItemDraft.desc,
     onGmItemCode: (e) => deps.setState(s => ({ gmItemDraft: { ...s.gmItemDraft, code: e.target.value } })),
     onGmItemName: (e) => deps.setState(s => ({ gmItemDraft: { ...s.gmItemDraft, name: e.target.value } })),
@@ -734,6 +744,32 @@ export function desktopHandlers(component) {
     }));
   }
 
+  async function deleteGmCharacter(id) {
+    if (!component.ensureGm('Login do mestre necessario para remover personagem')) return;
+    if (!id) return;
+    const roster = component.state.characters || [];
+    const target = roster.find(c => c && c.id === id);
+    const label = (target && target.name) || id;
+    const ask = typeof globalThis.confirm === 'function' ? globalThis.confirm : null;
+    if (ask && !ask('Remover ' + label + ' desta campanha? Nao ha desfazer.')) return;
+    try {
+      if (component.api()) await component.api().characters.delete(id);
+      const remaining = roster.filter(c => c && c.id !== id);
+      component._charactersTouched = true;
+      component.setState({
+        characters: remaining,
+        // Dropping the active sheet would leave the whole desktop reading from
+        // a character that no longer exists, so hand the selection over.
+        activeCharacterId: component.state.activeCharacterId === id
+          ? ((remaining[0] && remaining[0].id) || null)
+          : component.state.activeCharacterId,
+        gmStatus: 'Personagem removido: ' + label,
+      });
+    } catch (err) {
+      component.setState({ gmStatus: 'Falha ao remover personagem: ' + (err.message || '') });
+    }
+  }
+
   async function upsertGmItem() {
     if (!component.ensureGm('Login do mestre necessario para salvar item')) return;
     const d = component.state.gmItemDraft;
@@ -787,6 +823,7 @@ export function desktopHandlers(component) {
     onGmCharacterImageUpload,
     onGmItemImageUpload,
     createGmCharacter,
+    deleteGmCharacter,
     upsertGmItem,
     deleteGmItem,
     selectGameTab,
