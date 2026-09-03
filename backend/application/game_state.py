@@ -38,6 +38,39 @@ class GameStateService:
         self._member(campaign_id, session)
         return self.settings.set(campaign_id, "hqIp", validate_hq(payload))
 
+    def set_toxins(self, campaign_id: str, payload: Record, session: Session) -> object:
+        """Store this campaign's homebrew toxin catalog.
+
+        The book's toxins live in the frontend domain and are never written
+        here; this key holds only what a GM authored, so a rules update never
+        has to migrate campaign rows.
+        """
+        self._member(campaign_id, session)
+        toxins = payload.get("toxins")
+        if not isinstance(toxins, list):
+            raise ApplicationError(400, "'toxins' must be an array", "VALIDATION_ERROR")
+        if len(toxins) > 200:
+            raise ApplicationError(400, "Too many toxins (max 200)", "VALIDATION_ERROR")
+        if any(not isinstance(row, dict) for row in toxins):
+            raise ApplicationError(400, "Each toxin must be an object", "VALIDATION_ERROR")
+        return self.settings.set(campaign_id, "toxins", {"toxins": toxins})
+
+    def set_effects(self, campaign_id: str, payload: Record, session: Session) -> object:
+        """Store this campaign's GM-authored status effects.
+
+        Same shape rule as the toxin bench: only what the table authored lives
+        here, never the book presets, so a rules update never migrates rows.
+        """
+        self._member(campaign_id, session)
+        effects = payload.get("effects")
+        if not isinstance(effects, list):
+            raise ApplicationError(400, "'effects' must be an array", "VALIDATION_ERROR")
+        if len(effects) > 200:
+            raise ApplicationError(400, "Too many effects (max 200)", "VALIDATION_ERROR")
+        if any(not isinstance(row, dict) for row in effects):
+            raise ApplicationError(400, "Each effect must be an object", "VALIDATION_ERROR")
+        return self.settings.set(campaign_id, "effects", {"effects": effects})
+
     def set_tarot(self, campaign_id: str, payload: Record, session: Session) -> object:
         self._member(campaign_id, session)
         return self.settings.set(campaign_id, "tarot-state", payload)

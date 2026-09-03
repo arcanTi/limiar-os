@@ -26,4 +26,12 @@ export const CPRED_STATUS_PRESETS: StatusPreset[] = [
   // no numeric modifier: the badge is advisory and the GM decides
   // what "suppressed" means at the table (pinned, can't advance, etc).
   { id: 'suppressed', label_pt: 'Suprimido: falhou WILL DV15 contra fogo de supressao', duration: { value: 1, unit: 'round' }, modifiers: {} },
+  // Drug states from a failed Resist Torture/Drugs check. CPR describes these
+  // in prose rather than as numbers, so the badge carries the narrative and
+  // the GM adjudicates — except inebriation, which the book plays as a
+  // straight action penalty.
+  { id: 'toxin_inebriated', label_pt: 'Embriagado: -2 em todas as acoes', duration: { value: 1, unit: 'hour' }, modifiers: { actionBonus: -2 } },
+  { id: 'toxin_suggestible', label_pt: 'Sugestionavel: responde a interrogatorio como se fosse verdade', duration: { value: 10, unit: 'min' }, modifiers: {} },
+  { id: 'toxin_designer', label_pt: 'Droga de grife: efeito definido por quem a formulou', duration: { value: 1, unit: 'hour' }, modifiers: {} },
+  { id: 'toxin_poisoned', label_pt: 'Envenenado: falhou o teste de Resist Torture/Drugs', duration: null, modifiers: {} },
 ];

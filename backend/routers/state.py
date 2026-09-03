@@ -47,6 +47,26 @@ def set_hq(campaign_id: str, payload: Document, session: Staff, service: State) 
     return service.set_hq(campaign_id, payload.payload(), session)
 
 
+@router.get("/effects")
+def effects(campaign_id: str, session: Authenticated, service: State) -> object:
+    return service.get(campaign_id, "effects", session, {"effects": []})
+
+
+@router.post("/effects")
+def set_effects(campaign_id: str, payload: Document, session: Staff, service: State) -> object:
+    return service.set_effects(campaign_id, payload.payload(), session)
+
+
+@router.get("/toxins")
+def toxins(campaign_id: str, session: Authenticated, service: State) -> object:
+    return service.get(campaign_id, "toxins", session, {"toxins": []})
+
+
+@router.post("/toxins")
+def set_toxins(campaign_id: str, payload: Document, session: Staff, service: State) -> object:
+    return service.set_toxins(campaign_id, payload.payload(), session)
+
+
 @router.get("/tarot-state")
 def tarot(campaign_id: str, session: Authenticated, service: State) -> object:
     return service.get(campaign_id, "tarot-state", session)
