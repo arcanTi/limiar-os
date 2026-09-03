@@ -253,7 +253,15 @@
     "critInjuryLocationHead": "HEAD",
     "critInjuryAreaHint": "AREA WEAPON — select every target in the blast",
     "critInjuryTargetLabel": "TARGET",
-    "critInjuryCancel": "CANCEL"
+    "critInjuryCancel": "CANCEL",
+    "exportSheetPdf": "EXPORT PDF",
+    "npcGenerator": "RANDOM NPC",
+    "npcArchetype": "TYPE",
+    "npcTier": "TIER",
+    "npcFaction": "FACTION (OPTIONAL)",
+    "rollNpc": "ROLL NPC",
+    "rollAndSpawnNpc": "ROLL + CREATE",
+    "npcArmor": "ARMOR"
   },
   "pt": {
     "desktop": "DESKTOP",
@@ -509,6 +517,14 @@
     "critInjuryLocationHead": "CABECA",
     "critInjuryAreaHint": "ARMA DE AREA — selecione todos os alvos no raio",
     "critInjuryTargetLabel": "ALVO",
-    "critInjuryCancel": "CANCELAR"
+    "critInjuryCancel": "CANCELAR",
+    "exportSheetPdf": "EXPORTAR PDF",
+    "npcGenerator": "NPC ALEATORIO",
+    "npcArchetype": "TIPO",
+    "npcTier": "NIVEL",
+    "npcFaction": "FACCAO (OPCIONAL)",
+    "rollNpc": "ROLAR NPC",
+    "rollAndSpawnNpc": "ROLAR + CRIAR",
+    "npcArmor": "ARMADURA"
   }
 }

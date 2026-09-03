@@ -15,14 +15,27 @@ import {
   combatDamageContributions as combatDamageRows,
   parseCombatNpcAttacks as combatParseNpcAttacks,
   resolveFacedownContest as combatResolveFacedownContest,
+  resolveSuppressiveFire as combatResolveSuppressiveFire,
+  retreatCombatTurn as combatRetreatTurn,
+  startCombatState as combatStartState,
 } from '../../domain/combat/index.ts';
 import { NPC_TEMPLATES, NPC_ATTACK_SKILL_OPTIONS, npcDraftFromTemplate } from '../../domain/combat/npcTemplates.ts';
+import {
+  NPC_ARCHETYPES,
+  NPC_TIER_CHOICES,
+  NPC_GROUP_MAX,
+  generateNpc,
+  generateNpcGroup,
+  npcDraftFromGenerated,
+  npcGearFromAttackRows as domainNpcGearFromAttackRows,
+  npcStatLine,
+} from '../../domain/combat/npcGenerator.ts';
 import { resolveStabilizationDV } from '../../domain/combat/stabilizationEngine.ts';
+import { eligibleToxinAmmoFor as toxinEligibleAmmoFor, toxinAmmunitionFor } from '../../domain/toxins/index.ts';
 import { weaponRangeBand } from '../../domain/combat/combatAttackEngine.ts';
 import { canFireWeapon as combatCanFireWeapon, spendAmmo as combatSpendAmmo } from '../../domain/combat/combatAmmoEngine.ts';
 import { netActionsPerTurn } from '../../domain/netrunning/index.ts';
 import { weaponRollTone as viewWeaponRollTone } from '../view/constants.js';
-import { rollD10 } from '../../domain/combat/combatDice.ts';
 import { templateCells } from '../../domain/map/templateEngine.ts';
 import { mapTokenVisibleNow } from '../../domain/map/mapAttackIntent.ts';
 import { propsToWalls } from '../../domain/map/visionEngine.ts';
@@ -32,6 +45,14 @@ import { propsToWalls } from '../../domain/map/visionEngine.ts';
 // attack-roll context toggles (cover/beyond51m/aimedShot), and NPC creation.
 // addCriticalInjury/addStatusEffect stay in Component.js — shared with the
 // Tarot draw flow and the sheet's Conditions tab (see sheet.js's note).
+// Descriptive tags an NPC record carries (tier/archetype/faction from the
+// random generator). PCs have none; the rail and focus dock only render the
+// row when the list is non-empty.
+function npcTagList(character) {
+  const rows = character && Array.isArray(character.tags) ? character.tags : [];
+  return rows.map(tag => String(tag || '').trim()).filter(Boolean);
+}
+
 export function combatRenderVals(state = {}, deps = {}) {
   const S = state;
   const tx = deps.tx || {};
@@ -89,6 +110,13 @@ export function combatRenderVals(state = {}, deps = {}) {
         // "Suppressive Fire" special-rule text) get a batch WILL-save action.
         hasSuppressiveFire: !!item.suppressiveFire,
         suppressiveFire: () => deps.requestSuppressiveFire(id, item),
+        // Arrows and grenades can carry a toxin round, which replaces the
+        // weapon's damage with a Resist Torture/Drugs check on the target.
+        canLoadToxin: toxinEligibleAmmoFor(item).length > 0,
+        loadedToxinLabel: (toxinAmmunitionFor(item.toxinAmmoCode) || {}).name
+          ? toxinAmmunitionFor(item.toxinAmmoCode).name.toUpperCase()
+          : 'SEM TOXINA',
+        cycleToxinRound: () => deps.cycleToxinRound(id, item),
       };
     });
     const ctxAvail = deps.attackContextAvailable(character);
@@ -218,6 +246,10 @@ export function combatRenderVals(state = {}, deps = {}) {
       hasPsychosis: !!(d.cyberpsychosisExtreme || d.cyberpsychosisActive),
       defeated: !!entry.defeated,
       defeatedLabel: entry.defeated ? tx.defeated : tx.active,
+      tags: npcTagList(character),
+      tagChips: npcTagList(character).map(tag => ({ label: tag.toUpperCase() })),
+      tagsLabel: npcTagList(character).map(tag => tag.toUpperCase()).join(' · '),
+      hasTags: npcTagList(character).length > 0,
       initiativeValue: initLabel,
       initiativeInput: entry.initiative === null || entry.initiative === undefined ? '' : String(entry.initiative),
       acted: !!entry.acted,
@@ -390,6 +422,8 @@ export function combatRenderVals(state = {}, deps = {}) {
       defeated: c.defeated,
       isCurrent: c.isCurrent,
       isFocused,
+      tagsLabel: c.tagsLabel,
+      hasTags: c.hasTags,
       actedColor: c.actedColor,
       actedLabel: c.actedLabel,
       pillStyle: "display:flex;flex-direction:column;gap:4px;min-width:112px;flex:0 0 auto;text-align:left;cursor:pointer;padding:8px 10px;border:1px solid "
@@ -425,6 +459,37 @@ export function combatRenderVals(state = {}, deps = {}) {
     remove: () => deps.removeNpcAttackRow(idx),
     canRemove: npcAttackRowsSrc.length > 1,
   }));
+
+  // --- Random NPC generator: archetype x tier chips, optional faction tag,
+  // and a summary of the last rolled draft (full STAT line, armor, tags) so
+  // the GM sees what the dice produced before committing it to the roster ---
+  const npcGen = { archetype: 'guarda', tier: 'base', faction: '', ...(S.combatNpcGen || {}) };
+  const npcGenArchetypeChips = NPC_ARCHETYPES.map(a => ({
+    id: a.id,
+    label: a.label,
+    description: a.description,
+    active: npcGen.archetype === a.id,
+    style: 'lm-ui-btn lm-ui-btn--compact ' + (npcGen.archetype === a.id ? 'lm-ui-btn--danger' : 'lm-ui-btn--ghost-danger'),
+    apply: () => deps.setNpcGenOption({ archetype: a.id }),
+  }));
+  const npcGenTierChips = NPC_TIER_CHOICES.map(t => ({
+    id: t.id,
+    label: t.label,
+    description: t.description,
+    active: npcGen.tier === t.id,
+    style: 'lm-ui-btn lm-ui-btn--compact ' + (npcGen.tier === t.id ? 'lm-ui-btn--danger' : 'lm-ui-btn--ghost-danger'),
+    apply: () => deps.setNpcGenOption({ tier: t.id }),
+  }));
+  // Description of the active choice as a caption line (not a title attr:
+  // a title would replace the chip's accessible name with the blurb).
+  const activeArchetype = NPC_ARCHETYPES.find(a => a.id === npcGen.archetype) || NPC_ARCHETYPES[0];
+  const activeTier = NPC_TIER_CHOICES.find(t => t.id === npcGen.tier) || NPC_TIER_CHOICES[0];
+  const npcGenArchetypeHint = activeArchetype ? activeArchetype.description : '';
+  const npcGenTierHint = activeTier ? activeTier.description : '';
+  const npcGenerated = combatNpcDraft.generated && typeof combatNpcDraft.generated === 'object' ? combatNpcDraft.generated : null;
+  const combatNpcTags = npcGenerated ? (npcGenerated.tags || []).map(tag => ({ label: String(tag || '').toUpperCase() })) : [];
+  const combatNpcStatLine = npcGenerated ? npcStatLine(npcGenerated.stats) : '';
+  const combatNpcArmorLabel = npcGenerated && npcGenerated.armor && npcGenerated.armor.body ? String(npcGenerated.armor.body.name || '') : '';
 
   return {
     showCombatAccess: S.gm || combatState.active,
@@ -495,6 +560,18 @@ export function combatRenderVals(state = {}, deps = {}) {
     onCombatNpcQty: (e) => deps.setState({ combatNpcDraft: { ...(S.combatNpcDraft || {}), qty: e.target.value } }),
     addNpcAttackRow: () => deps.addNpcAttackRow(),
     createCombatNpc: () => deps.createCombatNpc(),
+    npcGenArchetypeChips,
+    npcGenTierChips,
+    npcGenArchetypeHint,
+    npcGenTierHint,
+    npcGenFaction: npcGen.faction || '',
+    onNpcGenFaction: (e) => deps.setNpcGenOption({ faction: e.target.value }),
+    rollRandomNpcDraft: () => deps.rollRandomNpcDraft(),
+    spawnRandomNpcs: () => deps.spawnRandomNpcs(),
+    hasCombatNpcGenerated: !!npcGenerated,
+    combatNpcTags,
+    combatNpcStatLine,
+    combatNpcArmorLabel,
     combatRollFeed,
     combatHasRolls: combatRollFeed.length > 0,
     combatNoRolls: combatRollFeed.length === 0,
@@ -544,9 +621,17 @@ export function combatHandlers(component) {
   }
   async function saveCombatState(nextState, options = {}) {
     const state = normalizeCombatState({ ...nextState, updatedAt: new Date().toISOString() });
+    let persisted = state;
     if (component.app().persistCombatState.available()) {
       try {
-        await component.app().persistCombatState.execute(state);
+        const saved = await component.app().persistCombatState.execute(state);
+        // The server answers with the stored document, new revision included.
+        // Keeping that revision locally is what lets the next write's
+        // expectedRevision match instead of tripping REVISION_CONFLICT on
+        // back-to-back saves (spawning a squad, for one).
+        if (saved && typeof saved === 'object' && Number.isInteger(saved.revision)) {
+          persisted = normalizeCombatState({ ...state, ...saved });
+        }
       } catch (err) {
         if (!options.allowLocal) {
           component.flash('Falha ao persistir combate: ' + err.message, 3200);
@@ -554,8 +639,8 @@ export function combatHandlers(component) {
         }
       }
     }
-    component.setState(combatStatePatch(state));
-    return state;
+    component.setState(combatStatePatch(persisted));
+    return persisted;
   }
   function combatCharacter(characterId) {
     const id = String(characterId || '');
@@ -868,6 +953,13 @@ export function combatHandlers(component) {
   function autoApplyCombatDamage(actorId, weapon, result) {
     const targetId = combatTargetFor(actorId);
     if (!targetId) return;
+    // A toxin round deals no weapon damage at all (dealsBaseWeaponDamage:
+    // false), so the hit hands the target to the resist check and stops here —
+    // running the armor path too would double-resolve the attack.
+    if (weapon && weapon.toxinAmmoCode) {
+      component.maybeApplyToxinAmmo(weapon, targetId);
+      return;
+    }
     const target = component.normalizeCharacter(combatCharacter(targetId) || {});
     if (!target.id) return;
     const location = component.state.attackContext && component.state.attackContext.aimedShot ? 'head' : 'body';
@@ -1212,25 +1304,12 @@ export function combatHandlers(component) {
   async function prevTurn() {
     if (!component.ensureGm('Login do mestre necessario para voltar turno')) return;
     const state = normalizeCombatState(component.state.combatState);
-    const order = state.order;
-    if (combatFirstActiveIndex(order, state.combatants) < 0) {
-      await saveCombatState({ ...state, turnIndex: -1 });
-      return;
-    }
-    const start = state.turnIndex >= 0 ? state.turnIndex : 0;
-    for (let offset = 1; offset <= order.length; offset++) {
-      const idx = (start - offset + order.length) % order.length;
-      const entry = state.combatants[order[idx]];
-      if (entry && !entry.defeated) {
-        await saveCombatState({ ...state, round: Math.max(1, state.round), turnIndex: idx });
-        return;
-      }
-    }
+    await saveCombatState(combatRetreatTurn(state));
   }
   async function startCombat() {
     if (!component.ensureGm('Login do mestre necessario para iniciar combate')) return;
     const state = normalizeCombatState(component.state.combatState);
-    const saved = await saveCombatState({ ...state, active: true });
+    const saved = await saveCombatState(combatStartState(state));
     if (saved) component.flash('Combate iniciado');
   }
   async function endCombat() {
@@ -1238,21 +1317,26 @@ export function combatHandlers(component) {
     const saved = await saveCombatState({ ...defaultCombatState(), active: false });
     if (saved) component.flash('Combate encerrado');
   }
-  async function addCombatant(characterId, side) {
+  // Adds a whole group in one write. Spawning N NPCs used to save the combat
+  // state N times in a row, which raced the revision guard; one save per
+  // batch is both cheaper and conflict-free.
+  async function addCombatants(characterIds, side) {
     if (!component.ensureGm('Login do mestre necessario para alterar combate')) return null;
-    const id = String(characterId || '');
-    if (!id) return null;
+    const ids = (Array.isArray(characterIds) ? characterIds : []).map(id => String(id || '')).filter(Boolean);
+    if (!ids.length) return null;
     const state = normalizeCombatState(component.state.combatState);
-    const next = {
-      ...state,
-      combatants: {
-        ...state.combatants,
-        [id]: normalizeCombatant(state.combatants[id], side),
-      },
-      order: state.order.includes(id) ? state.order : state.order.concat(id),
-    };
+    const combatants = { ...state.combatants };
+    const order = state.order.slice();
+    ids.forEach((id) => {
+      combatants[id] = normalizeCombatant(state.combatants[id], side);
+      if (!order.includes(id)) order.push(id);
+    });
+    const next = { ...state, combatants, order };
     next.turnIndex = combatRepairedTurnIndex(next);
     return saveCombatState(next);
+  }
+  async function addCombatant(characterId, side) {
+    return addCombatants([characterId], side);
   }
   async function removeCombatant(characterId) {
     if (!component.ensureGm('Login do mestre necessario para alterar combate')) return;
@@ -1280,15 +1364,47 @@ export function combatHandlers(component) {
     return combatParseNpcAttacks(text, { normalizeGearItem: (item, idx) => component.normalizeGearItem(item, idx) });
   }
   // The GM Cockpit's NPC builder collects attacks as structured rows
-  // (name/dice/skill), not the old free-text "nome|2d6|Handgun per line"
-  // field. Converting rows back into that pipe-delimited text lets us reuse
-  // parseCombatNpcAttacks's already-tested parsing instead of duplicating it.
+  // (name/dice/skill[/code]). Rows rolled by the random generator carry a
+  // catalog code, so the domain mapper keeps the real weapon profile (ROF,
+  // magazine, autofire); hand-typed rows degrade to the bare NPC weapon shape.
   function npcGearFromAttackRows(rows) {
-    const text = (Array.isArray(rows) ? rows : [])
-      .filter(row => row && String(row.name || '').trim())
-      .map(row => [row.name, row.dice || '1d6', row.skill || 'Autofire'].join('|'))
-      .join('\n');
-    return parseCombatNpcAttacks(text);
+    return domainNpcGearFromAttackRows(rows).map((item, idx) => component.normalizeGearItem(item, idx));
+  }
+  function npcGenOptions() {
+    return { archetype: 'guarda', tier: 'base', faction: '', ...(component.state.combatNpcGen || {}) };
+  }
+  function setNpcGenOption(patch) {
+    component.setState(s => ({ combatNpcGen: { ...(s.combatNpcGen || {}), ...(patch || {}) } }));
+  }
+  // Rolls one NPC into the builder draft. The GM can still rename it, nudge
+  // BODY/REF/HP/SP or edit the attack rows before hitting CRIAR NPC. 'misto'
+  // only means something for a group, so a single draft rolls as base.
+  function rollRandomNpcDraft() {
+    const opts = npcGenOptions();
+    const draft = component.state.combatNpcDraft || {};
+    const npc = generateNpc({ archetype: opts.archetype, tier: opts.tier === 'misto' ? 'base' : opts.tier, faction: opts.faction });
+    component.setState({ combatNpcDraft: npcDraftFromGenerated(npc, draft.qty || '1') });
+  }
+  // Rolls QTD independent NPCs (own stats, own gear, unique callsigns) and
+  // drops them all into the roster — unlike createCombatNpc, which clones a
+  // single draft N times with numbered names.
+  async function spawnRandomNpcs() {
+    if (!component.ensureGm('Login do mestre necessario para criar NPC')) return;
+    const opts = npcGenOptions();
+    const draft = component.state.combatNpcDraft || {};
+    const qty = Math.max(1, Math.min(NPC_GROUP_MAX, component.asNumber(draft.qty, 1, 1, NPC_GROUP_MAX)));
+    const group = generateNpcGroup({ archetype: opts.archetype, tier: opts.tier, qty, faction: opts.faction });
+    try {
+      const created = [];
+      for (const npc of group) {
+        const src = npcDraftFromGenerated(npc, '1');
+        created.push(await createOneCombatNpc(src, npcGearFromAttackRows(src.attackRows), { addToCombat: false }));
+      }
+      await addCombatants(created.map(c => c.id), 'enemy');
+      component.flash(group.length > 1 ? group.length + ' NPCs aleatorios adicionados ao combate' : 'NPC aleatorio adicionado ao combate');
+    } catch (err) {
+      component.flash('Falha ao criar NPC: ' + err.message, 3200);
+    }
   }
   function applyNpcTemplate(templateId) {
     const template = NPC_TEMPLATES.find(t => t.id === templateId);
@@ -1324,12 +1440,21 @@ export function combatHandlers(component) {
   function setCombatFocus(characterId) {
     component.setState({ combatFocusId: String(characterId || '') });
   }
-  async function createOneCombatNpc(src, gear) {
+  // options.addToCombat=false leaves the roster write to the caller so a
+  // whole squad lands in the combat state with a single save.
+  async function createOneCombatNpc(src, gear, options = {}) {
     const name = String(src.name || '').trim();
-    const base = component.normalizeStats({ BODY: component.asNumber(src.body, 5, 1, 20), REF: component.asNumber(src.ref, 5, 1, 20), DEX: 5, TECH: 5, COOL: 5, WILL: 5, INT: 5, LUCK: 5, MOVE: 5, EMP: 5 });
+    // Drafts rolled by the random generator carry the full STAT block, a
+    // focused skill list, real armor names and tags. The editable BODY/REF/
+    // HP/SP inputs still win so the GM can nudge a roll without re-rolling.
+    const gen = src.generated && typeof src.generated === 'object' ? src.generated : null;
+    const statSeed = gen && gen.stats ? { ...gen.stats } : { DEX: 5, TECH: 5, COOL: 5, WILL: 5, INT: 5, LUCK: 5, MOVE: 5, EMP: 5 };
+    const base = component.normalizeStats({ ...statSeed, BODY: component.asNumber(src.body, 5, 1, 20), REF: component.asNumber(src.ref, 5, 1, 20) });
     const hpMax = component.asNumber(src.hpMax, 35, 1, 999);
     const headSp = component.asNumber(src.headSp, 11, 0, 99);
     const bodySp = component.asNumber(src.bodySp, 11, 0, 99);
+    const armorHead = gen && gen.armor && gen.armor.head ? gen.armor.head : {};
+    const armorBody = gen && gen.armor && gen.armor.body ? gen.armor.body : {};
     const id = 'npc-' + component.slug(name) + '-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e4).toString(36);
     const character = component.normalizeCharacter({
       id,
@@ -1337,23 +1462,31 @@ export function combatHandlers(component) {
       side: 'enemy',
       name: name.toUpperCase(),
       role: 'NPC',
+      // A DRONE spawned from the template is inorganic, so poison rolls off it
+      // without the GM having to remember to flag it.
+      bodyType: src.bodyType || 'meat',
       level: 1,
       initials: (name.slice(0, 2) || 'NP').toUpperCase(),
       base,
       health: { cur: hpMax, max: hpMax },
-      armor: { head: { name: 'NPC Armor', sp: headSp, penalty: 0 }, body: { name: 'NPC Armor', sp: bodySp, penalty: 0 } },
+      armor: {
+        head: { name: armorHead.name || 'NPC Armor', sp: headSp, penalty: component.asNumber(armorHead.penalty, 0, 0, 9) },
+        body: { name: armorBody.name || 'NPC Armor', sp: bodySp, penalty: component.asNumber(armorBody.penalty, 0, 0, 9) },
+      },
       gear,
-      skills: component.normalizeSkills(null, base),
+      skills: component.normalizeSkills(gen && Array.isArray(gen.skills) ? gen.skills : null, base),
+      tags: gen && Array.isArray(gen.tags) ? gen.tags.slice() : [],
+      ...(gen ? { npcOrigin: { archetype: gen.archetype || '', tier: gen.tier || '', faction: gen.faction || '', seed: gen.seed || '' } } : {}),
       criticalInjuries: [],
       statusEffects: [],
       spDamage: { head: 0, body: 0 },
-      notes: 'NPC criado pelo Modo Combate.',
+      notes: gen && gen.notes ? gen.notes : 'NPC criado pelo Modo Combate.',
     });
     const savedRaw = await component.app().persistCharacter.save(character);
     const saved = component.normalizeCharacter(savedRaw);
     component._charactersTouched = true;
     component.setState(s => ({ characters: [...(s.characters || []).filter(c => c.id !== saved.id), saved] }));
-    await addCombatant(saved.id, 'enemy');
+    if (options.addToCombat !== false) await addCombatant(saved.id, 'enemy');
     return saved;
   }
   // Spawns `qty` NPCs off one draft, numbering names when qty > 1 (e.g.
@@ -1367,9 +1500,11 @@ export function combatHandlers(component) {
     const gear = npcGearFromAttackRows(src.attackRows);
     const qty = Math.max(1, Math.min(20, component.asNumber(src.qty, 1, 1, 20)));
     try {
+      const created = [];
       for (let i = 1; i <= qty; i++) {
-        await createOneCombatNpc({ ...src, name: qty > 1 ? name + ' ' + i : name }, gear);
+        created.push(await createOneCombatNpc({ ...src, name: qty > 1 ? name + ' ' + i : name }, gear, { addToCombat: false }));
       }
+      await addCombatants(created.map(c => c.id), 'enemy');
       component.setState({ combatNpcDraft: { name: '', body: '5', ref: '5', hpMax: '35', headSp: '11', bodySp: '11', qty: '1', templateId: '', attackRows: [{ name: '', dice: '2d6', skill: 'Handgun' }] } });
       component.flash(qty > 1 ? qty + ' NPCs adicionados ao combate' : 'NPC adicionado ao combate');
     } catch (err) {
@@ -1505,10 +1640,14 @@ export function combatHandlers(component) {
   // cockpit has no point-and-click map surface of its own; the map owns
   // richer map interactions), lists every character-linked token inside it
   // that the acting session can actually see, using the same visibility rule as
-  // the AoE RESOLVER flow), then rolls a WILL DV15 save per target. This
-  // uses the same silent/no-overlay batch-rolling style already established
-  // by rollInitiative's NPC branch — component.roll()'s single animated
-  // overlay (one _rollId in flight) isn't built for N simultaneous rolls.
+  // the AoE RESOLVER flow), then resolves the contest (CPR RAW p.174): the
+  // attacker's REF + Autofire + 1d10 goes through the animated roll overlay
+  // and becomes the DV; each target's WILL + Concentration + 1d10 must beat
+  // it or they are "suppressed" (must dive for cover next turn). Defender
+  // saves use the same silent/no-overlay batch-rolling style already
+  // established by rollInitiative's NPC branch — component.roll()'s single
+  // animated overlay (one _rollId in flight) isn't built for N simultaneous
+  // rolls. Cover exemption stays a GM call: the map has no cover geometry.
   async function requestSuppressiveFire(actorId, weapon) {
     if (!canRollCombatActor(actorId)) return component.flash('Voce so pode usar fogo supressivo pelo seu proprio combatente');
     const targetId = combatTargetFor(actorId);
@@ -1536,25 +1675,58 @@ export function combatHandlers(component) {
         return mapTokenVisibleNow(mapState, token, { gm: !!component.state.gm, username });
       });
       if (!affected.length) return component.flash('Nenhum alvo visivel na area de supressao');
-      resolveSuppressiveFireBatch(actor, affected.map(token => token.characterId));
+      rollSuppressiveFireAttack(actorId, actor, weapon, affected.map(token => token.characterId));
     } catch (err) {
       component.flash(err.message || 'Falha ao posicionar template de fogo supressivo', 3200);
     }
   }
-  function resolveSuppressiveFireBatch(actor, targetCharacterIds) {
-    const rows = targetCharacterIds.map(id => combatCharacter(id)).filter(Boolean).map(target => {
-      const derived = component.derivedStats(target.base, target);
-      const willMod = component.asNumber(derived.effectiveStats && derived.effectiveStats.WILL, 0, 0, 99);
-      const die = rollD10();
-      const total = die + willMod;
-      const success = total >= 15;
-      if (!success) component.addStatusEffect('suppressed', { targetId: target.id, source: 'suppressiveFire' });
-      return (target.name || target.id).toUpperCase() + ' :: ' + die + '+' + willMod + '=' + total + (success ? ' :: RESISTIU' : ' :: SUPRIMIDO');
+  // Attacker half of the contest: REF + Autofire + 1d10 (cyber and staged
+  // LUCK/ad-hoc mods included, same as any other attack roll). Ammo: RAW
+  // suppressive fire burns a full 10-round burst, spent on the trigger pull
+  // like every other attack (advisory — an empty magazine warns, never blocks).
+  function rollSuppressiveFireAttack(actorId, actor, weapon, targetCharacterIds) {
+    const mod = combatCheckMod(actor, 'Autofire');
+    const pending = consumePendingRollMods(actorId);
+    const reporter = combatGmRollReporter(actor);
+    const ammoState = weaponAmmoState(weapon);
+    const ammoCheck = ammoState ? combatCanFireWeapon(weapon, ammoState, 'suppressiveFirePlaceholder') : null;
+    if (ammoState) {
+      const spent = combatSpendAmmo(weapon, ammoState, 'suppressiveFirePlaceholder');
+      persistGearPatch(actorId, weapon.id, { currentAmmo: spent.ammoState.currentAmmo });
+    }
+    component.roll({
+      actorId,
+      check: true,
+      sides: 10,
+      count: 1,
+      mod: mod.mod + pending.luck + pending.adHoc,
+      breakdown: component.cyberSourceBreakdown(mod.sources)
+        .concat(pendingModBreakdown(pending))
+        .concat(ammoCheck && ammoCheck.needsReload ? [`SEM MUNICAO (${ammoCheck.currentAmmo}/${weapon.magazine}) — recarregue`] : []),
+      label: (((actor && actor.name) || 'OPERATIVO') + ' :: ' + ((weapon && weapon.name) || 'ARMA') + ' FOGO SUPRESSIVO').toUpperCase(),
+      onResolved: (result) => {
+        if (reporter) reporter(result);
+        resolveSuppressiveFireBatch(actor, targetCharacterIds, result.total);
+      },
+    });
+  }
+  // Defender half: WILL + Concentration + 1d10 per target vs the attacker's
+  // total. Concentration is a basic skill (everyone has it), so combatCheckMod
+  // never falls back to REF here.
+  function resolveSuppressiveFireBatch(actor, targetCharacterIds, attackerTotal) {
+    const targets = targetCharacterIds.map(id => combatCharacter(id)).filter(Boolean);
+    const defenders = targets.map(target => ({ id: target.id, mod: combatCheckMod(target, 'Concentration').mod }));
+    const contest = combatResolveSuppressiveFire(attackerTotal, defenders);
+    const rows = contest.defenders.map(row => {
+      const target = targets.find(t => t.id === row.id) || {};
+      if (!row.resisted) component.addStatusEffect('suppressed', { targetId: row.id, source: 'suppressiveFire' });
+      const dieTxt = row.die + (row.extra ? (row.crit ? '+' : '-') + row.extra : '');
+      return (target.name || row.id).toUpperCase() + ' :: ' + dieTxt + '+' + row.mod + '=' + row.total + (row.resisted ? ' :: RESISTIU' : ' :: SUPRIMIDO');
     });
     component.postChat({
       kind: 'text',
       sender: 'SISTEMA',
-      text: 'FOGO SUPRESSIVO :: ' + ((actor && actor.name) || 'OPERATIVO').toUpperCase() + ' :: WILL DV15\n' + rows.join('\n'),
+      text: 'FOGO SUPRESSIVO :: ' + ((actor && actor.name) || 'OPERATIVO').toUpperCase() + ' :: WILL + CONCENTRATION vs ' + contest.attackerTotal + '\n' + rows.join('\n'),
     });
   }
   // GM (or a player, for their own attacks) picks who a combatant is
@@ -1923,9 +2095,14 @@ export function combatHandlers(component) {
     startCombat,
     endCombat,
     addCombatant,
+    addCombatants,
     removeCombatant,
     toggleDefeated,
     parseCombatNpcAttacks,
+    npcGearFromAttackRows,
+    setNpcGenOption,
+    rollRandomNpcDraft,
+    spawnRandomNpcs,
     createCombatNpc,
     applyNpcTemplate,
     addNpcAttackRow,
@@ -1957,6 +2134,16 @@ export function combatHandlers(component) {
     consumePendingRollMods,
     resetLuckForSession,
     reloadWeapon,
+    // Cycles through the rounds this weapon accepts and back to none, so a
+    // single button covers load/swap/unload without another dropdown.
+    cycleToxinRound: (actorId, weapon) => {
+      const options = toxinEligibleAmmoFor(weapon);
+      if (!options.length) return;
+      const current = options.findIndex(row => row.code === (weapon && weapon.toxinAmmoCode));
+      const next = options[current + 1] || null;
+      persistGearPatch(actorId, weapon.id, { toxinAmmoCode: next ? next.code : null });
+      component.flash(next ? 'Carregado: ' + next.name : 'Toxina removida da arma');
+    },
     requestSuppressiveFire,
     mapAoeResolveVals,
     toggleMapAoeTarget,

@@ -6,11 +6,15 @@ export interface NpcTemplateAttack {
   name: string;
   dice: string;
   skill: string;
+  /** Catalog weapon code when the row came from the random generator; lets the gear item keep ROF/mag/autofire. */
+  code?: string;
 }
 
 export interface NpcTemplate {
   id: string;
   label: string;
+  /** Inorganic templates are immune to poison; defaults to meat when absent. */
+  bodyType?: 'meat' | 'fbc' | 'drone';
   body: number;
   ref: number;
   hpMax: number;
@@ -44,6 +48,7 @@ export const NPC_TEMPLATES: NpcTemplate[] = [
   {
     id: 'drone',
     label: 'DRONE',
+    bodyType: 'drone',
     body: 4, ref: 8, hpMax: 25, headSp: 8, bodySp: 8,
     attacks: [{ name: 'Mounted Weapon', dice: '3d6', skill: 'Heavy Weapons' }],
   },
@@ -62,8 +67,24 @@ export const NPC_ATTACK_SKILL_OPTIONS: string[] = [
   'Handgun', 'Autofire', 'Shoulder Arms', 'Heavy Weapons', 'Brawling', 'Martial Arts', 'Melee Weapon',
 ];
 
+// Extra payload a draft carries when it was rolled by domain/combat/npcGenerator:
+// the full STAT block, focused skills, armor names and tags. The editable
+// BODY/REF/HP/SP inputs still win over these values at spawn time.
+export interface NpcDraftGenerated {
+  archetype: string;
+  tier: string;
+  tags: string[];
+  faction: string;
+  stats: Record<string, number>;
+  skills: { name: string; level: number }[];
+  armor: { code: string; head: { name: string; sp: number; penalty: number }; body: { name: string; sp: number; penalty: number } };
+  seed: string;
+  notes: string;
+}
+
 export interface NpcDraftShape {
   name: string;
+  bodyType: 'meat' | 'fbc' | 'drone';
   body: string;
   ref: string;
   hpMax: string;
@@ -72,14 +93,16 @@ export interface NpcDraftShape {
   qty: string;
   templateId: string;
   attackRows: NpcTemplateAttack[];
+  generated?: NpcDraftGenerated;
 }
 
 export function npcDraftFromTemplate(template: NpcTemplate | null | undefined): NpcDraftShape {
   if (!template) {
-    return { name: '', body: '5', ref: '5', hpMax: '35', headSp: '11', bodySp: '11', qty: '1', templateId: '', attackRows: [{ name: '', dice: '2d6', skill: 'Handgun' }] };
+    return { name: '', bodyType: 'meat', body: '5', ref: '5', hpMax: '35', headSp: '11', bodySp: '11', qty: '1', templateId: '', attackRows: [{ name: '', dice: '2d6', skill: 'Handgun' }] };
   }
   return {
     name: template.label,
+    bodyType: template.bodyType || 'meat',
     body: String(template.body),
     ref: String(template.ref),
     hpMax: String(template.hpMax),

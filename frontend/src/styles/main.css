@@ -238,6 +238,18 @@
   .lm-combat-dock { min-width:0; }
   .lm-combat-drawer { display:flex;flex-direction:column;gap:14px; }
   .lm-combat-preset-row { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px; }
+  /* Random NPC generator (archetype x tier chips, faction, roll actions) and
+     the tag chips a generated NPC carries into the rail / focus dock. */
+  .lm-combat-gen-row { display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px; }
+  .lm-combat-gen-label { flex:0 0 auto;min-width:64px;font:8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64; }
+  .lm-combat-gen-hint { font:9px 'Share Tech Mono',monospace;letter-spacing:.5px;color:#6f7a64;margin:-2px 0 8px; }
+  .lm-combat-gen-actions { display:flex;gap:8px;align-items:center;margin:6px 0 10px; }
+  .lm-combat-gen-actions .lm-ui-input { flex:1;min-width:0; }
+  .lm-combat-gen-summary { border:1px dashed rgba(192,99,91,.35);background:rgba(192,99,91,.05);padding:8px 10px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px; }
+  .lm-combat-gen-stats { font:10px 'Share Tech Mono',monospace;letter-spacing:.5px;color:#e8e4d8;word-break:break-word; }
+  .lm-combat-tag-row { display:flex;gap:4px;flex-wrap:wrap; }
+  .lm-combat-tag { display:inline-block;border:1px solid rgba(192,99,91,.5);color:#c0635b;font:8px 'Share Tech Mono',monospace;letter-spacing:1px;padding:2px 6px;text-transform:uppercase; }
+  .lm-combat-pill-tags { font:8px 'Share Tech Mono',monospace;letter-spacing:.5px;color:#c0635b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .lm-combat-atkrow-list { display:flex;flex-direction:column;gap:6px; }
   .lm-combat-atkrow { display:grid;grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr) auto;gap:6px;align-items:center; }
   @media (max-width:900px) {
@@ -245,6 +257,8 @@
   }
   @media (max-width:620px) {
     .lm-combat-atkrow { grid-template-columns:1fr 1fr; }
+    .lm-combat-gen-actions { flex-wrap:wrap; }
+    .lm-combat-gen-actions .lm-ui-input { flex-basis:100%; }
   }
   .lm-combat-roll-list { display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto; }
   .lm-combat-roll-row { border:1px solid rgba(214,170,78,.12);background:#080a07;padding:9px; }

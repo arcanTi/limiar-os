@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { combatHandlers, combatRenderVals } from '../../../src/ui/views/combat.js';
+import { generateNpc, npcDraftFromGenerated } from '../../../src/domain/combat/npcGenerator.ts';
 import PersistCharacter from '../../../src/application/PersistCharacter.ts';
 import PersistCombatState from '../../../src/application/PersistCombatState.ts';
 import CampaignMapQueries from '../../../src/application/CampaignMapQueries.ts';
@@ -846,5 +847,161 @@ describe('ui/views/combat combatHandlers', () => {
 
     const deathSaveCalls = component.postChat.mock.calls.filter(([payload]) => payload && payload.request && payload.request.label === 'DEATH SAVE');
     expect(deathSaveCalls.length).toBe(1);
+  });
+});
+
+describe('ui/views/combat random NPC generator', () => {
+  it('render vals expose archetype/tier chips, faction and the rolled summary', () => {
+    const draft = npcDraftFromGenerated(generateNpc({ archetype: 'corpsec', tier: 'elite', seed: 'ui' }));
+    const deps = renderDeps({ setNpcGenOption: vi.fn() });
+    const vals = combatRenderVals({
+      gm: true,
+      characters: [mira],
+      combatState: { ...baseCombatState(), active: false },
+      combatNpcDraft: draft,
+      combatNpcGen: { archetype: 'corpsec', tier: 'misto', faction: 'Arasaka' },
+    }, deps);
+    expect(vals.npcGenArchetypeChips.map(c => c.id)).toEqual(['civil', 'guarda', 'ganger', 'policial', 'corpsec', 'solo', 'drone']);
+    expect(vals.npcGenArchetypeChips.find(c => c.id === 'corpsec').active).toBe(true);
+    expect(vals.npcGenTierChips.map(c => c.id)).toEqual(['base', 'veterano', 'elite', 'chefe', 'misto']);
+    expect(vals.npcGenTierChips.find(c => c.id === 'misto').active).toBe(true);
+    expect(vals.npcGenFaction).toBe('Arasaka');
+    expect(vals.hasCombatNpcGenerated).toBe(true);
+    expect(vals.combatNpcTags.map(t => t.label)).toEqual(expect.arrayContaining(['ELITE', 'CORPSEC']));
+    expect(vals.combatNpcStatLine).toContain('REF ' + draft.generated.stats.REF);
+    expect(vals.combatNpcArmorLabel).toBe(draft.generated.armor.body.name);
+    vals.npcGenArchetypeChips.find(c => c.id === 'solo').apply();
+    expect(deps.setNpcGenOption).toHaveBeenCalledWith({ archetype: 'solo' });
+    vals.npcGenTierChips.find(c => c.id === 'chefe').apply();
+    expect(deps.setNpcGenOption).toHaveBeenCalledWith({ tier: 'chefe' });
+  });
+
+  it('defaults the generator to guarda/base and hides the summary for a hand-built draft', () => {
+    const vals = combatRenderVals({ gm: true, characters: [mira], combatState: { ...baseCombatState(), active: false }, combatNpcDraft: { name: 'X', attackRows: [] } }, renderDeps());
+    expect(vals.npcGenArchetypeChips.find(c => c.active).id).toBe('guarda');
+    expect(vals.npcGenTierChips.find(c => c.active).id).toBe('base');
+    expect(vals.npcGenArchetypeHint).toContain('Seguranca privada');
+    expect(vals.npcGenTierHint).toContain('Mook padrao');
+    expect(vals.hasCombatNpcGenerated).toBe(false);
+    expect(vals.combatNpcTags).toEqual([]);
+    expect(vals.combatNpcStatLine).toBe('');
+  });
+
+  it('shows NPC tags on the rail pill and focus dock, none for PCs', () => {
+    const goon = { ...rook, id: 'goon', name: 'GUARDA HOLT', kind: 'npc', tags: ['elite', 'guarda'] };
+    const combatState = { ...baseCombatState(), order: ['mira', 'goon'], combatants: { mira: baseCombatState().combatants.mira, goon: { side: 'enemy', initiative: 5, acted: false, defeated: false } } };
+    const vals = combatRenderVals({ gm: true, characters: [mira, goon], combatState, combatFocusId: 'goon' }, renderDeps());
+    const pill = vals.combatRailRows.find(r => r.id === 'goon');
+    expect(pill.hasTags).toBe(true);
+    expect(pill.tagsLabel).toBe('ELITE · GUARDA');
+    expect(vals.combatRailRows.find(r => r.id === 'mira').hasTags).toBe(false);
+    expect(vals.combatFocusCard.id).toBe('goon');
+    expect(vals.combatFocusCard.tagChips).toEqual([{ label: 'ELITE' }, { label: 'GUARDA' }]);
+  });
+
+  it('setNpcGenOption/rollRandomNpcDraft fill the builder draft with a generated NPC and keep QTD', () => {
+    const component = fakeComponent({ state: { combatNpcDraft: { qty: '4', attackRows: [] } } });
+    const h = combatHandlers(component);
+    h.setNpcGenOption({ archetype: 'solo', tier: 'misto' });
+    h.setNpcGenOption({ faction: 'Militech' });
+    expect(component.state.combatNpcGen).toEqual({ archetype: 'solo', tier: 'misto', faction: 'Militech' });
+    h.rollRandomNpcDraft();
+    const draft = component.state.combatNpcDraft;
+    expect(draft.name).toContain('SOLO');
+    expect(draft.qty).toBe('4');
+    expect(draft.templateId).toBe('');
+    expect(draft.generated).toMatchObject({ archetype: 'solo', tier: 'base', faction: 'MILITECH' });
+    expect(draft.generated.tags).toContain('militech');
+    expect(draft.attackRows.length).toBeGreaterThan(0);
+    expect(Number(draft.hpMax)).toBeGreaterThan(0);
+  });
+
+  it('spawnRandomNpcs rolls QTD distinct NPCs with stats, skills, armor and tags on the record', async () => {
+    const set = vi.fn(async (s) => s);
+    const component = fakeComponent({
+      api: () => ({ combat: { state: { set } }, characters: { upsert: vi.fn(async (c) => c) } }),
+      normalizeStats: (b) => b,
+      normalizeSkills: vi.fn((skills) => skills || []),
+      slug: (s) => String(s).toLowerCase().replace(/\s+/g, '-'),
+      normalizeGearItem: (item, idx) => ({ ...item, id: item.id || 'gear-' + idx }),
+      state: { combatNpcDraft: { qty: '3', attackRows: [] }, combatNpcGen: { archetype: 'corpsec', tier: 'elite', faction: 'Arasaka' } },
+    });
+    const h = combatHandlers(component);
+    await h.spawnRandomNpcs();
+
+    const npcs = component.state.characters.filter(c => c.kind === 'npc');
+    expect(npcs).toHaveLength(3);
+    expect(new Set(npcs.map(c => c.name)).size).toBe(3);
+    npcs.forEach((npc) => {
+      expect(npc.name.startsWith('ELITE CORPSEC ')).toBe(true);
+      expect(npc.tags).toEqual(expect.arrayContaining(['elite', 'corpsec', 'arasaka']));
+      expect(npc.npcOrigin).toMatchObject({ archetype: 'corpsec', tier: 'elite', faction: 'ARASAKA' });
+      expect(npc.base.INT).toBeGreaterThan(0);
+      expect(npc.base.REF).toBeGreaterThanOrEqual(8);
+      expect(npc.armor.body.name).not.toBe('NPC Armor');
+      expect(npc.armor.body.sp).toBeGreaterThanOrEqual(15);
+      expect(npc.gear).toHaveLength(2);
+      expect(npc.gear[0].code).toBeTruthy();
+      expect(npc.notes).toContain('NPC aleatorio');
+      expect(component.state.combatState.order).toContain(npc.id);
+    });
+    expect(component.normalizeSkills).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'Evasion', level: 4 })]), expect.any(Object));
+    expect(component.flash).toHaveBeenCalledWith('3 NPCs aleatorios adicionados ao combate');
+    // The squad lands in the combat state with a single write, not one per NPC.
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(set.mock.calls[0][0].order).toEqual(expect.arrayContaining(npcs.map(c => c.id)));
+  });
+
+  it('saveCombatState adopts the revision the server answers with, so back-to-back writes do not race', async () => {
+    let revision = 3;
+    const set = vi.fn(async (s) => ({ ...s, revision: ++revision }));
+    const component = fakeComponent({ api: () => ({ combat: { state: { set } } }) });
+    const h = combatHandlers(component);
+    await h.addCombatant('rook', 'pc');
+    expect(component.state.combatState.revision).toBe(4);
+    await h.addCombatant('mira', 'pc');
+    expect(set.mock.calls[1][0].revision).toBe(4);
+    expect(component.state.combatState.revision).toBe(5);
+  });
+
+  it('addCombatants adds a whole group in one write and repairs the turn index', async () => {
+    const set = vi.fn(async (s) => s);
+    const component = fakeComponent({
+      api: () => ({ combat: { state: { set } } }),
+      state: { characters: [mira, rook, { ...rook, id: 'g1' }, { ...rook, id: 'g2' }], combatState: { ...baseCombatState(), combatants: {}, order: [], turnIndex: -1 } },
+    });
+    const h = combatHandlers(component);
+    await h.addCombatants(['g1', 'g2', '', 'g1'], 'enemy');
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(component.state.combatState.order).toEqual(['g1', 'g2']);
+    expect(component.state.combatState.combatants.g2.side).toBe('enemy');
+    expect(await h.addCombatants([], 'enemy')).toBeNull();
+  });
+
+  it('createCombatNpc keeps the generated STAT block but lets the edited BODY/REF inputs win', async () => {
+    const set = vi.fn(async (s) => s);
+    const component = fakeComponent({
+      api: () => ({ combat: { state: { set } }, characters: { upsert: vi.fn(async (c) => c) } }),
+      normalizeStats: (b) => b,
+      normalizeSkills: vi.fn((skills) => skills || []),
+      slug: (s) => String(s).toLowerCase().replace(/\s+/g, '-'),
+      normalizeGearItem: (item, idx) => ({ ...item, id: item.id || 'gear-' + idx }),
+    });
+    const h = combatHandlers(component);
+    const draft = npcDraftFromGenerated(generateNpc({ archetype: 'ganger', tier: 'base', seed: 'edit' }));
+    await h.createCombatNpc({ ...draft, body: '9', ref: '2' });
+    const npc = component.state.characters.find(c => c.kind === 'npc');
+    expect(npc.base.BODY).toBe(9);
+    expect(npc.base.REF).toBe(2);
+    expect(npc.base.INT).toBe(draft.generated.stats.INT);
+    expect(npc.tags).toEqual(draft.generated.tags);
+    expect(npc.bodyType).toBe('meat');
+  });
+
+  it('spawnRandomNpcs refuses without GM login', async () => {
+    const component = fakeComponent({ ensureGm: vi.fn(() => false) });
+    const h = combatHandlers(component);
+    await h.spawnRandomNpcs();
+    expect(component.state.characters.filter(c => c.kind === 'npc')).toHaveLength(0);
   });
 });
