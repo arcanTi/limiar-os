@@ -124,7 +124,7 @@
 	              <span class="lm-player-create-plus">+</span>
 	              <span class="lm-player-create-body">
 	                <span class="lm-player-create-title">CRIAR OPERATIVO</span>
-	                <span class="lm-player-create-sub">CYBERPUNK RED // FICHA AUTO</span>
+	                <span class="lm-player-create-sub">CYBERPUNK RED // ASSISTENTE GUIADO</span>
 	              </span>
 	            </button>
 	          </div>
@@ -2066,12 +2066,6 @@
             </sc-if>
           </div>
         </sc-if>
-        <sc-if value="{{ canPlayerCreateSheet }}">
-          <div class="px-4 pb-4 mt-auto flex gap-1.5">
-            <button onClick="{{ cancelSheetEdit }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact lm-ui-btn--full">{{ tx.cancel }}</button>
-            <button onClick="{{ saveSheetDraft }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact lm-ui-btn--full">{{ tx.saveSheet }}</button>
-          </div>
-        </sc-if>
       </aside>
 
       <!-- CENTER: tabs + content -->
@@ -2304,19 +2298,6 @@
           </sc-if>
         </div>
       </sc-if>
-      <sc-if value="{{ canPlayerCreateSheet }}">
-        <div class="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-cyber-cyan/20 flex-wrap">
-          <div>
-            <div class="text-[10px] font-mono tracking-widest text-cyber-cyan">PLAYER CHARACTER BUILDER</div>
-            <div class="text-[9px] font-mono text-cyber-muted mt-0.5">Cyberpunk RED // Streetrat-style auto totals</div>
-          </div>
-          <div class="flex gap-1.5 flex-shrink-0">
-            <button onClick="{{ cancelSheetEdit }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ tx.cancel }}</button>
-            <button onClick="{{ saveSheetDraft }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">{{ tx.saveSheet }}</button>
-          </div>
-        </div>
-      </sc-if>
-
       <div class="lm-operative-profile">
         <div class="lm-operative-portrait-wrap flex-shrink-0" style="width:112px;">
           <sc-if value="{{ canEditSheet }}">

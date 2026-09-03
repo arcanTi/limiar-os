@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { sheetHandlers, sheetRenderVals } from '../../../src/ui/views/sheet.js';
+import { mountOnboardingWizard } from '../../../src/ui/views/onboarding.js';
+
+vi.mock('../../../src/ui/views/onboarding.js', () => ({ mountOnboardingWizard: vi.fn(() => ({})) }));
 import PersistCharacter from '../../../src/application/PersistCharacter.ts';
 import {
   damageProgramRez,
@@ -364,6 +367,62 @@ describe('ui/views/sheet sheetHandlers', () => {
     sheetHandlers(component).editSheet();
     expect(component.state.sheetEditing).toBe(true);
     expect(component.state.sheetTab).toBe('core');
+  });
+
+  it('createPlayerCharacter opens the guided wizard scoped to the active campaign instead of the drawer builder', () => {
+    mountOnboardingWizard.mockClear();
+    const api = vi.fn(() => ({ characters: {}, campaigns: {} }));
+    const svgCard = () => 'svg';
+    const component = fakeComponent({
+      state: { gm: false, gmAuthenticated: false, authAuthenticated: true, activeCampaignId: 'mesa-1', activeCampaignName: 'Mesa Um', sheetOpen: false },
+      api,
+      store: vi.fn(() => ({ svgCard })),
+    });
+    sheetHandlers(component).createPlayerCharacter();
+    expect(mountOnboardingWizard).toHaveBeenCalledOnce();
+    expect(mountOnboardingWizard.mock.calls[0][0]).toMatchObject({ mode: 'new', campaignId: 'mesa-1', campaignName: 'Mesa Um', svgCard });
+    expect(component.state.sheetCreating).toBeUndefined();
+    expect(component.state.sheetEditing).toBeUndefined();
+  });
+
+  it('createPlayerCharacter lands on the new sheet after the wizard finishes', async () => {
+    mountOnboardingWizard.mockClear();
+    const reloadRemoteData = vi.fn(async function () {
+      this.state = { ...this.state, characters: [...characters, { id: 'c', name: 'NEW', role: 'Solo', level: 1 }] };
+    });
+    const component = fakeComponent({
+      state: { gm: false, gmAuthenticated: false, authAuthenticated: true, sheetOpen: false },
+      api: vi.fn(() => ({})),
+    });
+    component.reloadRemoteData = reloadRemoteData;
+    sheetHandlers(component).createPlayerCharacter();
+    const { onDone } = mountOnboardingWizard.mock.calls[0][0];
+    onDone({ skipped: true });
+    expect(reloadRemoteData).not.toHaveBeenCalled();
+    await onDone({ character: { id: 'c' } });
+    expect(reloadRemoteData).toHaveBeenCalledOnce();
+    expect(component.state).toMatchObject({ activeCharacterId: 'c', sheetOpen: true, sheetEditing: false, sheetCreating: false, gm: false });
+  });
+
+  it('createPlayerCharacter redirects to login when nobody is authenticated', () => {
+    mountOnboardingWizard.mockClear();
+    const component = fakeComponent({ state: { gmAuthenticated: false, authAuthenticated: false } });
+    sheetHandlers(component).createPlayerCharacter();
+    expect(component.redirectToLogin).toHaveBeenCalled();
+    expect(mountOnboardingWizard).not.toHaveBeenCalled();
+  });
+
+  it('createSheetCharacter keeps the drawer builder for the GM and routes players to the wizard', () => {
+    mountOnboardingWizard.mockClear();
+    const gm = fakeComponent();
+    sheetHandlers(gm).createSheetCharacter();
+    expect(gm.state).toMatchObject({ sheetEditing: true, sheetCreating: true });
+    expect(mountOnboardingWizard).not.toHaveBeenCalled();
+
+    const player = fakeComponent({ state: { gm: false, gmAuthenticated: false, authAuthenticated: true }, api: vi.fn(() => ({})) });
+    sheetHandlers(player).createSheetCharacter();
+    expect(mountOnboardingWizard).toHaveBeenCalledOnce();
+    expect(player.state.sheetCreating).toBeUndefined();
   });
 
   it('cancelSheetEdit clears the draft and editing flags', () => {

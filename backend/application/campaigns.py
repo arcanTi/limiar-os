@@ -56,7 +56,10 @@ class CampaignService:
             raise ApplicationError(403, "Character access denied")
         visible = self.campaigns.list_campaigns_for(dict(session))
         row = next((item for item in visible if item.get("id") == campaign_id), None)
-        if not row or not row.get("canJoin"):
+        # A player already seated at the table may join again with another of
+        # their own sheets: the new operative replaces the previous seat. Only
+        # outsiders need the public/invited `canJoin` gate.
+        if not row or not (row.get("canJoin") or row.get("isMember")):
             raise ApplicationError(403, "Campaign access denied")
         return self.campaigns.join_campaign(campaign_id, character_id, dict(session))
 

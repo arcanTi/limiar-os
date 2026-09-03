@@ -27,6 +27,7 @@ import {
   programRunModifiers,
 } from '../../domain/netrunning/index.ts';
 import { ipCost as econIpCost, ipRoleCost as econIpRoleCost, formatIpLogRows as econFormatIpLogRows } from '../../domain/economy/index.ts';
+import { mountOnboardingWizard } from './onboarding.js';
 import { BODY_TYPES as TOXIN_BODY_TYPES } from '../../domain/toxins/index.ts';
 import { characterEffectDigest } from '../../domain/effects/index.ts';
 import { effectPresetCatalog } from '../../domain/effects/customEffects.ts';
@@ -48,7 +49,6 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const isPlayer = !!(S.authUser && S.authUser.role === 'player');
   const canEditSheet = (S.gmAuthenticated && S.gm) || isPlayer;
   const canSaveSheet = canEditSheet || (S.sheetEditing && S.sheetCreating && !S.gmAuthenticated);
-  const canPlayerCreateSheet = S.sheetEditing && S.sheetCreating && !S.gmAuthenticated && S.authAuthenticated;
 
   const sheetDraft = S.sheetDraft || deps.sheetDraftFrom(activeCharacter);
   const updateSheetField = (key, value) => deps.setState(s => {
@@ -577,7 +577,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     onRepairAmount: (e) => deps.setState({ shieldRepairAmount: e.target.value }),
   };
   return {
-    canEditSheet, notCanEditSheet: !canEditSheet, canSaveSheet, canPlayerCreateSheet,
+    canEditSheet, notCanEditSheet: !canEditSheet, canSaveSheet,
     isGmSheet: !!S.gm,
     activeIp, activeIpPct: deps.clampPct(activeIp / 1000 * 100),
     portraitUrl: activeCharacter.portraitUrl || '',
@@ -794,14 +794,43 @@ export function sheetHandlers(component) {
     component.setState({ sheetEditing: true, sheetCreating: false, sheetDraft: sheetDraftFrom(component.activeCharacter()), sheetTab: 'core' });
   }
 
+  // Players never build a sheet inside the drawer: every new operative goes
+  // through the same guided wizard as the first access. Inside a campaign the
+  // wizard also joins with the new sheet, which replaces the player's seat.
   function createPlayerCharacter() {
     if (!component.state.authAuthenticated) {
       component.redirectToLogin();
       return;
     }
-    component.setState({ sheetOpen: true, sheetEditing: true, sheetCreating: true, sheetDraft: newSheetDraft(), gm: false, sheetTab: 'core' });
+    const api = component.api();
+    if (!api) return;
+    const store = component.store() || {};
+    return mountOnboardingWizard({
+      api,
+      mode: 'new',
+      svgCard: store.svgCard,
+      campaignId: component.state.activeCampaignId || '',
+      campaignName: component.state.activeCampaignName || '',
+      onDone: ({ skipped, character } = {}) => {
+        if (skipped || !character) return;
+        openCreatedCharacter(character);
+      },
+    });
   }
 
+  // Pull the fresh roster, then land on the sheet that was just created. A
+  // failed refresh falls back to a reload so the player never sees a stale list.
+  async function openCreatedCharacter(character) {
+    try {
+      if (typeof component.reloadRemoteData === 'function') await component.reloadRemoteData();
+      selectCharacter(character.id);
+      component.setState({ sheetOpen: true, sheetEditing: false, sheetCreating: false, sheetDraft: null, gm: false, sheetTab: 'core' });
+    } catch {
+      if (globalThis.location && typeof globalThis.location.reload === 'function') globalThis.location.reload();
+    }
+  }
+
+  // GMs keep the full drawer builder; players are routed to the wizard.
   function createSheetCharacter() {
     if (!component.state.gmAuthenticated) return createPlayerCharacter();
     component.setState({ sheetEditing: true, sheetCreating: true, sheetDraft: newSheetDraft(), sheetTab: 'core' });

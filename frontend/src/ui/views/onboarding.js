@@ -1,7 +1,11 @@
-// First-character wizard. A new player cannot join a campaign without a
-// character, so this overlay breaks creation into validated steps and preserves
-// the target campaign through completion. It mounts independently and delegates
-// events from its root, following the campaigns overlay pattern.
+// Character wizard. A new player cannot join a campaign without a character,
+// so this overlay breaks creation into validated steps and preserves the target
+// campaign through completion. It mounts independently and delegates events
+// from its root, following the campaigns overlay pattern.
+//
+// Two modes share the same steps: `first` (login-time onboarding, may be
+// skipped for later) and `new` (a player already inside the app creates another
+// operative; inside a campaign the new sheet replaces their seat there).
 
 import {
   WIZARD_STEPS,
@@ -36,6 +40,28 @@ import {
   CPRED_STAT_BUDGET,
   CPRED_STAT_ORDER,
 } from '../../domain/character/constants.ts';
+
+export const WIZARD_MODES = ['first', 'new'];
+
+/** Header/footer copy that differs between first access and a later new sheet. */
+export function wizardCopy(mode = 'first') {
+  if (mode === 'new') {
+    return {
+      mode,
+      kicker: 'NOVO OPERATIVO // FICHA',
+      ariaLabel: 'Criar um novo operativo',
+      skipLabel: 'Cancelar',
+      campaignNote: (name) => `Ao concluir, este operativo passa a ser o seu personagem em <strong>${esc(name)}</strong>.`,
+    };
+  }
+  return {
+    mode: 'first',
+    kicker: 'PRIMEIRO ACESSO // FICHA',
+    ariaLabel: 'Criar seu primeiro operativo',
+    skipLabel: 'Fazer isso depois',
+    campaignNote: (name) => `Ao concluir, você entra em <strong>${esc(name)}</strong>.`,
+  };
+}
 
 const esc = (value) => String(value == null ? '' : value)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -279,7 +305,7 @@ function skillsStep(draft, filter) {
     </div>`;
 }
 
-function reviewStep(draft, campaignName) {
+function reviewStep(draft, campaignName, mode = 'first') {
   const raised = draft.skills.filter((skill) => skill.level > skillFloor(skill));
   const rolled = draft.statMethod === 'roll';
   const rerolls = statRerollCount(draft);
@@ -308,30 +334,31 @@ function reviewStep(draft, campaignName) {
     : '<span class="font-sans text-xs text-cyber-text/45">Nenhuma perícia acima do nível inicial.</span>'}
         </div>
       </section>
-      ${campaignName ? `<div class="font-sans text-[13px] text-cyber-bright bg-cyber-gold/10 border-l-[3px] border-cyber-gold px-3 py-2.5">Ao concluir, você entra em <strong>${esc(campaignName)}</strong>.</div>` : ''}
+      ${campaignName ? `<div class="font-sans text-[13px] text-cyber-bright bg-cyber-gold/10 border-l-[3px] border-cyber-gold px-3 py-2.5">${wizardCopy(mode).campaignNote(campaignName)}</div>` : ''}
     </div>`;
 }
 
 function render(root, state) {
   const progress = wizardProgress(state.step, state.draft);
+  const copy = wizardCopy(state.mode);
   const body = {
     system: () => systemStep(state.draft),
     identity: () => identityStep(state.draft),
     attributes: () => attributesStep(state.draft, state.hint),
     skills: () => skillsStep(state.draft, state.skillFilter),
-    review: () => reviewStep(state.draft, state.campaignName),
+    review: () => reviewStep(state.draft, state.campaignName, state.mode),
   }[state.step]();
 
   const footBtn = 'font-mono text-[11px] font-bold tracking-[1.5px] px-5 py-2.5 cursor-pointer border';
 
   root.innerHTML = `
     <div data-wiz-backdrop class="absolute inset-0 bg-cyber-bg/90 backdrop-blur-sm"></div>
-    <section role="dialog" aria-modal="true" aria-label="Criar seu primeiro operativo"
+    <section role="dialog" aria-modal="true" aria-label="${copy.ariaLabel}"
              class="clip-all relative mx-auto top-1/2 -translate-y-1/2 w-[min(760px,calc(100vw-2rem))] max-h-[calc(100vh-3rem)]
                     flex flex-col bg-cyber-surface border border-cyber-gold/35">
       <header class="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-cyber-gold/20">
         <div>
-          <p class="font-mono text-[10px] font-semibold tracking-[2px] text-cyber-gold m-0 mb-1">PRIMEIRO ACESSO // FICHA</p>
+          <p class="font-mono text-[10px] font-semibold tracking-[2px] text-cyber-gold m-0 mb-1">${copy.kicker}</p>
           <h2 class="font-sans text-[22px] font-bold tracking-wide text-cyber-bright m-0">${esc(progress.label)}</h2>
           <p class="font-mono text-[10px] tracking-[1px] text-cyber-text/45 m-0 mt-1">Passo ${progress.index + 1} de ${progress.total}</p>
         </div>
@@ -340,7 +367,7 @@ function render(root, state) {
       <div class="flex-1 min-h-0 overflow-y-auto px-6 py-5">${body}</div>
       ${pendingBlock(progress)}
       <footer class="flex items-center justify-between gap-3 px-6 py-4 border-t border-cyber-gold/20">
-        <button type="button" data-wiz-skip class="${footBtn} border-cyber-text/20 text-cyber-text/55">Fazer isso depois</button>
+        <button type="button" data-wiz-skip class="${footBtn} border-cyber-text/20 text-cyber-text/55">${copy.skipLabel}</button>
         <div class="flex gap-2">
           ${progress.index > 0 ? `<button type="button" data-wiz-back class="${footBtn} border-cyber-gold text-cyber-gold">Voltar</button>` : ''}
           <button type="button" data-wiz-next ${progress.canAdvance ? '' : 'disabled'}
@@ -353,8 +380,9 @@ function render(root, state) {
     </section>`;
 }
 
-export function createWizardController({ api, campaignId = '', campaignName = '', onDone, svgCard } = {}) {
+export function createWizardController({ api, campaignId = '', campaignName = '', onDone, svgCard, mode = 'first' } = {}) {
   const state = {
+    mode: WIZARD_MODES.includes(mode) ? mode : 'first',
     step: WIZARD_STEPS[0],
     draft: createWizardDraft(),
     skillFilter: '',
@@ -491,6 +519,7 @@ export function mountOnboardingWizard({
   campaignName = '',
   onDone,
   svgCard,
+  mode = 'first',
 } = {}) {
   if (!api || !documentRef?.body) return null;
   let root = documentRef.getElementById('limiar-onboarding-wizard');
@@ -501,12 +530,13 @@ export function mountOnboardingWizard({
   }
   if (root.dataset.mounted === 'true') return root;
   root.dataset.mounted = 'true';
-  // The root covers the screen only while mounted; dismissing it restores
-  // `hidden` so the empty element cannot intercept clicks.
+  // The root covers the screen only while mounted. Dismissing removes it so
+  // the next mount (e.g. a player creating another operative) starts from a
+  // fresh element instead of stacking a second set of delegated listeners.
   root.className = 'fixed inset-0 z-[900]';
   root.hidden = false;
 
-  const controller = createWizardController({ api, campaignId, campaignName, onDone, svgCard });
+  const controller = createWizardController({ api, campaignId, campaignName, onDone, svgCard, mode });
 
   /**
    * Repaint the step and restore focus to the field that was in use.
@@ -529,6 +559,7 @@ export function mountOnboardingWizard({
     root.dataset.mounted = 'false';
     root.innerHTML = '';
     root.hidden = true;
+    if (typeof root.remove === 'function') root.remove();
   }
 
   function close() {

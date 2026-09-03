@@ -7,6 +7,7 @@ import pytest
 
 from backend.application.campaign_events import CampaignEventService
 from backend.application.campaign_maps import CampaignMapService
+from backend.application.campaigns import CampaignService
 from backend.application.characters import CharacterService
 from backend.application.errors import ApplicationError
 from backend.application.game_state import GameStateService
@@ -87,11 +88,20 @@ class MemoryCampaigns:
             return True
         return session["username"] in self.owners.get(campaign_id, ())
 
-    def list_campaigns_for(self, _session):
+    def list_campaigns_for(self, session):
         return [
-            {"id": campaign_id, "canJoin": campaign_id in self.joinable}
+            {
+                "id": campaign_id,
+                "canJoin": campaign_id in self.joinable,
+                "isMember": self.is_campaign_member(campaign_id, session),
+            }
             for campaign_id in sorted(self.campaign_ids)
         ]
+
+    def join_campaign(self, campaign_id, character_id, session):
+        if self.members is not None:
+            self.members.setdefault(campaign_id, set()).add(session["username"])
+        return {"campaign_id": campaign_id, "username": session["username"], "character_id": character_id}
 
 
 class MemoryIdentity:
@@ -263,6 +273,28 @@ def test_first_sheet_can_be_written_before_the_join_completes():
 
     with pytest.raises(ApplicationError, match="Campaign access denied"):
         service.save_as_player({"id": "sneak", "name": "Sneak"}, newbie, "closed")
+
+
+def test_seated_player_can_join_again_with_another_own_sheet():
+    """Creating a new operative inside a table re-seats the player with it."""
+    records = MemoryRecords({"characters": {
+        "ana-old": {"id": "ana-old", "ownerUsername": "ana"},
+        "ana-new": {"id": "ana-new", "ownerUsername": "ana"},
+        "bruno-pc": {"id": "bruno-pc", "ownerUsername": "bruno"},
+    }})
+    campaigns = MemoryCampaigns(campaign_ids=("mesa",), members={"mesa": {"ana"}}, joinable=())
+    service = CampaignService(campaigns, records, events=None)
+    ana = {"username": "ana", "role": "player"}
+
+    seat = service.join("mesa", "ana-new", ana)
+    assert seat["character_id"] == "ana-new"
+
+    # Membership does not open the table to someone who was never let in.
+    with pytest.raises(ApplicationError, match="Campaign access denied"):
+        service.join("mesa", "bruno-pc", {"username": "bruno", "role": "player"})
+    # Nor does it let the seated player bring someone else's sheet.
+    with pytest.raises(ApplicationError, match="Character access denied"):
+        service.join("mesa", "bruno-pc", ana)
 
 
 def test_end_turn_policy_advances_owned_combatant():

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildCharacterPayload, createWizardController } from '../../../src/ui/views/onboarding.js';
+import { buildCharacterPayload, createWizardController, wizardCopy } from '../../../src/ui/views/onboarding.js';
 import { createWizardDraft, rollStats, setSkillLevel, skillFloor } from '../../../src/domain/character/characterWizard.ts';
 
 function completeDraft(name = 'V Angel') {
@@ -188,5 +188,36 @@ describe('conclusao', () => {
 
     expect(api.characters.createPlayer).toHaveBeenCalledOnce();
     expect(first.ok !== second.ok).toBe(true);
+  });
+});
+
+describe('modo novo operativo (jogador ja dentro do app)', () => {
+  it('troca o cabecalho e o botao de saida sem mudar os passos', () => {
+    const first = wizardCopy('first');
+    const again = wizardCopy('new');
+    expect(first.kicker).toContain('PRIMEIRO ACESSO');
+    expect(first.skipLabel).toBe('Fazer isso depois');
+    expect(again.kicker).toContain('NOVO OPERATIVO');
+    expect(again.skipLabel).toBe('Cancelar');
+    expect(again.campaignNote('Mesa X')).toContain('passa a ser o seu personagem');
+  });
+
+  it('cai no modo de primeiro acesso para valores desconhecidos', () => {
+    expect(wizardCopy('whatever').mode).toBe('first');
+    expect(createWizardController({ api: fakeApi(), mode: 'bogus' }).state.mode).toBe('first');
+    expect(createWizardController({ api: fakeApi(), mode: 'new' }).state.mode).toBe('new');
+  });
+
+  it('dentro da campanha, a nova ficha entra na mesa e substitui o assento', async () => {
+    const api = fakeApi();
+    const onDone = vi.fn();
+    const controller = createWizardController({ api, campaignId: 'mesa-1', mode: 'new', onDone });
+    controller.state.draft = completeDraft('rook two');
+
+    const result = await controller.finish();
+
+    expect(result.ok).toBe(true);
+    expect(api.campaigns.join).toHaveBeenCalledWith('mesa-1', expect.stringMatching(/^rook-two-/));
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ campaignId: 'mesa-1', character: expect.objectContaining({ name: 'ROOK TWO' }) }));
   });
 });
