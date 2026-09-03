@@ -6,6 +6,7 @@ import './styles/main.css';
 // view. Loading it asynchronously keeps the player-sheet startup chunk lean.
 void import('../games/nexus/index.js');
 import { createLimiarAPI, LimiarStore } from './infrastructure/store.ts';
+import { downloadBytes } from './infrastructure/download.ts';
 import { mountComponent } from './framework/index.js';
 import Component from './ui/Component.js';
 import { mountCampaignsOverlay } from './ui/views/campaigns.js';
@@ -25,6 +26,7 @@ mountComponent(Component, {
   api,
   app,
   store: LimiarStore,
+  downloadFile: downloadBytes,
   activeCampaignId,
 });
 
