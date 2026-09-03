@@ -176,4 +176,39 @@ export interface CanonicalRules {
   criticalInjuryAliases?: unknown;
   redmasCatalogCorrections?: Record<string, CanonicalCatalogEntry>;
   homebrewLimiarCatalogCorrections?: Record<string, CanonicalCatalogEntry>;
+  corePoisonAndDrugRules?: CanonicalPoisonAndDrugRules;
+}
+
+export interface CanonicalPoisonAndDrugRules {
+  sourceType?: string;
+  source?: string;
+  coreMechanic?: {
+    checkSkill?: string;
+    onFailure?: string;
+    onSuccess?: string;
+    armorInteraction?: { ablatesArmor?: boolean; soaksDamage?: boolean };
+    immuneBodyTypes?: string[];
+    immuneNote?: string;
+  };
+  intensities?: Record<string, { resistDV?: number; damage?: string }>;
+  poisons?: Record<string, { name?: string; intensity?: string }>;
+  drugs?: Record<string, { name?: string; intensity?: string; effect?: string }>;
+  ammunition?: Record<string, CanonicalToxinAmmunitionEntry>;
+  doses?: Record<string, { name?: string; toxinId?: string }>;
+  relatedCyberware?: Record<string, string>;
+  crafting?: string;
+}
+
+export interface CanonicalToxinAmmunitionEntry {
+  name?: string;
+  cost?: number;
+  costCategory?: string;
+  eligibleWeapons?: string[];
+  dealsBaseWeaponDamage?: boolean;
+  condition?: string;
+  resistDV?: number;
+  damage?: string;
+  inflictedInjury?: string;
+  injuryDuration?: string;
+  bonusDamageApplied?: boolean;
 }
