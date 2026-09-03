@@ -19,7 +19,7 @@ The latest evidence-based repository score lives in
 | Login | Character sheet | Tactical Mesa |
 | --- | --- | --- |
 | ![Login screen](docs/screenshots/login.png) | ![Character sheet](docs/screenshots/character-sheet.png) | ![Tactical Mesa in combat](docs/screenshots/tactical-map.png) |
-| Local username/password login, optional Google sign-in, no external service required to start a session. | Full CPR operative file — attributes, Trauma Team plan, Humanity, RAM and IP tracked live. | Scene, tokens, HP rings and round/turn state, all synced to the shared combat cockpit. |
+| Login is a single 6-character access token handed out by the GM — no password, no external service. | Full CPR operative file — attributes, Trauma Team plan, Humanity, RAM and IP tracked live. | Scene, tokens, HP rings and round/turn state, all synced to the shared combat cockpit. |
 
 ## What the system does
 
@@ -47,10 +47,9 @@ interface are built for that system.
 
 The project is local-first:
 
-- local user/password login works without an external provider;
+- login is a 6-character access token issued at the table, with no external provider;
 - Docker Compose starts the Python server and PostgreSQL together;
-- Google Login is an optional integration;
-- absence of Google configuration does not block local login.
+- no email is ever sent: a GM reads a token out and the player types it in.
 
 ## Access and campaigns
 
@@ -64,6 +63,119 @@ Access control has three roles:
 Public campaigns can be discovered and joined with a player sheet. Private
 campaigns require an invite. The campaigns drawer shows notifications,
 invites, roster, linked sheet and the **MESA** entry.
+
+### Character scope
+
+A character belongs to exactly one campaign. A GM sees and manages only the
+sheets of tables they run — a player's sheet never appears at another table —
+and sheets created before any campaign was chosen, including the seeded
+NOVA/BYTE/IRIS demo trio, live in a campaign-less bucket that the desktop shows
+only when you continue without a campaign.
+
+Staff delete a sheet from **SYSTEM → GM DATA OPS → PERSONAGENS DESTA
+CAMPANHA**, which is also how a table clears the demo sheets on a fresh
+install. Deletion is limited to the campaign you run; `admin` can delete any.
+
+## Effects panel
+
+`deriveStats` reports that a character is at `-6` to actions. The **PAINEL DE
+EFEITOS**, at the top of the sheet's CONDICOES tab, says why:
+
+```
+PAINEL DE EFEITOS                                        -6 acoes
+
+CONTRA (6)
+ -2  Olho Danificado :: -2 em acoes      CABECA :: Tratamento DV13     [X]
+ -2  Embriagado :: -2 em acoes           1 h :: origem: toxina:alcohol [X]
+ -2  Ferido Grave :: -2 em acoes         HP 12 <= 20
+ -2  Armadura :: -2 em REF, DEX e MOVE   penalidade da peca mais pesada
+ -3  SP perdido :: cabeca -3 / corpo -0  atual 8/11 e 11/11
+ -2  Chrome instalado :: -2 Humanidade   custo permanente
+
+A FAVOR (1)
+ +2  Toxin Binders :: +2 em Resist Torture/Drugs
+
+EM VIGOR (sem numero)
+     Envenenado                          origem: toxina:arsenic        [X]
+```
+
+It gathers every live source — untreated critical injuries, status effects
+(tarot, conditions, toxins), the Seriously Wounded penalty, armor penalty and
+ablation, cyberware stat/skill bonuses and humanity cost, cyberpsychosis,
+accelerated healing, poison immunity — into one ledger split into what is
+against the character, what is for them, and what is in force without a number.
+
+Rows that a GM can lift carry an **X**: status effects and critical injuries.
+Structural facts (armor penalty, wound state, installed chrome) do not, because
+removing them means changing the sheet, not clearing a condition.
+
+The totals come from `deriveStats`, never from summing the rows. The rows are an
+explanation of that number and must not be able to contradict it.
+
+### Creating an effect
+
+**SYSTEM → GM DATA OPS → EFEITOS** authors an effect and hands it to players.
+The form only offers modifiers the conditions engine actually reads:
+
+| Field | Effect |
+| --- | --- |
+| Acoes | added to every action roll |
+| Evasao | added to evasion |
+| MOVE | added to effective MOVE |
+| Death Save | added to the Death Save |
+| Atributo | added to one stat (INT, REF, DEX…) |
+| SP cabeca / corpo | armor ablated |
+| Cargas | uses before the effect burns out |
+| Ignora Ferido Grave / estado de ferimento / Death Save | engine flags |
+
+Values are **signed**: `+2` helps, `-2` hurts. A blank duration means
+indefinite. **EFEITO REAL** previews what will actually be saved, built by the
+same normalizer that saves it — so anything the engine would ignore is already
+gone from the preview.
+
+That closed vocabulary is the point. A free-text modifier would render as a
+badge on the sheet and change no roll at the table; here an authored effect
+becomes the same status instance a built-in preset produces, so it flows
+through aggregation, duration, charges and the effects panel with no second
+code path. Campaign effects appear in the sheet's ADD STATUS picker marked with
+`*`, and are stored per campaign — reusing a preset id overrides it for that
+table only.
+
+## Poisons and drugs
+
+A toxin is resisted with one **Resist Torture/Drugs** check against a fixed DV.
+Failing takes the full effect; passing costs nothing. Poison damage goes
+**straight to HP** — armor neither soaks it nor ablates from it — which is why
+toxins never travel through the combat damage engine.
+
+| Intensity | Resist DV | Poison damage |
+| --- | --- | --- |
+| Mild (Beladona, Lixo Toxico) | 11 | 1d6 direct HP |
+| Strong (Arsenico) | 13 | 2d6 direct HP |
+| Deadly (Biotoxina, Peixe-Pedra) | 15 | 3d6 direct HP |
+
+Drugs use the same rungs and DVs but describe a state instead of rolling dice:
+Alcool (embriaguez), Pentotal Sodico (sugestionabilidade), Droga de Grife.
+
+**Immunity.** Poison needs meat. Each sheet carries a `CORPO / TOXINAS` field —
+`meat`, `fbc` or `drone`; drones and Full Body Conversions are immune outright,
+and the cockpit's DRONE template spawns immune. Nasal Filters block **inhaled**
+toxins only, never injected or ingested ones. Toxin Binders add +2 to the check.
+
+**GM bench** (SYSTEM → GM DATA OPS → TOXINAS): pick a toxin, tick the targets
+— each one shows its immunity before you spend the dose — and APLICAR rolls one
+check per target, writes the HP loss and status, and posts the result to chat.
+The same screen authors the campaign's own toxins: name, kind, intensity, and
+optionally a tuned DV and damage. Left blank, DV and dice follow the intensity.
+Custom toxins are stored per campaign and never leak to another table; reusing a
+book toxin's id overrides it for that table only.
+
+**Ammunition.** Biotoxina (500eb), Veneno (100eb) and Gas Lacrimogeneo (50eb)
+are sold in the market and delivered like any other item. They fit arrows and
+grenades only, and deal **no weapon damage at all** — a hit hands the target
+straight to the resist check. Load one from the weapon row in the combat
+cockpit; the button cycles through the rounds that weapon accepts and back to
+none.
 
 ## Tactical Mesa
 
@@ -331,8 +443,7 @@ For native development, point the process at a reachable PostgreSQL database:
 
 ```bash
 cd frontend && npm run build && cd ..
-LIMIAR_DATABASE_URL='postgresql://limiar:password@127.0.0.1:5432/limiar' \
-LIMIAR_GM_PASSWORD='replace-this' python3 server.py
+LIMIAR_DATABASE_URL='postgresql://limiar:password@127.0.0.1:5432/limiar' python3 server.py
 ```
 
 The real server serves the UI, `/api/*`, WebSocket events and PostgreSQL. A
@@ -355,34 +466,62 @@ the next `docker compose up` creates schema version 1 and a fresh admin.
 
 ## Local login
 
-On a fresh database, the initial admin user is controlled by:
+Every account is reached with one **6-character access token** — no username,
+no password. Typing the token *is* logging in, and the token belongs to exactly
+one account.
+
+Tokens are drawn from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`: `0`, `O`, `1`, `I` and
+`L` are left out so a token read aloud at the table cannot be mistyped into
+someone else's account. Input is case-insensitive and separators are ignored,
+so `a7k2-qf` and `A7K2QF` are the same token.
+
+### Issuing tokens
+
+Admins and GMs issue tokens from **SYSTEM → GM DATA OPS → EMITIR TOKEN DE
+ACESSO** in the app:
+
+- a new username mints a fresh token, shown once in full so it can be read out;
+- **NOVO** on a roster row reissues a token, which immediately kills the old
+  one and every session it had opened;
+- with a campaign active, the invite box also puts the new account on that
+  table.
+
+A GM can only issue, reissue and delete `player` accounts; `gm` and `admin`
+accounts are admin-only.
+
+### The master account
+
+On a fresh database the bootstrap admin is controlled by:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `LIMIAR_GM_USER` | `mestre` | initial admin user |
-| `LIMIAR_GM_PASSWORD` | required in Compose | initial admin password |
+| `LIMIAR_GM_USER` | `mestre` | bootstrap admin username |
+| `LIMIAR_MASTER_TOKEN` | generated | bootstrap admin access token |
 
-Set both values in `.env` before the first `docker compose up`. They only seed
-the admin when PostgreSQL is empty.
+Leaving `LIMIAR_MASTER_TOKEN` unset is the recommended path: a random token is
+generated on first boot and written once to the server log —
+
+```bash
+docker compose logs app | grep 'master account'
+```
+
+Set it explicitly only if you need a token you already know:
 
 ```bash
 LIMIAR_GM_USER=mestre
-LIMIAR_GM_PASSWORD=replace-with-a-long-random-password
+LIMIAR_MASTER_TOKEN=A7K2QF
 ```
 
-## Optional Google Login
+### What a 6-character token is and is not
 
-Google Login is optional. To enable it, create an OAuth Client ID for Web, set
-it in `.env`, and recreate the application service:
-
-```bash
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-docker compose up -d --force-recreate app
-```
-
-The backend validates the `id_token`, `aud`, issuer and verified email.
-Without `GOOGLE_CLIENT_ID`, username/password login remains the supported
-flow and the Google integration stays unavailable.
+Six characters over a 31-symbol alphabet is about 887 million combinations —
+enough for a table, not enough to leave unguarded on the open internet. Two
+rate limits carry that weight: 10 login attempts per minute per IP, plus a
+deployment-wide cap of 60 per minute so spreading guesses over many addresses
+does not help. Tokens are stored in plain text, on purpose, because the GM
+panel has to be able to show them again; anyone with database access therefore
+has every account. Run the server on the table's network or behind an
+authenticating proxy, and reissue a token the moment it leaks.
 
 ## Other environment variables
 
@@ -401,16 +540,16 @@ deployment automation can reject an accidental legacy configuration.
 
 ## Rotating credentials
 
-`LIMIAR_GM_PASSWORD` only seeds the admin on a fresh database, so it cannot
-change the password of an account that already exists. To revoke every session
-and reset a password, stop the server and run:
+`LIMIAR_MASTER_TOKEN` only seeds the admin on a fresh database, so it cannot
+rotate the token of an account that already exists. To revoke every session and
+reissue a token, stop the server and run:
 
 ```bash
 docker compose exec app python scripts/rotate-credentials.py
 ```
 
-It prompts for the new password, so nothing sensitive reaches your shell
-history. Use `--sessions-only` to log everyone out without changing a password.
+The new token is printed once. Use `--user ana` to pick another account, or
+`--sessions-only` to log everyone out without touching any token.
 
 ## Rebuilding the frontend
 

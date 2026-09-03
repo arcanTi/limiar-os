@@ -23,8 +23,8 @@ build no longer produces.
 
 There is no screenshot pipeline in the repo. These were captured by driving a
 headless Chrome over the DevTools Protocol against a real `python3 server.py`,
-using a throwaway account created through `/api/register` and deleted from
-`data/limiar.db` afterwards. Two things matter if you redo it:
+using a throwaway account issued from the GM panel (`POST /api/users`) and
+deleted afterwards. Two things matter if you redo it:
 
 - capture at `deviceScaleFactor: 2` — the UI is dense, and at 1x it is
   unreadable once the README table scales the image down;

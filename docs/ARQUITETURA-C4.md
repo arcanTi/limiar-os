@@ -25,12 +25,10 @@ flowchart TB
 
     limiar["<b>Limiar OS</b><br/>[Sistema de software]<br/>Sistema operacional de campanha local-first<br/>para Cyberpunk RED: fichas, combate, mapa tático,<br/>campanhas, chat, cyberware, Tarot de Night City<br/>e o minigame Nexus Breach na mesma superfície"]
 
-    google["<b>Google Identity</b><br/>[Sistema externo · OPCIONAL]<br/>Emite id_token do Google Sign-In;<br/>validado via oauth2.googleapis.com/tokeninfo"]
     fs["<b>Sistema de arquivos local</b><br/>[Sistema externo]<br/>uploads/ (imagens), data/seed/ (catálogo)"]
 
     gm -->|"usa via navegador<br/>HTTP/JSON"| limiar
     player -->|"usa via navegador<br/>HTTP/JSON"| limiar
-    limiar -->|"valida id_token, aud, issuer<br/>e e-mail verificado · HTTPS<br/>só quando GOOGLE_CLIENT_ID está definido"| google
     limiar -->|"lê e grava<br/>uploads + referências"| fs
 
     classDef person fill:#6b6b6b,stroke:#3f3f3f,color:#fff
@@ -38,13 +36,12 @@ flowchart TB
     classDef external fill:#8b8b8b,stroke:#5f5f5f,color:#fff
     class gm,player person
     class limiar system
-    class google,fs external
+    class fs external
 ```
 
-**Ponto de arquitetura:** não há dependência externa obrigatória. Login
-local com usuário/senha (PBKDF2-HMAC em `backend/security.py`) funciona sem
-provedor nenhum; a ausência de `GOOGLE_CLIENT_ID` desabilita a integração
-Google sem bloquear o acesso.
+**Ponto de arquitetura:** não há dependência externa nenhuma. O login é um
+token de acesso de 6 caracteres (`backend/security.py`) emitido pelo mestre
+dentro do próprio app: sem senha, sem provedor, sem e-mail.
 
 ---
 
@@ -66,7 +63,7 @@ flowchart TB
         subgraph browser["Navegador"]
             direction TB
             shell["<b>App Shell</b><br/>[SPA · Vite/ES modules]<br/>frontend/index.html + dist/assets/<br/>Ficha, combate, campanhas, chat, HQ,<br/>Tarot, desktop"]
-            loginpg["<b>Login</b><br/>[Página · Vite entry]<br/>login.html + assets/login-*<br/>Login local, Google Sign-In,<br/>seletor de campanha"]
+            loginpg["<b>Login</b><br/>[Página · Vite entry]<br/>login.html + assets/login-*<br/>Token de acesso de 6 caracteres,<br/>seletor de campanha"]
             mapapp["<b>Mesa tática</b><br/>[Página · Vite entry + Canvas]<br/>campaign-map.html + assets/campaign-map-*<br/>Cenas, tokens, fog, LOS, luzes,<br/>templates de área, régua"]
             nexus["<b>Nexus Breach</b><br/>[Minigame · JS + Canvas]<br/>frontend/games/nexus/<br/>Netrunning embutido no shell"]
             dice["<b>sarah-dice</b><br/>[Lib vendorizada · WebGL]<br/>vendor/sarah-dice/<br/>Renderização 3D dos dados"]
@@ -81,7 +78,6 @@ flowchart TB
         build["<b>Build do frontend</b><br/>[Vite · tempo de build, não roda em produção]<br/>frontend/src/ → dist/*.js<br/>npm run build"]
     end
 
-    google["<b>Google Identity</b><br/>[Sistema externo · opcional]"]
 
     gm --> loginpg
     player --> loginpg
@@ -91,14 +87,13 @@ flowchart TB
     shell --> dice
 
     shell -->|"JSON/HTTPS<br/>/api/characters, /api/combat-state,<br/>/api/tarot-state, /api/chat, /api/hq…"| api
-    loginpg -->|"/api/login, /api/register,<br/>/api/auth/google, /api/session"| api
+    loginpg -->|"/api/login (token de acesso),<br/>/api/session"| api
     mapapp -->|"/api/campaign-maps/*<br/>+ long-poll /api/campaigns/{id}/updates"| api
     nexus -->|"/api/nexus-challenge<br/>/api/nexus-result"| api
 
     api -->|"psycopg · pool transacional"| db
     api -->|"grava e serve imagens"| uploads
     api -->|"carrega no boot / seed idempotente"| seed
-    api -->|"valida id_token · HTTPS"| google
     build -.->|"gera bundles que o backend serve"| shell
     build -.-> loginpg
     build -.-> mapapp
@@ -111,7 +106,6 @@ flowchart TB
     class gm,player person
     class shell,loginpg,mapapp,nexus,dice,api container
     class db,uploads,seed store
-    class google external
     class build tooling
 ```
 
@@ -136,10 +130,10 @@ flowchart TB
         subgraph routes["backend/routers/ — endpoints FastAPI nativos"]
             direction LR
             base["<b>common</b><br/>Dependências de sessão,<br/>limite de corpo e envelope de erro"]
-            auth["<b>AuthRoutes</b><br/>auth.py<br/>/api/login, /api/logout, /api/register,<br/>/api/session, /api/auth/google,<br/>/api/users*, /api/password-reset-requests*"]
+            auth["<b>AuthRoutes</b><br/>auth.py<br/>/api/login, /api/logout, /api/session,<br/>/api/users*,<br/>/api/users/{u}/access-token"]
             camp["<b>CampaignRoutes</b><br/>campaigns.py<br/>/api/campaigns*, convites, membros,<br/>/api/notifications, canal de updates"]
             maps["<b>CampaignMapRoutes</b><br/>campaign_maps.py<br/>/api/campaign-maps/* — cenas, tokens,<br/>walls, luzes, fog, reveals, props,<br/>templates, drawings, pins, pings"]
-            chars["<b>CharacterRoutes</b><br/>characters.py<br/>/api/characters*, /api/player-characters"]
+            chars["<b>CharacterRoutes</b><br/>characters.py<br/>/api/characters*, /api/player-characters,<br/>+ formas escopadas em<br/>/api/campaigns/{id}/(player-)characters"]
             cat["<b>CatalogRoutes</b><br/>catalog.py<br/>/api/items*, /api/reference/*, /api/map"]
             state["<b>StateRoutes</b><br/>state.py<br/>/api/combat-state (+/end-turn),<br/>/api/tarot-state, /api/hq,<br/>/api/nexus-challenge, /api/nexus-result"]
             comms["<b>CommsRoutes</b><br/>comms.py<br/>/api/chat"]
@@ -151,25 +145,23 @@ flowchart TB
             direction LR
             rrec["<b>records</b><br/>Documentos tipados genéricos<br/>(fichas, itens, estados)"]
             rcamp["<b>campaigns</b><br/>Campanhas, membros, convites"]
-            rid["<b>identity</b><br/>Unit of work transacional<br/>users, sessions e password resets"]
+            rid["<b>identity</b><br/>Unit of work transacional<br/>users, sessions e tokens de acesso"]
             rmaps["<b>campaign_map_*</b><br/>Fachada + cenas, elementos,<br/>exploração, templates, tokens e projection"]
             rchat["<b>chat</b><br/>chat_messages"]
             rsync["<b>campaign_sync</b><br/>Event log PostgreSQL compartilhado,<br/>tópicos map/chat/combat/roster,<br/>stream entre múltiplos workers"]
         end
 
         dom["<b>domain/validation.py</b><br/>Validação de payload no servidor<br/>(a regra de CPR vive no frontend)"]
-        sec["<b>security.py</b><br/>PBKDF2-HMAC + verificação de senha,<br/>rate limiting por IP"]
+        sec["<b>security.py</b><br/>Geração/normalização do token de acesso,<br/>rate limiting por IP e global"]
         appsvc["<b>application/</b><br/>Casos de uso, autorização e ports<br/>Identity, Session e CampaignEvent services<br/>sem dependência de FastAPI"]
         dbm["<b>db.py + migrations/</b><br/>Pool psycopg, Alembic,<br/>JSONB e seed idempotente"]
-        cfg["<b>config.py</b><br/>PORT, HOST, DATABASE_URL, UPLOAD_DIR,<br/>LIMIAR_SESSION_TTL, LIMIAR_MAX_UPLOAD_MB,<br/>LIMIAR_GM_USER/PASSWORD"]
+        cfg["<b>config.py</b><br/>PORT, HOST, DATABASE_URL, UPLOAD_DIR,<br/>LIMIAR_SESSION_TTL, LIMIAR_MAX_UPLOAD_MB,<br/>LIMIAR_GM_USER, LIMIAR_MASTER_TOKEN"]
     end
 
     db[("PostgreSQL<br/>schema Alembic")]
     files[("uploads/ · data/seed/")]
-    google["Google Identity<br/>[externo · opcional]"]
 
     auth --> sec
-    auth --> google
     routes --> base
     auth --> appsvc
     chars --> appsvc
@@ -196,7 +188,7 @@ flowchart TB
     classDef external fill:#8b8b8b,stroke:#5f5f5f,color:#fff
     class base,auth,camp,maps,chars,cat,state,comms,meta,upl,rid,rrec,rcamp,rmaps,rchat,rsync,dom,sec,appsvc,dbm,cfg comp
     class db,files store
-    class google external
+
 ```
 
 **Assimetria deliberada:** o backend é fino. Ele valida payload, aplica
@@ -419,8 +411,8 @@ sequenceDiagram
    frontend puro; o backend impõe papel (`admin`/`gm`/`player`) e propriedade.
    Rotas estreitas como `/api/combat-state/end-turn` existem exatamente para
    dar ao jogador um poder específico sem abrir o estado de combate inteiro.
-3. **Local-first de verdade.** Google Identity é o único sistema externo, e é
-   opcional. Sem `GOOGLE_CLIENT_ID`, nada quebra.
+3. **Local-first de verdade.** Não sobrou sistema externo: a credencial é um
+   token de 6 caracteres emitido na mesa e revogável a qualquer momento.
 4. **`dist/` é fronteira de contêiner.** O código-fonte em `frontend/src/` não
    é servido; é insumo de build. Verificar comportamento exige build + servidor
    real.

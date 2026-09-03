@@ -23,11 +23,9 @@ Escopo confirmado:
   devem apresentar somente esse sistema.
 - O produto usa FastAPI/PostgreSQL: o servidor Python e o container continuam suficientes
   para executar a mesa.
-- Login por usuario e senha local e o fluxo base e deve funcionar sem servicos
-  externos.
-- Google Login e opcional. O SDK e as chamadas externas so podem ser ativados
-  quando `GOOGLE_CLIENT_ID` estiver configurado; sua ausencia nunca pode impedir
-  o login local.
+- O login e um token de acesso de 6 caracteres emitido pelo mestre dentro do
+  app, e deve funcionar sem servicos externos. Senha e Google Login foram
+  removidos.
 - O canvas coleta contexto fisico; `systemAdapter` traduz; os modulos de dominio
   resolvem as regras; o usuario confirma a aplicacao.
 - Enforcement de mesa continua advisory: a UI avisa e registra, sem substituir
@@ -449,9 +447,10 @@ pra chamar de "prova" uma sessao rodada nessas condicoes.
       2026-07-28 (2 sessoes `admin` apagadas, backup em
       `data/limiar.db.bak-*` antes da operacao, coberto pelo `.gitignore`);
       token vazado reconfirmado morto (401 em `/api/users`,
-      `authenticated:false` em `/api/session`). **Troca da senha do `mestre`
-      pendente do operador** — `LIMIAR_GM_PASSWORD` so semeia o admin em banco
-      novo, entao use `python3 scripts/rotate-credentials.py`.
+      `authenticated:false` em `/api/session`). **Troca da credencial do `mestre`
+      pendente do operador** — `LIMIAR_MASTER_TOKEN` so semeia o admin em banco
+      novo, entao use `python3 scripts/rotate-credentials.py` (hoje reemite o
+      token de acesso; na epoca desta auditoria era uma senha).
 - [x] Mudar o default de `HOST` para `127.0.0.1` e exigir opt-in explicito para
       escutar em `0.0.0.0`.
 
@@ -766,14 +765,13 @@ da campanha.
 
 Objetivo: completar seguranca, portabilidade e operacao prolongada.
 
-#### 9A. Google Login opcional e local-first
+#### 9A. Google Login opcional e local-first — CANCELADO
+
+Superado pelo login por token de acesso: nao ha mais SDK Google, `/api/meta/config`,
+senha nem `password_reset_requests`. O unico item que sobrevive e servir a fonte
+localmente no login.
 
 - [ ] Servir fonte local ou usar stack de fontes do sistema no login.
-- [ ] Consultar `/api/meta/config` antes de carregar o SDK Google.
-- [ ] Injetar o SDK somente quando `GOOGLE_CLIENT_ID` existir.
-- [ ] Ocultar divisor e botao Google quando a integracao estiver desligada.
-- [ ] Manter usuario/senha funcional com internet bloqueada.
-- [ ] Testar configurado, nao configurado, timeout e token invalido.
 
 #### 9B. Cookie de sessao e CSRF
 
@@ -1000,6 +998,44 @@ YYYY-MM-DD | Fase/item | commit | testes | evidencia live/API
   corrigido incluindo os campos no shape. Reconfirmado: sucesso total,
   falha parcial sem dano duplicado no retry, resolucao de template —
   tudo via clique real nos botoes do mapa/cockpit
+
+- 2026-09-03 | Onboarding: usabilidade do wizard de primeira ficha |
+  working tree | backend 160, frontend 883, typecheck/build/diff-check verdes |
+  live em servidor FastAPI + PostgreSQL de teste (`compose.test.yaml`): toggle
+  "Distribuir 62 pontos" / "Rolar 1d10 por atributo" (1 rerolado, sem teto de
+  8; rola tudo de uma vez ou um atributo por vez, `creation.statRolls` conta os
+  dados e `creation.statRerolls` as rerolagens por atributo, exigido
+  `statRolls >= 10`); grid dos atributos em `grid-cols-fit-stat` (210px) porque
+  o card estourava a celula de 150px e cortava o `+`; dica explicando por
+  que o `+` nao subiu (teto 8, minimo 2, orcamento zerado); faixa "Tudo certo"
+  removida e mensagem de orcamento unificada na barra; espacamento `gap-3` /
+  `px-6` e spinner nativo escondido; `validate_character_creation` no backend
+  recusa na criacao de ficha de player STAT fora de 2-8 (2-10 rolado), soma
+  > 62 por pontos, pericia > 10 ou gasto > 60 — `POST /api/player-characters`
+  com todos os STATs em 10 devolveu 400 `VALIDATION_ERROR`; atualizacao de
+  ficha existente nao e revalidada.
+- 2026-09-03 | Onboarding: fechamento RAW da criacao (CPR p.42/45/78/88/90) |
+  working tree | backend 169, frontend 897, typecheck/build/diff-check verdes |
+  LUCK cai para o teto 8 na criacao (era 10); pericia 2-6 na criacao (teto 6,
+  treinada nunca fica em 1: 0 -> 2 -> 0); orcamento mostrado como 86 com 26 ja
+  nas 13 basicas (interno segue 60 livres, `skillBudgetView`); campo "Idioma de
+  origem" na identidade grava `Language (X)` 4 gratis com flag `origin` —
+  `normalizeSkills` passa a preservar pericias `Language (...)` fora do
+  catalogo e `sheet.js` mantem a flag ao salvar; backend valida tudo isso so na
+  criacao (`creation.originLanguage` tem que bater com a pericia marcada);
+  rolagem 1d10 rotulada REGRA DA CASA (nao e o Edgerunner do livro: faltam as
+  tabelas de Role p.74-76; Streetrat tambem ausente).
+
+- 2026-09-03 | RAW: EMP, Mortally Wounded e Death Save acumulado (CPR p.80 e
+  wound states) | working tree | frontend 901, typecheck/build/diff-check
+  verdes | `deriveEffectiveEmp` passa de ceil para floor (44 -> 4, 39 -> 3;
+  teste antigo pinnava o ceil errado); `deriveStats` ganha `woundState`:
+  HP < 1 = Mortally Wounded com -4 em acoes e MOVE -6 (minimo 1), antes o
+  estado sumia abaixo de 1 HP e zerava a penalidade; `effectiveMoveStat` (mapa)
+  aplica o mesmo; `deathSavesPassed` no registro soma +1 ao Death Save a cada
+  save passado (gravado por `recordDeathSavePassed` no cliente de quem rolou),
+  zera ao estabilizar ou ao voltar a HP >= 1; painel de efeitos lista as tres
+  linhas. Foco (DLC investigacao) segue fora.
 
 ## 10. Backlog vivo de friccao
 
