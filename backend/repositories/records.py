@@ -9,14 +9,32 @@ from ..db import _ALLOWED_TABLES, _DOMAIN, _dict_to_upsert, _row_to_dict, db
 from ..domain.validation import sanitize_payload
 
 
-def list_records(kind: str) -> list[dict[str, object]]:
+def list_records(kind: str, campaign_id: str | None = None) -> list[dict[str, object]]:
+    """List one kind, optionally restricted to a campaign.
+
+    `campaign_id=""` selects the rows that belong to no campaign — the seeded
+    demo sheets and anything created before a table was picked — which is what
+    the desktop shows when the user continues without a campaign. Passing
+    ``None`` skips the filter entirely and is only for kinds that are not
+    campaign-bound.
+    """
     cfg = _DOMAIN[kind]
     table = cfg["table"]
     if table not in _ALLOWED_TABLES:
         msg = f"unknown table: {table}"
         raise RuntimeError(msg)
+    if campaign_id is None:
+        sql, params = f"SELECT * FROM {table} ORDER BY id", ()  # noqa: S608
+    elif campaign_id:
+        sql = f"SELECT * FROM {table} WHERE campaignid = %s ORDER BY id"  # noqa: S608
+        params = (campaign_id,)
+    else:
+        # Rows written before campaignid was normalized carry '' rather than
+        # NULL for the campaign-less scope; both mean the same thing here.
+        sql = f"SELECT * FROM {table} WHERE campaignid IS NULL OR campaignid = '' ORDER BY id"  # noqa: S608
+        params = ()
     with db() as conn:
-        rows = conn.execute(f"SELECT * FROM {table} ORDER BY id").fetchall()  # noqa: S608
+        rows = conn.execute(sql, params).fetchall()
     return [_row_to_dict(row, cfg["typed"]) for row in rows]
 
 

@@ -33,7 +33,7 @@ export function createLimiarAPI(options: LimiarApiOptions = {}) {
     request: http.request,
     auth: createAuthApi(http),
     users: createUsersApi(http.request),
-    characters: createCharactersApi(http.request),
+    characters: createCharactersApi(http.request, campaignId),
     campaigns: createCampaignsApi(http.request, waitForCampaignEvent),
     campaignMaps: createCampaignMapsApi(http.request, waitForCampaignEvent),
     catalog,

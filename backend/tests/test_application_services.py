@@ -11,14 +11,18 @@ from backend.application.characters import CharacterService
 from backend.application.errors import ApplicationError
 from backend.application.game_state import GameStateService
 from backend.application.sessions import SessionService
+from backend.domain.validation import ValidationError
 
 
 class MemoryRecords:
     def __init__(self, rows=None):
         self.rows = rows or {}
 
-    def list(self, kind):
-        return list(self.rows.get(kind, {}).values())
+    def list(self, kind, campaign_id=None):
+        rows = list(self.rows.get(kind, {}).values())
+        if campaign_id is None:
+            return rows
+        return [row for row in rows if str(row.get("campaignId") or "") == campaign_id]
 
     def get(self, kind, record_id):
         return self.rows.get(kind, {}).get(record_id)
@@ -63,15 +67,31 @@ class MemorySettings:
 
 
 class MemoryCampaigns:
-    def __init__(self, campaign_ids=("mesa",)):
+    def __init__(self, campaign_ids=("mesa",), members=None, owners=None, joinable=()):
         self.campaign_ids = set(campaign_ids)
+        # None keeps the permissive default the older tests rely on.
+        self.members = members
+        self.owners = owners
+        self.joinable = set(joinable)
 
     def get_campaign(self, campaign_id):
         return {"id": campaign_id} if campaign_id in self.campaign_ids else None
 
-    @staticmethod
-    def is_campaign_member(_campaign_id, _session):
-        return True
+    def is_campaign_member(self, campaign_id, session):
+        if self.members is None:
+            return True
+        return session["username"] in self.members.get(campaign_id, ())
+
+    def is_campaign_owner(self, campaign_id, session):
+        if self.owners is None:
+            return True
+        return session["username"] in self.owners.get(campaign_id, ())
+
+    def list_campaigns_for(self, _session):
+        return [
+            {"id": campaign_id, "canJoin": campaign_id in self.joinable}
+            for campaign_id in sorted(self.campaign_ids)
+        ]
 
 
 class MemoryIdentity:
@@ -118,19 +138,131 @@ def test_character_query_projects_only_owned_sheets_for_player():
         "mine": {"id": "mine", "ownerUsername": "ana"},
         "other": {"id": "other", "ownerUsername": "bruno"},
     }})
-    service = CharacterService(records)
+    service = CharacterService(records, MemoryCampaigns())
     assert [row["id"] for row in service.list({"username": "ana", "role": "player"})] == ["mine"]
 
 
 def test_character_service_stamps_schema_and_owner():
     records = MemoryRecords()
-    service = CharacterService(records)
+    service = CharacterService(records, MemoryCampaigns())
     saved = service.save_as_player(
         {"id": "ana-sheet", "name": "Ana"},
         {"username": "ana", "role": "player"},
     )
     assert saved["schemaVersion"] == 1
     assert saved["ownerUsername"] == "ana"
+
+
+def test_player_creation_rejects_an_illegal_stat_spread():
+    service = CharacterService(MemoryRecords(), MemoryCampaigns())
+    with pytest.raises(ValidationError):
+        service.save_as_player(
+            {"id": "cheater", "name": "Cheater", "base": {k: 10 for k in ("INT", "REF", "DEX", "TECH", "COOL", "WILL", "LUCK", "MOVE", "BODY", "EMP")}},
+            {"username": "ana", "role": "player"},
+        )
+
+
+def test_player_update_of_an_existing_sheet_is_not_held_to_creation_limits():
+    grown = {k: 10 for k in ("INT", "REF", "DEX", "TECH", "COOL", "WILL", "LUCK", "MOVE", "BODY", "EMP")}
+    records = MemoryRecords({"characters": {"vet": {"id": "vet", "name": "Vet", "ownerUsername": "ana", "revision": 0}}})
+    service = CharacterService(records, MemoryCampaigns())
+    saved = service.save_as_player(
+        {"id": "vet", "name": "Vet", "base": grown, "expectedRevision": 0},
+        {"username": "ana", "role": "player"},
+    )
+    assert saved["base"] == grown
+
+
+def _two_table_records():
+    return MemoryRecords({"characters": {
+        "alpha-pc": {"id": "alpha-pc", "ownerUsername": "ana", "campaignId": "alpha"},
+        "beta-pc": {"id": "beta-pc", "ownerUsername": "bruno", "campaignId": "beta"},
+        "demo": {"id": "demo", "name": "NOVA"},
+    }})
+
+
+def test_gm_reads_only_the_sheets_of_the_table_they_run():
+    """Regression: every GM used to read every player's sheet on the deployment."""
+    campaigns = MemoryCampaigns(
+        campaign_ids=("alpha", "beta"),
+        members={"alpha": {"ana"}, "beta": {"gm-beta", "bruno"}},
+        owners={"alpha": set(), "beta": {"gm-beta"}},
+    )
+    service = CharacterService(_two_table_records(), campaigns)
+    gm_beta = {"username": "gm-beta", "role": "gm"}
+
+    assert [row["id"] for row in service.list(gm_beta, "beta")] == ["beta-pc"]
+    assert service.list(gm_beta, "alpha") == []
+    with pytest.raises(ApplicationError, match="Character access denied"):
+        service.get("alpha-pc", gm_beta)
+    with pytest.raises(ApplicationError, match="mestre desta campanha"):
+        service.delete("alpha-pc", gm_beta)
+
+
+def test_unscoped_listing_hides_sheets_that_belong_to_a_table():
+    campaigns = MemoryCampaigns(campaign_ids=("alpha", "beta"))
+    service = CharacterService(_two_table_records(), campaigns)
+
+    rows = service.list({"username": "root", "role": "admin"})
+    assert [row["id"] for row in rows] == ["demo"]
+
+
+def test_staff_can_delete_the_seeded_demo_sheets():
+    records = _two_table_records()
+    campaigns = MemoryCampaigns(campaign_ids=("alpha",), owners={"alpha": set()})
+    service = CharacterService(records, campaigns)
+
+    assert service.delete("demo", {"username": "gm", "role": "gm"}) is True
+    assert records.get("characters", "demo") is None
+
+
+def test_new_sheet_takes_the_campaign_of_the_request():
+    records = MemoryRecords()
+    campaigns = MemoryCampaigns(
+        campaign_ids=("alpha",),
+        members={"alpha": {"ana"}},
+    )
+    service = CharacterService(records, campaigns)
+
+    saved = service.save_as_player(
+        {"id": "ana-sheet", "name": "Ana"},
+        {"username": "ana", "role": "player"},
+        "alpha",
+    )
+    assert saved["campaignId"] == "alpha"
+
+
+def test_a_saved_sheet_cannot_be_moved_to_another_table():
+    records = _two_table_records()
+    campaigns = MemoryCampaigns(
+        campaign_ids=("alpha", "beta"),
+        members={"alpha": {"ana"}, "beta": {"ana"}},
+    )
+    service = CharacterService(records, campaigns)
+
+    saved = service.save_as_player(
+        {"id": "alpha-pc", "name": "Ana", "campaignId": "beta", "expectedRevision": 0},
+        {"username": "ana", "role": "player"},
+        "beta",
+    )
+    assert saved["campaignId"] == "alpha"
+
+
+def test_first_sheet_can_be_written_before_the_join_completes():
+    """Onboarding creates the sheet first: the join needs a character id."""
+    campaigns = MemoryCampaigns(
+        campaign_ids=("open", "closed"),
+        members={"open": set(), "closed": set()},
+        joinable=("open",),
+    )
+    service = CharacterService(MemoryRecords(), campaigns)
+    newbie = {"username": "newbie", "role": "player"}
+
+    saved = service.save_as_player({"id": "newbie-pc", "name": "Newbie"}, newbie, "open")
+    assert saved["campaignId"] == "open"
+
+    with pytest.raises(ApplicationError, match="Campaign access denied"):
+        service.save_as_player({"id": "sneak", "name": "Sneak"}, newbie, "closed")
 
 
 def test_end_turn_policy_advances_owned_combatant():
