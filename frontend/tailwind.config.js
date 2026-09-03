@@ -41,6 +41,8 @@ export default {
       // viram classes estaticas que sempre compilam.
       gridTemplateColumns: {
         'fit-sm': 'repeat(auto-fit,minmax(150px,1fr))',
+        // Stat card: label column + two steppers + input + gaps needs ~200px.
+        'fit-stat': 'repeat(auto-fit,minmax(210px,1fr))',
         'fit-md': 'repeat(auto-fit,minmax(160px,1fr))',
         'fit-lg': 'repeat(auto-fit,minmax(260px,1fr))',
       },

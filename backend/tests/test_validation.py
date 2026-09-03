@@ -5,6 +5,7 @@ from backend.domain.validation import (
     sanitize_payload,
     sanitize_text,
     validate_character,
+    validate_character_creation,
     validate_chat,
     validate_hq,
     validate_item,
@@ -83,3 +84,92 @@ def test_sanitize_text_and_payload_strip_control_characters_and_limit_length():
         "note": "ok",
         "rows": ["ab"],
     }
+
+
+def _legal_base(**overrides):
+    base = {"INT": 6, "REF": 8, "DEX": 6, "TECH": 6, "COOL": 6, "WILL": 7, "LUCK": 5, "MOVE": 6, "BODY": 8, "EMP": 4}
+    base.update(overrides)
+    return base
+
+
+def test_character_creation_accepts_the_complete_package():
+    validate_character_creation({"name": "V", "base": _legal_base(), "skills": [
+        {"name": "Athletics", "level": 4},
+        {"name": "Handgun", "level": 6},
+        {"name": "Pilot Air Vehicle", "level": 3, "difficult": True},
+    ]})
+
+
+def test_character_creation_rejects_a_rolled_stat_above_ten_but_allows_nine():
+    rolled = {"creation": {"method": "roll", "statRolls": 10}, "base": _legal_base(INT=9)}
+    validate_character_creation({"name": "V", **rolled})
+
+
+def test_character_creation_skips_fields_that_are_absent():
+    validate_character_creation({"name": "minimal"})
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({"base": _legal_base(INT=9)}, "'base.INT' must be between 2 and 8"),
+        ({"base": _legal_base(LUCK=9, REF=4)}, "'base.LUCK' must be between 2 and 8"),
+        ({"base": _legal_base(EMP=1)}, "'base.EMP' must be between 2 and 8"),
+        ({"base": _legal_base(EMP=8)}, "spends 66 points; the limit is 62"),
+        ({"base": _legal_base(INT="6")}, "'base.INT' must be an integer"),
+        ({"base": []}, "'base' must be an object"),
+        ({"skills": [{"name": "Handgun", "level": 7}]}, "must be between 0 and 6"),
+        ({"skills": [{"name": "Handgun", "level": 1}]}, "must be 0 or at least 2"),
+        ({"skills": [{"name": "Athletics", "level": 1}]}, "must be at least 2"),
+        ({"skills": [{"name": f"S{i}", "level": 6} for i in range(11)]}, "spend 66 points; the limit is 60"),
+        ({"skills": [{"name": "Language (Japanese)", "level": 4, "origin": True}]}, "claims the origin language"),
+        (
+            {"creation": {"originLanguage": "Japanese"}, "skills": [{"name": "Language (Spanish)", "level": 4, "origin": True}]},
+            "claims the origin language",
+        ),
+        (
+            {"creation": {"originLanguage": "Japanese"}, "skills": [{"name": "Language (Japanese)", "level": 3, "origin": True}]},
+            "must be at least 4",
+        ),
+        ({"creation": {"method": "wish"}}, "'creation.method' must be one of"),
+        ({"creation": {"method": "roll"}}, "'creation.statRolls' must be at least 10"),
+        ({"creation": {"method": "roll", "statRolls": 3}}, "'creation.statRolls' must be at least 10"),
+        ({"creation": {"method": "roll", "statRolls": -1}}, "non-negative"),
+        ({"creation": {"method": "roll", "statRolls": 10, "statRerolls": "2"}}, "'creation.statRerolls'"),
+    ],
+)
+def test_character_creation_rejects_illegal_spreads(payload, message):
+    with pytest.raises(ValidationError) as caught:
+        validate_character_creation({"name": "V", **payload})
+    assert any(message in error for error in caught.value.errors)
+
+
+def test_character_creation_lets_rolled_stats_exceed_the_point_budget():
+    rolled = {"creation": {"method": "roll", "statRolls": 12, "statRerolls": 2}, "base": _legal_base(INT=10, BODY=10, EMP=9)}
+    validate_character_creation({"name": "V", **rolled})
+    with pytest.raises(ValidationError):
+        validate_character_creation({"name": "V", **rolled, "base": _legal_base(INT=11)})
+
+
+def test_character_creation_origin_language_is_free_and_raisable():
+    payload = {
+        "name": "V",
+        "creation": {"originLanguage": "Japanese"},
+        "skills": [{"name": "Language (Japanese)", "level": 6, "origin": True}]
+        + [{"name": f"S{i}", "level": 6} for i in range(9)],  # 54 + 2 above the free 4 = 56
+    }
+    validate_character_creation(payload)
+    payload["skills"].append({"name": "S9", "level": 6})  # 62 > 60
+    with pytest.raises(ValidationError):
+        validate_character_creation(payload)
+
+
+def test_character_creation_free_skill_levels_do_not_count():
+    # Thirteen default skills at 2 cost nothing; only levels above 2 spend.
+    defaults = [
+        {"name": name, "level": 2}
+        for name in ("Athletics", "Brawling", "Concentration", "Conversation", "Education", "Evasion", "First Aid",
+                     "Human Perception", "Language (Streetslang)", "Local Expert (Your Home)", "Perception",
+                     "Persuasion", "Stealth")
+    ]
+    validate_character_creation({"name": "V", "skills": defaults + [{"name": f"S{i}", "level": 6} for i in range(10)]})

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { buildCharacterPayload, createWizardController } from '../../../src/ui/views/onboarding.js';
-import { createWizardDraft, setSkillLevel, skillFloor } from '../../../src/domain/character/characterWizard.ts';
+import { createWizardDraft, rollStats, setSkillLevel, skillFloor } from '../../../src/domain/character/characterWizard.ts';
 
 function completeDraft(name = 'V Angel') {
-  let draft = createWizardDraft({ name });
-  const cheap = draft.skills.filter((s) => !s.difficult && skillFloor(s) === 0).slice(0, 6);
-  cheap.forEach((skill) => { draft = setSkillLevel(draft, skill.id, 10); });
+  let draft = createWizardDraft({ name, originLanguage: 'Portuguese' });
+  const cheap = draft.skills.filter((s) => !s.difficult && skillFloor(s) === 0).slice(0, 10);
+  cheap.forEach((skill) => { draft = setSkillLevel(draft, skill.id, 6); });
   return draft;
 }
 
@@ -40,6 +40,68 @@ describe('payload enviado ao backend', () => {
 
   it('sem gerador de retrato, nao inventa um campo quebrado', () => {
     expect(buildCharacterPayload(completeDraft()).portraitUrl).toBeUndefined();
+  });
+});
+
+describe('metodo dos atributos no payload', () => {
+  it('declara distribuicao por pontos por padrao', () => {
+    expect(buildCharacterPayload(completeDraft()).creation).toEqual({ method: 'points', statRolls: 0, statRerolls: 0, originLanguage: 'Portuguese' });
+  });
+
+  it('declara dados e quantas rolagens quando o jogador rolou', () => {
+    const rolled = rollStats(rollStats(completeDraft(), () => 0.5), () => 0.5);
+    expect(buildCharacterPayload(rolled).creation).toEqual({ method: 'roll', statRolls: 20, statRerolls: 10, originLanguage: 'Portuguese' });
+  });
+
+  it('manda o idioma de origem como pericia marcada origin, e so ela', () => {
+    const skills = buildCharacterPayload(completeDraft()).skills;
+    const flagged = skills.filter((s) => s.origin);
+    expect(flagged).toHaveLength(1);
+    expect(flagged[0]).toMatchObject({ name: 'Language (Portuguese)', level: 4, origin: true });
+    expect(skills.find((s) => s.name === 'Athletics').origin).toBeUndefined();
+  });
+});
+
+describe('orientacao de atributos no controller', () => {
+  it('explica por que o + nao subiu o atributo e limpa ao acertar', () => {
+    const controller = createWizardController({ api: fakeApi() });
+    controller.handlers.bumpStat('INT', 1); // orcamento fechado
+    expect(controller.state.hint).toContain('Sem pontos sobrando');
+    controller.handlers.bumpStat('EMP', -1);
+    expect(controller.state.hint).toBe('');
+  });
+
+  it('avisa o teto de 8 ao digitar acima dele', () => {
+    const controller = createWizardController({ api: fakeApi() });
+    controller.handlers.setStat('EMP', 2);
+    controller.handlers.setStat('INT', 12);
+    expect(controller.state.draft.base.INT).toBe(8);
+    expect(controller.state.hint).toContain('não passa de 8');
+  });
+
+  it('rola os atributos e trava os steppers', () => {
+    const controller = createWizardController({ api: fakeApi() });
+    controller.handlers.setStatMethod('roll');
+    expect(controller.state.draft.statMethod).toBe('roll');
+    controller.handlers.rollStats(() => 0.95);
+    expect(controller.state.draft.base.BODY).toBe(10);
+    controller.handlers.bumpStat('BODY', -1);
+    expect(controller.state.draft.base.BODY).toBe(10);
+    expect(controller.state.hint).toContain('rolados');
+    controller.handlers.rollStat('BODY', () => 0.15);
+    expect(controller.state.draft.base.BODY).toBe(2);
+    expect(controller.state.draft.statRolled.BODY).toBe(2);
+    expect(controller.state.hint).toBe('');
+  });
+
+  it('avancar de passo descarta a dica antiga', () => {
+    const controller = createWizardController({ api: fakeApi() });
+    controller.state.draft = completeDraft();
+    controller.state.step = 'attributes';
+    controller.handlers.bumpStat('INT', 1);
+    expect(controller.state.hint).not.toBe('');
+    controller.handlers.next();
+    expect(controller.state.hint).toBe('');
   });
 });
 

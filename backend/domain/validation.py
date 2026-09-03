@@ -109,6 +109,154 @@ def validate_character(payload: dict[str, object]) -> None:
     _val_int(payload, "level")
 
 
+# --- Cyberpunk RED character creation -------------------------------------
+# Mirrors frontend/src/domain/character/constants.ts. The wizard already
+# enforces these numbers client-side; this is the server-side guard so a
+# hand-crafted payload cannot open a sheet with 10 in every STAT.
+
+CPRED_STAT_ORDER = ("INT", "REF", "DEX", "TECH", "COOL", "WILL", "LUCK", "MOVE", "BODY", "EMP")
+CPRED_STAT_BUDGET = 62
+CPRED_STAT_MIN = 2
+CPRED_STAT_MAX = 8  # every STAT, LUCK included (CPR p.42/78)
+CPRED_STAT_ROLL_MAX = 10  # house-rule raw 1d10; the RAW Edgerunner tables cap at 8
+CPRED_SKILL_BUDGET = 60  # 86 RAW minus the 26 locked in the 13 basic skills
+CPRED_SKILL_LEVEL_MAX = 6  # creation cap (p.42/90); 10 is reached with IP later
+CPRED_SKILL_TRAINED_MIN = 2  # a trained skill never starts at 1 (p.88)
+CPRED_DEFAULT_SKILL_LEVEL = 2
+CPRED_ORIGIN_LANGUAGE_LEVEL = 4  # free Cultural Origin language (p.41/45)
+CPRED_DEFAULT_SKILL_NAMES = frozenset(
+    {
+        "Athletics",
+        "Brawling",
+        "Concentration",
+        "Conversation",
+        "Education",
+        "Evasion",
+        "First Aid",
+        "Human Perception",
+        "Language (Streetslang)",
+        "Local Expert (Your Home)",
+        "Perception",
+        "Persuasion",
+        "Stealth",
+    }
+)
+CPRED_STAT_METHODS = ("points", "roll")
+
+
+def _stat_max(_key: str, method: str) -> int:
+    return CPRED_STAT_ROLL_MAX if method == "roll" else CPRED_STAT_MAX
+
+
+def _creation_method(payload: dict[str, object]) -> str:
+    creation = payload.get("creation")
+    if creation is None:
+        return "points"
+    if not isinstance(creation, dict):
+        raise ValidationError(["'creation' must be an object"])
+    method = creation.get("method", "points")
+    if method not in CPRED_STAT_METHODS:
+        raise ValidationError([f"'creation.method' must be one of {', '.join(CPRED_STAT_METHODS)}"])
+    for field in ("statRolls", "statRerolls"):
+        count = creation.get(field, 0)
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise ValidationError([f"'creation.{field}' must be a non-negative integer"])
+    if method == "roll" and creation.get("statRolls", 0) < len(CPRED_STAT_ORDER):
+        raise ValidationError(
+            [f"'creation.statRolls' must be at least {len(CPRED_STAT_ORDER)} when STATs are rolled"]
+        )
+    origin = creation.get("originLanguage", "")
+    if origin is not None and not isinstance(origin, str):
+        raise ValidationError(["'creation.originLanguage' must be a string"])
+    return str(method)
+
+
+def _origin_language(payload: dict[str, object]) -> str:
+    creation = payload.get("creation")
+    if not isinstance(creation, dict):
+        return ""
+    return str(creation.get("originLanguage") or "").strip()
+
+
+def _validate_creation_stats(base: object, method: str, errors: list[str]) -> None:
+    if not isinstance(base, dict):
+        errors.append("'base' must be an object")
+        return
+    total = 0
+    for key in CPRED_STAT_ORDER:
+        value = base.get(key)
+        if isinstance(value, bool) or not isinstance(value, int):
+            errors.append(f"'base.{key}' must be an integer")
+            continue
+        maximum = _stat_max(key, method)
+        if value < CPRED_STAT_MIN or value > maximum:
+            errors.append(f"'base.{key}' must be between {CPRED_STAT_MIN} and {maximum}")
+        total += value
+    if method == "points" and total > CPRED_STAT_BUDGET:
+        errors.append(f"'base' spends {total} points; the limit is {CPRED_STAT_BUDGET}")
+
+
+def _validate_creation_skills(skills: object, origin_language: str, errors: list[str]) -> None:
+    if not isinstance(skills, list):
+        errors.append("'skills' must be a list")
+        return
+    origin_name = f"Language ({origin_language})" if origin_language else ""
+    spent = 0
+    for index, skill in enumerate(skills):
+        if not isinstance(skill, dict):
+            errors.append(f"'skills[{index}]' must be an object")
+            continue
+        level = skill.get("level", 0)
+        if isinstance(level, bool) or not isinstance(level, int):
+            errors.append(f"'skills[{index}].level' must be an integer")
+            continue
+        if level < 0 or level > CPRED_SKILL_LEVEL_MAX:
+            errors.append(f"'skills[{index}].level' must be between 0 and {CPRED_SKILL_LEVEL_MAX}")
+            continue
+        name = str(skill.get("name") or "")
+        if skill.get("origin"):
+            if not origin_name or name != origin_name:
+                errors.append(
+                    f"'skills[{index}]' claims the origin language; "
+                    f"creation.originLanguage is {origin_language!r}"
+                )
+                continue
+            floor = CPRED_ORIGIN_LANGUAGE_LEVEL
+        else:
+            floor = CPRED_DEFAULT_SKILL_LEVEL if name in CPRED_DEFAULT_SKILL_NAMES else 0
+        if level < floor:
+            errors.append(f"'skills[{index}].level' must be at least {floor}")
+            continue
+        if floor < CPRED_SKILL_TRAINED_MIN and 0 < level < CPRED_SKILL_TRAINED_MIN:
+            errors.append(
+                f"'skills[{index}].level' must be 0 or at least {CPRED_SKILL_TRAINED_MIN}"
+            )
+            continue
+        cost = 2 if skill.get("difficult") else 1
+        spent += max(0, level - floor) * cost
+    if spent > CPRED_SKILL_BUDGET:
+        errors.append(f"'skills' spend {spent} points; the limit is {CPRED_SKILL_BUDGET}")
+
+
+def validate_character_creation(payload: dict[str, object]) -> None:
+    """Guard a brand-new player sheet against an illegal starting spread.
+
+    Only fields that are present are checked: a payload without `base` or
+    `skills` is a minimal sheet the GM fills in later, not a cheat. Existing
+    sheets are never re-validated here because play (IP, cyberware) moves
+    them past creation limits legitimately.
+    """
+
+    method = _creation_method(payload)
+    errors: list[str] = []
+    if "base" in payload:
+        _validate_creation_stats(payload.get("base"), method, errors)
+    if "skills" in payload:
+        _validate_creation_skills(payload.get("skills"), _origin_language(payload), errors)
+    if errors:
+        raise ValidationError(errors)
+
+
 def validate_item(payload: dict[str, object]) -> None:
     _val_str(payload, "name", required=True, max_len=120)
     _val_int(payload, "price")

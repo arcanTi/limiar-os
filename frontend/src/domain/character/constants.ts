@@ -46,10 +46,38 @@ export const CPRED_STAT_ORDER: CpredStat[] = ['INT', 'REF', 'DEX', 'TECH', 'COOL
 export const CPRED_STAT_BUDGET = 62;
 export const CPRED_STAT_MIN = 2;
 export const CPRED_STAT_MAX = 8;
+// Rolled STATs (1d10 per attribute, ones rerolled) are not capped by the point-buy maximum.
+export const CPRED_STAT_ROLL_SIDES = 10;
+export const CPRED_STAT_ROLL_MAX = 10;
 export const CPRED_ARMOR_PENALTY_STATS: CpredStat[] = ['REF', 'DEX', 'MOVE'];
 export const CPRED_ROLES = ['Rockerboy', 'Solo', 'Netrunner', 'Tech', 'Medtech', 'Media', 'Exec', 'Lawman', 'Fixer', 'Nomad'];
 
+// RAW (CPR p.88/90): 86 skill points, of which 26 are the mandatory 13 basic
+// skills at level 2. The app tracks the 60 that remain free (`skillSpend`
+// excludes `baseLevel`), and the UI shows both numbers.
 export const CPRED_SKILL_BUDGET = 60;
+export const CPRED_SKILL_BUDGET_TOTAL = 86;
+export const CPRED_SKILL_BASIC_ALLOCATION = CPRED_SKILL_BUDGET_TOTAL - CPRED_SKILL_BUDGET;
+// At creation no skill goes above 6, and a trained skill starts at 2 (p.42/88/90).
+export const CPRED_SKILL_CREATION_MAX = 6;
+export const CPRED_SKILL_TRAINED_MIN = 2;
+// Cultural Origin grants Language (origin) 4 for free (p.41/45, 89).
+export const CPRED_ORIGIN_LANGUAGE_LEVEL = 4;
+export const CPRED_CULTURAL_ORIGINS: { region: string; languages: string[] }[] = [
+  // CPR p.45, Cultural Origins table.
+  { region: 'North American', languages: ['Chinese', 'Cree', 'Creole', 'English', 'French', 'Navajo', 'Spanish'] },
+  { region: 'South/Central American', languages: ['Creole', 'English', 'German', 'Guarani', 'Mayan', 'Portuguese', 'Quechua', 'Spanish'] },
+  { region: 'Western European', languages: ['Dutch', 'English', 'French', 'German', 'Italian', 'Norwegian', 'Portuguese', 'Spanish'] },
+  { region: 'Eastern European', languages: ['English', 'Finnish', 'Polish', 'Romanian', 'Russian', 'Ukrainian'] },
+  { region: 'Middle Eastern/North African', languages: ['Arabic', 'Berber', 'English', 'Farsi', 'French', 'Hebrew', 'Turkish'] },
+  { region: 'Sub-Saharan African', languages: ['Arabic', 'English', 'French', 'Hausa', 'Lingala', 'Oromo', 'Portuguese', 'Swahili', 'Twi', 'Yoruba'] },
+  { region: 'South Asian', languages: ['Bengali', 'Dari', 'English', 'Hindi', 'Nepali', 'Sinhalese', 'Tamil', 'Urdu'] },
+  { region: 'South East Asian', languages: ['Arabic', 'Burmese', 'English', 'Filipino', 'Hindi', 'Indonesian', 'Khmer', 'Malay', 'Vietnamese'] },
+  { region: 'East Asian', languages: ['Cantonese Chinese', 'English', 'Japanese', 'Korean', 'Mandarin Chinese', 'Mongolian'] },
+  { region: 'Oceania/Pacific Islander', languages: ['English', 'French', 'Hawaiian', 'Maori', 'Pama-Nyungan', 'Tahitian'] },
+];
+export const CPRED_LANGUAGES: string[] = [...new Set(CPRED_CULTURAL_ORIGINS.flatMap((o) => o.languages))].sort();
+export const languageSkillName = (language: string): string => `Language (${String(language || '').trim()})`;
 
 export const CPRED_STORY_TEMPLATE = 'ORIGEM:\\n\\nOBJETIVO:\\n\\nDIVIDA OU PROBLEMA:\\n\\nALIADOS:\\n\\nINIMIGOS:\\n\\nESTILO / ASSINATURA:\\n';
 

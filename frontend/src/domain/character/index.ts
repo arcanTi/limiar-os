@@ -9,6 +9,7 @@ import {
   CPRED_SKILL_ALIASES,
   CPRED_STAT_MAX,
   CPRED_STAT_ORDER,
+  CPRED_ORIGIN_LANGUAGE_LEVEL,
 } from './constants.ts';
 import type { ArmorSlot, CharacterArmor, CpredStat } from './constants.ts';
 
@@ -141,6 +142,8 @@ export interface CharacterSkill {
   defaultSkill: boolean;
   difficult: boolean;
   total: number;
+  /** Free Cultural Origin language: `baseLevel` 4 costs nothing. */
+  origin?: boolean;
 }
 
 export interface RawSkillInput {
@@ -150,6 +153,42 @@ export interface RawSkillInput {
   level?: unknown;
   bonus?: unknown;
   difficult?: unknown;
+  origin?: unknown;
+}
+
+const LANGUAGE_SKILL = /^Language \((.+)\)$/;
+
+/**
+ * Languages outside the catalog (Cultural Origin) are the one kind of extra
+ * skill a sheet keeps; everything else unknown is dropped as before.
+ */
+function extraLanguageSkills(incoming: RawSkillInput[], stats: Partial<Record<string, unknown>> | null | undefined): CharacterSkill[] {
+  const catalog = new Set(CPRED_DEFAULT_SKILLS.map((skill) => skill.name));
+  const seen = new Set<string>();
+  const extras: CharacterSkill[] = [];
+  incoming.forEach((src) => {
+    const name = skillCanonicalName(src && src.name);
+    if (!LANGUAGE_SKILL.test(name) || catalog.has(name) || seen.has(name)) return;
+    seen.add(name);
+    const origin = !!(src && src.origin);
+    const baseLevel = origin ? CPRED_ORIGIN_LANGUAGE_LEVEL : 0;
+    const level = asNumber(src.level, baseLevel, baseLevel, 10);
+    const bonus = asNumber(src.bonus, 0, -20, 20);
+    const stat = 'INT';
+    extras.push({
+      id: src.id || 'language-' + name.replace(LANGUAGE_SKILL, '$1').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name,
+      stat,
+      level,
+      baseLevel,
+      bonus,
+      defaultSkill: false,
+      difficult: false,
+      origin,
+      total: (stats && Number(stats[stat])) ? Number(stats[stat]) + level + bonus : level + bonus,
+    });
+  });
+  return extras;
 }
 
 export function normalizeSkills(skills: unknown, stats: Partial<Record<string, unknown>> | null | undefined): CharacterSkill[] {
@@ -171,7 +210,7 @@ export function normalizeSkills(skills: unknown, stats: Partial<Record<string, u
       difficult: src.difficult == null ? !!fallback.difficult : !!src.difficult,
       total: (stats && Number(stats[stat])) ? Number(stats[stat]) + level + bonus : level + bonus,
     };
-  });
+  }).concat(extraLanguageSkills(incoming, stats));
 }
 
 export function skillSpend(skills: unknown): number {
