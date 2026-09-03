@@ -764,6 +764,35 @@
                     <button onClick="{{ tpl.apply }}" class="{{ tpl.style }}">{{ tpl.label }}</button>
                   </sc-for>
                 </div>
+                <div class="lm-combat-subtitle lm-combat-subtitle--danger">{{ tx.npcGenerator }}</div>
+                <div class="lm-combat-gen-row">
+                  <span class="lm-combat-gen-label">{{ tx.npcArchetype }}</span>
+                  <sc-for list="{{ npcGenArchetypeChips }}" as="chip" hint-placeholder-count="7">
+                    <button onClick="{{ chip.apply }}" class="{{ chip.style }}">{{ chip.label }}</button>
+                  </sc-for>
+                </div>
+                <div class="lm-combat-gen-hint">{{ npcGenArchetypeHint }}</div>
+                <div class="lm-combat-gen-row">
+                  <span class="lm-combat-gen-label">{{ tx.npcTier }}</span>
+                  <sc-for list="{{ npcGenTierChips }}" as="chip" hint-placeholder-count="5">
+                    <button onClick="{{ chip.apply }}" class="{{ chip.style }}">{{ chip.label }}</button>
+                  </sc-for>
+                </div>
+                <div class="lm-combat-gen-hint">{{ npcGenTierHint }}</div>
+                <div class="lm-combat-gen-actions">
+                  <input value="{{ npcGenFaction }}" onInput="{{ onNpcGenFaction }}" placeholder="{{ tx.npcFaction }}" class="lm-ui-input" />
+                  <button onClick="{{ rollRandomNpcDraft }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">{{ tx.rollNpc }}</button>
+                  <button onClick="{{ spawnRandomNpcs }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.rollAndSpawnNpc }}</button>
+                </div>
+                <sc-if value="{{ hasCombatNpcGenerated }}">
+                  <div class="lm-combat-gen-summary">
+                    <div class="lm-combat-tag-row">
+                      <sc-for list="{{ combatNpcTags }}" as="tag" hint-placeholder-count="3"><span class="lm-combat-tag">{{ tag.label }}</span></sc-for>
+                    </div>
+                    <div class="lm-combat-gen-stats">{{ combatNpcStatLine }}</div>
+                    <div class="lm-combat-gen-stats">{{ tx.npcArmor }} :: {{ combatNpcArmorLabel }}</div>
+                  </div>
+                </sc-if>
                 <div style="display:flex;gap:8px;margin-bottom:8px;">
                   <input value="{{ combatNpcName }}" onInput="{{ onCombatNpcName }}" placeholder="NOME DO NPC" class="lm-ui-input" style="flex:1;" />
                   <label class="lm-combat-mini-label" style="width:64px;">QTD<input type="number" min="1" max="20" value="{{ combatNpcQty }}" onInput="{{ onCombatNpcQty }}" class="lm-ui-input lm-ui-input--mono" /></label>
@@ -806,6 +835,7 @@
               <sc-for list="{{ combatRailRows }}" as="p" hint-placeholder-count="4">
                 <button onClick="{{ p.focus }}" style="{{ p.pillStyle }}" class="lm-combat-rail-pill">
                   <div class="lm-combat-meta" style="color:{{ p.sideColor }};font-size:9px;">{{ p.name }}</div>
+                  <sc-if value="{{ p.hasTags }}"><div class="lm-combat-pill-tags">{{ p.tagsLabel }}</div></sc-if>
                   <div class="lm-combat-hpbar"><div class="lm-combat-hpbar-fill" style="width:{{ p.hpPct }}%;"></div></div>
                   <div style="display:flex;justify-content:space-between;font:9px 'Share Tech Mono',monospace;">
                     <span style="color:#d6aa4e;">{{ p.initiativeValue }}</span>
@@ -820,6 +850,11 @@
                   <div class="lm-combat-name-block">
                     <div style="{{ combatFocusCard.nameStyle }}">{{ combatFocusCard.name }}</div>
                     <div class="lm-combat-meta" style="color:{{ combatFocusCard.sideColor }};">{{ combatFocusCard.side }} // {{ tx.initiative }} {{ combatFocusCard.initiativeValue }} <sc-if value="{{ combatFocusCard.isCurrent }}">// {{ combatFocusCard.currentLabel }}</sc-if> <sc-if value="{{ combatFocusCard.defeated }}">// {{ combatFocusCard.defeatedLabel }}</sc-if></div>
+                    <sc-if value="{{ combatFocusCard.hasTags }}">
+                      <div class="lm-combat-tag-row">
+                        <sc-for list="{{ combatFocusCard.tagChips }}" as="tag" hint-placeholder-count="3"><span class="lm-combat-tag">{{ tag.label }}</span></sc-for>
+                      </div>
+                    </sc-if>
                   </div>
                 </div>
                 <div class="lm-combat-stat-grid--postit">
@@ -899,6 +934,7 @@
                           <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                           <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
                           <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RECARREGAR</button></sc-if>
+                          <sc-if value="{{ w.canLoadToxin }}"><button onClick="{{ w.cycleToxinRound }}" title="Trocar a municao de toxina carregada" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ w.loadedToxinLabel }}</button></sc-if>
                         </div>
                       </sc-for>
                     </div>
@@ -1012,6 +1048,7 @@
                             <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                             <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
                             <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RECARREGAR</button></sc-if>
+                          <sc-if value="{{ w.canLoadToxin }}"><button onClick="{{ w.cycleToxinRound }}" title="Trocar a municao de toxina carregada" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ w.loadedToxinLabel }}</button></sc-if>
                           </div>
                         </sc-for>
                       </div>
@@ -1089,6 +1126,35 @@
                     <button onClick="{{ tpl.apply }}" class="{{ tpl.style }}">{{ tpl.label }}</button>
                   </sc-for>
                 </div>
+                <div class="lm-combat-subtitle lm-combat-subtitle--danger">{{ tx.npcGenerator }}</div>
+                <div class="lm-combat-gen-row">
+                  <span class="lm-combat-gen-label">{{ tx.npcArchetype }}</span>
+                  <sc-for list="{{ npcGenArchetypeChips }}" as="chip" hint-placeholder-count="7">
+                    <button onClick="{{ chip.apply }}" class="{{ chip.style }}">{{ chip.label }}</button>
+                  </sc-for>
+                </div>
+                <div class="lm-combat-gen-hint">{{ npcGenArchetypeHint }}</div>
+                <div class="lm-combat-gen-row">
+                  <span class="lm-combat-gen-label">{{ tx.npcTier }}</span>
+                  <sc-for list="{{ npcGenTierChips }}" as="chip" hint-placeholder-count="5">
+                    <button onClick="{{ chip.apply }}" class="{{ chip.style }}">{{ chip.label }}</button>
+                  </sc-for>
+                </div>
+                <div class="lm-combat-gen-hint">{{ npcGenTierHint }}</div>
+                <div class="lm-combat-gen-actions">
+                  <input value="{{ npcGenFaction }}" onInput="{{ onNpcGenFaction }}" placeholder="{{ tx.npcFaction }}" class="lm-ui-input" />
+                  <button onClick="{{ rollRandomNpcDraft }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">{{ tx.rollNpc }}</button>
+                  <button onClick="{{ spawnRandomNpcs }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.rollAndSpawnNpc }}</button>
+                </div>
+                <sc-if value="{{ hasCombatNpcGenerated }}">
+                  <div class="lm-combat-gen-summary">
+                    <div class="lm-combat-tag-row">
+                      <sc-for list="{{ combatNpcTags }}" as="tag" hint-placeholder-count="3"><span class="lm-combat-tag">{{ tag.label }}</span></sc-for>
+                    </div>
+                    <div class="lm-combat-gen-stats">{{ combatNpcStatLine }}</div>
+                    <div class="lm-combat-gen-stats">{{ tx.npcArmor }} :: {{ combatNpcArmorLabel }}</div>
+                  </div>
+                </sc-if>
                 <div style="display:flex;gap:8px;margin-bottom:8px;">
                   <input value="{{ combatNpcName }}" onInput="{{ onCombatNpcName }}" placeholder="NOME DO NPC" class="lm-ui-input" style="flex:1;" />
                   <label class="lm-combat-mini-label" style="width:64px;">QTD<input type="number" min="1" max="20" value="{{ combatNpcQty }}" onInput="{{ onCombatNpcQty }}" class="lm-ui-input lm-ui-input--mono" /></label>
@@ -1567,11 +1633,7 @@
             <label for="profile-avatar-upload" class="lm-ui-btn lm-ui-btn--compact lm-ui-btn--ghost-gold" style="cursor:pointer;">TROCAR FOTO</label>
           </div>
           <input value="{{ profileEmail }}" onInput="{{ onProfileEmail }}" placeholder="email" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-            <input type="password" value="{{ profileCurrentPassword }}" onInput="{{ onProfileCurrentPassword }}" placeholder="senha atual" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
-            <input type="password" value="{{ profileNewPassword }}" onInput="{{ onProfileNewPassword }}" placeholder="nova senha" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
-          </div>
-          <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">Preencha senha atual + nova senha para trocar. Deixe em branco para nao alterar.</div>
+          <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">O acesso e feito pelo token de 6 caracteres. Perdeu o seu? Peca um novo ao mestre.</div>
 
           <sc-if value="{{ profileIsAdmin }}">
             <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin-top:14px;">FUNCAO // <span style="color:#3fe0d0;">ADMIN</span></div>
@@ -1586,7 +1648,12 @@
             </div>
           </sc-if>
 
-          <button onClick="{{ saveProfile }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact" style="margin-top:14px;">SALVAR PERFIL</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+            <button onClick="{{ saveProfile }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">SALVAR PERFIL</button>
+            <sc-if value="{{ hasSheetToExport }}">
+              <button onClick="{{ exportMySheetPdf }}" title="Baixar a ficha em PDF editavel para usar offline" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ tx.exportSheetPdf }}</button>
+            </sc-if>
+          </div>
           <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:#3fe0d0;margin-top:8px;">{{ profileStatus }}</div>
         </div>
 
@@ -1594,30 +1661,25 @@
           <div style="border:1px solid rgba(63,224,208,0.24);background:#09110f;padding:16px 18px;">
             <div style="font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0;margin-bottom:12px;">GM DATA OPS</div>
             <sc-if value="{{ canManageUsers }}">
-              <sc-if value="{{ hasPasswordResetRows }}">
-                <div style="border:1px solid rgba(230,140,80,0.35);background:#120c0a;padding:12px;margin-bottom:16px;">
-                  <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#e68c50;margin-bottom:10px;">SOLICITACOES DE SENHA PENDENTES</div>
-                  <div style="display:flex;flex-direction:column;gap:6px;">
-                    <sc-for list="{{ passwordResetRows }}" as="r" hint-placeholder-count="2">
-                      <div style="display:grid;grid-template-columns:1fr 74px auto auto;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(230,140,80,.2);padding:7px;">
-                        <div style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.username }}</div>
-                        <div style="font:9px 'Share Tech Mono',monospace;color:#3fe0d0;">{{ r.roleLabel }}</div>
-                        <button onClick="{{ r.onResolve }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RESETAR</button>
-                        <button onClick="{{ r.onDismiss }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">IGNORAR</button>
-                      </div>
-                    </sc-for>
+              <sc-if value="{{ hasIssuedToken }}">
+                <div style="border:1px solid rgba(63,224,208,0.45);background:#08120f;padding:12px;margin-bottom:16px;">
+                  <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0;margin-bottom:8px;">TOKEN DE {{ issuedTokenUsername }}</div>
+                  <div style="font:26px/1 'Share Tech Mono',monospace;letter-spacing:12px;color:#f0ead8;padding:8px 0 12px;">{{ issuedTokenValue }}</div>
+                  <div style="display:flex;gap:8px;">
+                    <button onClick="{{ copyIssuedToken }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">COPIAR</button>
+                    <button onClick="{{ dismissIssuedToken }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">FECHAR</button>
                   </div>
+                  <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:8px;">Repasse ao jogador. Ele entra so com esse token.</div>
                 </div>
               </sc-if>
               <div style="border:1px solid rgba(214,170,78,0.2);background:#0b0e0a;padding:12px;margin-bottom:16px;">
-                <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:10px;">CRIAR / RESETAR ACESSO DE JOGADOR</div>
+                <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:10px;">EMITIR TOKEN DE ACESSO</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                   <input value="{{ userDraftUsername }}" onInput="{{ onUserDraftUsername }}" placeholder="usuario" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
-                  <input value="{{ userDraftEmail }}" onInput="{{ onUserDraftEmail }}" placeholder="email" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+                  <input value="{{ userDraftEmail }}" onInput="{{ onUserDraftEmail }}" placeholder="email (opcional)" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:8px;">
-                  <input type="password" value="{{ userDraftPassword }}" onInput="{{ onUserDraftPassword }}" placeholder="senha nova / reset" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
-                  <sc-if value="{{ canManageStaffRoles }}">
+                <sc-if value="{{ canManageStaffRoles }}">
+                  <div style="margin-top:8px;">
                     <select value="{{ userDraftRole }}" onChange="{{ onUserDraftRole }}" class="lm-ui-select lm-ui-select--full">
                       <sc-if value="{{ userRoleAdminSelected }}"><option value="admin" selected>ADMIN</option></sc-if>
                       <sc-if value="{{ userRoleGmSelected }}"><option value="admin">ADMIN</option></sc-if>
@@ -1629,22 +1691,192 @@
                       <sc-if value="{{ userRoleGmSelected }}"><option value="player">PLAYER</option></sc-if>
                       <sc-if value="{{ userRolePlayerSelected }}"><option value="player" selected>PLAYER</option></sc-if>
                     </select>
-                  </sc-if>
-                </div>
-                <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">Sem envio de email — repasse a senha ao jogador diretamente.</div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ hasActiveCampaign }}">
+                  <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:#9a9883;cursor:pointer;">
+                    <sc-if value="{{ userDraftInviteToCampaign }}"><input type="checkbox" checked onChange="{{ onUserDraftInviteToCampaign }}" /></sc-if>
+                    <sc-if value="{{ userDraftNoCampaignInvite }}"><input type="checkbox" onChange="{{ onUserDraftInviteToCampaign }}" /></sc-if>
+                    <span>CONVIDAR PARA {{ activeCampaignLabel }}</span>
+                  </label>
+                </sc-if>
+                <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">Contas novas ganham um token de 6 caracteres na hora. Nada de senha, nada de email de convite.</div>
                 <button onClick="{{ saveUserDraft }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact" style="margin-top:8px;">SALVAR USUARIO</button>
                 <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;">
                   <sc-for list="{{ userRows }}" as="u" hint-placeholder-count="3">
-                    <div style="display:grid;grid-template-columns:1fr 74px auto auto;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(214,170,78,.12);padding:7px;">
+                    <div style="display:grid;grid-template-columns:1fr 74px 78px auto auto auto;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(214,170,78,.12);padding:7px;">
                       <div style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ u.username }}</div>
                       <div style="font:9px 'Share Tech Mono',monospace;color:#3fe0d0;">{{ u.roleLabel }}</div>
-                      <sc-if value="{{ u.canManage }}"><button onClick="{{ u.onEdit }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RESET</button></sc-if>
+                      <button onClick="{{ u.onCopyToken }}" title="Copiar token" style="font:12px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;background:none;border:none;padding:0;text-align:left;cursor:pointer;">{{ u.accessToken }}</button>
+                      <sc-if value="{{ u.canManage }}"><button onClick="{{ u.onRegenerate }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">NOVO</button></sc-if>
+                      <sc-if value="{{ u.canManage }}"><button onClick="{{ u.onEdit }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">EDIT</button></sc-if>
                       <sc-if value="{{ u.canManage }}"><button onClick="{{ u.onDelete }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">DEL</button></sc-if>
                     </div>
                   </sc-for>
                 </div>
               </div>
             </sc-if>
+            <div style="height:1px;background:rgba(63,224,208,0.18);margin:16px 0;"></div>
+            <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#8ad9ba;margin-bottom:10px;">EFEITOS // APLICAR NO JOGADOR</div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;">
+              <select onChange="{{ onEffectSelect }}" class="lm-ui-select lm-ui-select--full">
+                <sc-for list="{{ effectOptions }}" as="e" hint-placeholder-count="8">
+                  <sc-if value="{{ e.selected }}"><option value="{{ e.id }}" selected>{{ e.label }}</option></sc-if>
+                  <sc-if value="{{ e.notSelected }}"><option value="{{ e.id }}">{{ e.label }}</option></sc-if>
+                </sc-for>
+              </select>
+              <button onClick="{{ applyEffect }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">APLICAR ({{ effectApplyCount }})</button>
+            </div>
+            <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">{{ effectSelectedSummary }}</div>
+            <sc-if value="{{ noEffectTargets }}">
+              <div style="font:9px 'Share Tech Mono',monospace;color:#6f7a64;margin-top:8px;">Nenhum personagem nesta campanha.</div>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+              <sc-for list="{{ effectTargetRows }}" as="t" hint-placeholder-count="3">
+                <label style="display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;background:#080a07;border:1px solid rgba(63,224,208,.12);padding:6px 8px;cursor:pointer;">
+                  <sc-if value="{{ t.checked }}"><input type="checkbox" checked onChange="{{ t.onToggle }}" /></sc-if>
+                  <sc-if value="{{ t.notChecked }}"><input type="checkbox" onChange="{{ t.onToggle }}" /></sc-if>
+                  <span style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;">{{ t.name }}</span>
+                  <span style="font:9px 'Share Tech Mono',monospace;color:#6f7a64;">{{ t.activeCount }} ativo(s)</span>
+                </label>
+              </sc-for>
+            </div>
+
+            <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#8ad9ba;margin:16px 0 10px;">EFEITOS // CRIAR OU AJUSTAR</div>
+            <div style="display:grid;grid-template-columns:1fr 90px 110px;gap:8px;">
+              <input value="{{ effectDraftName }}" onInput="{{ onEffectDraftName }}" placeholder="nome do efeito" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+              <input value="{{ effectDraftDurationValue }}" onInput="{{ onEffectDraftDurationValue }}" placeholder="duracao" title="Em branco = indefinido" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+              <select onChange="{{ onEffectDraftDurationUnit }}" class="lm-ui-select lm-ui-select--full">
+                <sc-for list="{{ effectDurationOptions }}" as="u" hint-placeholder-count="3">
+                  <sc-if value="{{ u.selected }}"><option value="{{ u.id }}" selected>{{ u.label }}</option></sc-if>
+                  <sc-if value="{{ u.notSelected }}"><option value="{{ u.id }}">{{ u.label }}</option></sc-if>
+                </sc-for>
+              </select>
+            </div>
+            <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin:8px 0 5px;">MODIFICADORES (valor com sinal: +2 ajuda, -2 atrapalha)</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+              <label style="display:block;"><span style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;">ACOES</span><input value="{{ effectDraftAction }}" onInput="{{ onEffectDraftAction }}" placeholder="0" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
+              <label style="display:block;"><span style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;">EVASAO</span><input value="{{ effectDraftEvasion }}" onInput="{{ onEffectDraftEvasion }}" placeholder="0" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
+              <label style="display:block;"><span style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;">MOVE</span><input value="{{ effectDraftMove }}" onInput="{{ onEffectDraftMove }}" placeholder="0" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
+              <label style="display:block;"><span style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;">DEATH SAVE</span><input value="{{ effectDraftDeathSave }}" onInput="{{ onEffectDraftDeathSave }}" placeholder="0" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
+            </div>
+            <div style="display:grid;grid-template-columns:90px 1fr 1fr 1fr 90px;gap:8px;margin-top:8px;">
+              <select onChange="{{ onEffectDraftStatKey }}" class="lm-ui-select lm-ui-select--full">
+                <sc-for list="{{ effectStatOptions }}" as="st" hint-placeholder-count="10">
+                  <sc-if value="{{ st.selected }}"><option value="{{ st.id }}" selected>{{ st.label }}</option></sc-if>
+                  <sc-if value="{{ st.notSelected }}"><option value="{{ st.id }}">{{ st.label }}</option></sc-if>
+                </sc-for>
+              </select>
+              <label style="display:block;"><span style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;">ATRIBUTO</span><input value="{{ effectDraftStatValue }}" onInput="{{ onEffectDraftStatValue }}" placeholder="0" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
+              <label style="display:block;"><span style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;">SP CABECA</span><input value="{{ effectDraftSpHead }}" onInput="{{ onEffectDraftSpHead }}" placeholder="0" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
+              <label style="display:block;"><span style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;">SP CORPO</span><input value="{{ effectDraftSpBody }}" onInput="{{ onEffectDraftSpBody }}" placeholder="0" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
+              <label style="display:block;"><span style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;">CARGAS</span><input value="{{ effectDraftCharges }}" onInput="{{ onEffectDraftCharges }}" placeholder="0" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+              <sc-for list="{{ effectFlagRows }}" as="f" hint-placeholder-count="3">
+                <label style="display:flex;align-items:center;gap:6px;font:9px 'Share Tech Mono',monospace;color:#9a9883;cursor:pointer;">
+                  <sc-if value="{{ f.checked }}"><input type="checkbox" checked onChange="{{ f.onToggle }}" /></sc-if>
+                  <sc-if value="{{ f.notChecked }}"><input type="checkbox" onChange="{{ f.onToggle }}" /></sc-if>
+                  <span>{{ f.label }}</span>
+                </label>
+              </sc-for>
+            </div>
+            <textarea value="{{ effectDraftNote }}" onInput="{{ onEffectDraftNote }}" placeholder="observacao para a mesa (opcional)" class="lm-ui-input lm-ui-input--gold lm-ui-textarea" style="margin-top:8px;"></textarea>
+            <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#3fe0d0;margin-top:6px;">EFEITO REAL :: {{ effectDraftPreview }}</div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button onClick="{{ saveEffectDraft }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">SALVAR EFEITO</button>
+              <button onClick="{{ clearEffectDraft }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">LIMPAR</button>
+            </div>
+            <sc-if value="{{ noCustomEffectRows }}">
+              <div style="font:9px 'Share Tech Mono',monospace;color:#6f7a64;margin-top:10px;">Nenhum efeito proprio nesta campanha. Os presets do sistema estao sempre disponiveis.</div>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-top:10px;">
+              <sc-for list="{{ customEffectRows }}" as="e" hint-placeholder-count="2">
+                <div style="display:grid;grid-template-columns:1fr auto auto;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(63,224,208,.12);padding:6px 8px;">
+                  <span style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;">{{ e.label }}</span>
+                  <button onClick="{{ e.onEdit }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">EDIT</button>
+                  <button onClick="{{ e.onDelete }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">DEL</button>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="height:1px;background:rgba(63,224,208,0.18);margin:16px 0;"></div>
+            <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#8ad9ba;margin-bottom:10px;">TOXINAS // APLICAR DOSE</div>
+            <div style="display:grid;grid-template-columns:1fr 90px auto;gap:8px;align-items:center;">
+              <select value="{{ toxinSelectedName }}" onChange="{{ onToxinSelect }}" class="lm-ui-select lm-ui-select--full">
+                <sc-for list="{{ toxinOptions }}" as="t" hint-placeholder-count="6">
+                  <sc-if value="{{ t.selected }}"><option value="{{ t.id }}" selected>{{ t.label }}</option></sc-if>
+                  <sc-if value="{{ t.notSelected }}"><option value="{{ t.id }}">{{ t.label }}</option></sc-if>
+                </sc-for>
+              </select>
+              <input value="{{ toxinApplyModifier }}" onInput="{{ onToxinModifier }}" placeholder="mod" title="Modificador situacional no teste do alvo" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+              <button onClick="{{ applyToxin }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">APLICAR ({{ toxinApplyCount }})</button>
+            </div>
+            <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">{{ toxinSelectedSummary }}</div>
+            <sc-if value="{{ noToxinTargets }}">
+              <div style="font:9px 'Share Tech Mono',monospace;color:#6f7a64;margin-top:8px;">Nenhum personagem nesta campanha.</div>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+              <sc-for list="{{ toxinTargetRows }}" as="t" hint-placeholder-count="3">
+                <label style="display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;background:#080a07;border:1px solid rgba(63,224,208,.12);padding:6px 8px;cursor:pointer;">
+                  <sc-if value="{{ t.checked }}"><input type="checkbox" checked onChange="{{ t.onToggle }}" /></sc-if>
+                  <sc-if value="{{ t.notChecked }}"><input type="checkbox" onChange="{{ t.onToggle }}" /></sc-if>
+                  <span style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;">{{ t.name }}</span>
+                  <sc-if value="{{ t.immune }}"><span style="font:9px 'Share Tech Mono',monospace;color:#e68c50;">IMUNE :: {{ t.immunityReason }}</span></sc-if>
+                  <sc-if value="{{ t.notImmune }}"><span style="font:9px 'Share Tech Mono',monospace;color:#6f7a64;">{{ t.bodyLabel }}</span></sc-if>
+                </label>
+              </sc-for>
+            </div>
+
+            <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#8ad9ba;margin:16px 0 10px;">TOXINAS // CRIAR OU AJUSTAR</div>
+            <div style="display:grid;grid-template-columns:1fr 110px 110px;gap:8px;">
+              <input value="{{ toxinDraftName }}" onInput="{{ onToxinDraftName }}" placeholder="nome da toxina" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+              <select value="{{ toxinDraftKind }}" onChange="{{ onToxinDraftKind }}" class="lm-ui-select lm-ui-select--full">
+                <sc-if value="{{ toxinDraftIsPoison }}"><option value="poison" selected>VENENO</option><option value="drug">DROGA</option></sc-if>
+                <sc-if value="{{ toxinDraftIsDrug }}"><option value="poison">VENENO</option><option value="drug" selected>DROGA</option></sc-if>
+              </select>
+              <select value="{{ toxinDraftIntensity }}" onChange="{{ onToxinDraftIntensity }}" class="lm-ui-select lm-ui-select--full">
+                <sc-for list="{{ toxinIntensityOptions }}" as="i" hint-placeholder-count="3">
+                  <sc-if value="{{ i.selected }}"><option value="{{ i.id }}" selected>{{ i.label }}</option></sc-if>
+                  <sc-if value="{{ i.notSelected }}"><option value="{{ i.id }}">{{ i.label }}</option></sc-if>
+                </sc-for>
+              </select>
+            </div>
+            <div style="display:grid;grid-template-columns:110px 110px 1fr;gap:8px;margin-top:8px;">
+              <input value="{{ toxinDraftResistDV }}" onInput="{{ onToxinDraftResistDV }}" placeholder="{{ toxinDraftDvPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+              <input value="{{ toxinDraftDamage }}" onInput="{{ onToxinDraftDamage }}" placeholder="{{ toxinDraftDamagePlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+              <select value="{{ toxinDraftDelivery }}" onChange="{{ onToxinDraftDelivery }}" class="lm-ui-select lm-ui-select--full">
+                <sc-for list="{{ toxinDeliveryOptions }}" as="d" hint-placeholder-count="4">
+                  <sc-if value="{{ d.selected }}"><option value="{{ d.id }}" selected>{{ d.label }}</option></sc-if>
+                  <sc-if value="{{ d.notSelected }}"><option value="{{ d.id }}">{{ d.label }}</option></sc-if>
+                </sc-for>
+              </select>
+            </div>
+            <textarea value="{{ toxinDraftEffect }}" onInput="{{ onToxinDraftEffect }}" placeholder="efeito descrito (opcional)" class="lm-ui-input lm-ui-input--gold lm-ui-textarea" style="margin-top:8px;"></textarea>
+            <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:6px;">Em branco, DV e dano seguem a intensidade. Preview: {{ toxinDraftPreview }}</div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button onClick="{{ saveToxinDraft }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">SALVAR TOXINA</button>
+              <button onClick="{{ clearToxinDraft }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">LIMPAR</button>
+            </div>
+            <sc-if value="{{ noToxinCustomRows }}">
+              <div style="font:9px 'Share Tech Mono',monospace;color:#6f7a64;margin-top:10px;">Nenhuma toxina propria nesta campanha. As do livro estao sempre disponiveis.</div>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-top:10px;">
+              <sc-for list="{{ toxinCustomRows }}" as="t" hint-placeholder-count="2">
+                <div style="display:grid;grid-template-columns:1fr auto auto;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(63,224,208,.12);padding:6px 8px;">
+                  <span style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;">{{ t.label }}</span>
+                  <button onClick="{{ t.onEdit }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">EDIT</button>
+                  <button onClick="{{ t.onDelete }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">DEL</button>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:10px;">MUNICAO DE TOXINA (mercado)</div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px;">
+              <sc-for list="{{ toxinAmmoRows }}" as="a" hint-placeholder-count="3">
+                <div style="font:9px 'Share Tech Mono',monospace;color:#8ad9ba;">{{ a.label }} :: {{ a.note }}</div>
+              </sc-for>
+            </div>
+            <div style="height:1px;background:rgba(63,224,208,0.18);margin:16px 0;"></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <input value="{{ gmCharacterName }}" onInput="{{ onGmCharacterName }}" placeholder="{{ tx.characterName }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
               <input value="{{ gmCharacterRole }}" onInput="{{ onGmCharacterRole }}" placeholder="{{ tx.role }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
@@ -1653,6 +1885,19 @@
             <div style="display:flex;gap:8px;margin-top:10px;">
               <button onClick="{{ triggerGmCharacterUpload }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ tx.uploadPortrait }}</button>
               <button onClick="{{ createGmCharacter }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">{{ tx.createCharacter }}</button>
+            </div>
+            <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin:14px 0 8px;">PERSONAGENS DESTA CAMPANHA</div>
+            <sc-if value="{{ noGmCharacterRows }}">
+              <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;">Nenhum personagem aqui ainda.</div>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <sc-for list="{{ gmCharacterRows }}" as="c" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:1fr auto auto;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(63,224,208,.12);padding:7px;">
+                  <div style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ c.name }}</div>
+                  <div style="font:9px 'Share Tech Mono',monospace;color:#6f7a64;">{{ c.owner }}</div>
+                  <button onClick="{{ c.onDelete }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">DEL</button>
+                </div>
+              </sc-for>
             </div>
             <div style="height:1px;background:rgba(63,224,208,0.18);margin:16px 0;"></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -1809,6 +2054,9 @@
                 <button onClick="{{ createSheetCharacter }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact lm-ui-btn--full">{{ tx.newCharacter }}</button>
                 <button onClick="{{ editSheet }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact lm-ui-btn--full">{{ tx.editSheet }}</button>
               </div>
+              <sc-if value="{{ canExportSheetPdf }}">
+                <button onClick="{{ exportSheetPdf }}" title="Baixar a ficha em PDF editavel" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact lm-ui-btn--full">{{ tx.exportSheetPdf }}</button>
+              </sc-if>
             </sc-if>
             <sc-if value="{{ sheetEditing }}">
               <div class="flex gap-1.5">
@@ -1828,6 +2076,135 @@
 
       <!-- CENTER: tabs + content -->
       <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- GM roster (SYS.01/MESA): every sheet at this table, and the switch
+             that decides which one every other GM tool is pointing at. -->
+        <sc-if value="{{ gm }}">
+        <div class="lm-roster-panel">
+          <div class="lm-roster-head">
+            <div class="lm-roster-title">MESA // PERSONAGENS</div>
+            <div class="lm-roster-sub">{{ rosterSummary }}</div>
+            <button onClick="{{ toggleRoster }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ rosterToggleLabel }}</button>
+          </div>
+          <sc-if value="{{ rosterOpen }}">
+            <div class="lm-roster-tools">
+              <input value="{{ rosterQuery }}" onInput="{{ onRosterQuery }}" placeholder="buscar nome / role / dono" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+              <div class="lm-roster-filters">
+                <sc-for list="{{ rosterFilterBtns }}" as="f" hint-placeholder-count="3">
+                  <button onClick="{{ f.onClick }}" class="{{ f.style }}">{{ f.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <sc-if value="{{ noRosterCards }}">
+              <div class="lm-roster-empty">Nenhuma ficha corresponde ao filtro.</div>
+            </sc-if>
+            <div class="lm-roster-grid">
+              <sc-for list="{{ rosterCards }}" as="rc" hint-placeholder-count="4">
+                <div class="{{ rc.style }}" style="{{ rc.vars }}">
+                  <button onClick="{{ rc.onSelect }}" class="lm-roster-card-main">
+                    <span class="lm-roster-card-id">
+                      <span class="lm-roster-initials">{{ rc.initials }}</span>
+                      <span class="lm-roster-kind">{{ rc.kindLabel }}</span>
+                    </span>
+                    <span class="lm-roster-card-body">
+                      <span class="lm-roster-name">{{ rc.name }}</span>
+                      <span class="lm-roster-meta">{{ rc.role }} // LVL {{ rc.level }} // {{ rc.ip }} IP</span>
+                      <span class="lm-roster-bar"><span class="lm-roster-bar-fill" style="width:{{ rc.hpPct }}%;background:{{ rc.hpColor }};"></span></span>
+                      <span class="lm-roster-line"><span>HP {{ rc.hpLabel }}</span><span>{{ rc.owner }}</span></span>
+                      <sc-if value="{{ rc.hasConditions }}"><span class="lm-roster-cond">{{ rc.conditionLabel }}</span></sc-if>
+                    </span>
+                  </button>
+                  <div class="lm-roster-card-foot">
+                    <span class="lm-roster-state">{{ rc.statusLabel }}</span>
+                    <button onClick="{{ rc.onDelete }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">DEL</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ hasRosterActive }}">
+              <div class="lm-roster-console">
+                <div class="lm-roster-console-head">
+                  <span class="lm-roster-console-title">CONSOLE RAPIDO // {{ rosterActiveName }}</span>
+                  <span class="lm-roster-console-meta">{{ rosterActiveMeta }}</span>
+                </div>
+                <div class="lm-roster-console-row">
+                  <input type="number" min="1" value="{{ rosterAmount }}" onInput="{{ onRosterAmount }}" title="Quantidade usada pelos botoes" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono" style="width:74px;" />
+                  <button onClick="{{ rosterDamage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">-HP</button>
+                  <button onClick="{{ rosterHeal }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">+HP</button>
+                  <button onClick="{{ rosterHealFull }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">HP CHEIO</button>
+                  <button onClick="{{ rosterIpGain }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">+IP</button>
+                  <button onClick="{{ rosterIpSpend }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">-IP</button>
+                  <button onClick="{{ rosterCreditsGain }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">+EB</button>
+                  <button onClick="{{ rosterCreditsSpend }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">-EB</button>
+                </div>
+                <div class="lm-roster-console-row">
+                  <select onChange="{{ onRosterInjury }}" class="lm-ui-select lm-ui-select--full">
+                    <sc-for list="{{ rosterInjuryOptions }}" as="ri" hint-placeholder-count="6">
+                      <sc-if value="{{ ri.selected }}"><option value="{{ ri.value }}" selected>{{ ri.label }}</option></sc-if>
+                      <sc-if value="{{ ri.notSelected }}"><option value="{{ ri.value }}">{{ ri.label }}</option></sc-if>
+                    </sc-for>
+                  </select>
+                  <button onClick="{{ addRosterInjury }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">+ LESAO</button>
+                </div>
+                <div class="lm-roster-console-row">
+                  <select onChange="{{ onRosterStatus }}" class="lm-ui-select lm-ui-select--full">
+                    <sc-for list="{{ rosterStatusOptions }}" as="rs" hint-placeholder-count="6">
+                      <sc-if value="{{ rs.selected }}"><option value="{{ rs.value }}" selected>{{ rs.label }}</option></sc-if>
+                      <sc-if value="{{ rs.notSelected }}"><option value="{{ rs.value }}">{{ rs.label }}</option></sc-if>
+                    </sc-for>
+                  </select>
+                  <button onClick="{{ addRosterStatus }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">+ EFEITO</button>
+                </div>
+                <sc-if value="{{ hasRosterGrantOptions }}">
+                  <div class="lm-roster-console-row">
+                    <select onChange="{{ onRosterGrant }}" class="lm-ui-select lm-ui-select--full">
+                      <sc-for list="{{ rosterGrantOptions }}" as="rg" hint-placeholder-count="6">
+                        <sc-if value="{{ rg.selected }}"><option value="{{ rg.value }}" selected>{{ rg.label }}</option></sc-if>
+                        <sc-if value="{{ rg.notSelected }}"><option value="{{ rg.value }}">{{ rg.label }}</option></sc-if>
+                      </sc-for>
+                    </select>
+                    <button onClick="{{ grantRosterItem }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">DAR ITEM</button>
+                  </div>
+                </sc-if>
+                <div class="lm-roster-remove-grid">
+                  <div>
+                    <div class="lm-roster-remove-title">LESOES</div>
+                    <sc-if value="{{ noRosterInjuries }}"><div class="lm-roster-empty">nenhuma</div></sc-if>
+                    <sc-for list="{{ rosterInjuryRows }}" as="ri" hint-placeholder-count="2">
+                      <div class="lm-roster-remove-row">
+                        <span class="lm-roster-remove-label">{{ ri.label }}</span>
+                        <span class="lm-roster-remove-state" style="color:{{ ri.stateColor }};">{{ ri.stateLabel }}</span>
+                        <button onClick="{{ ri.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div>
+                    <div class="lm-roster-remove-title">EFEITOS</div>
+                    <sc-if value="{{ noRosterStatuses }}"><div class="lm-roster-empty">nenhum</div></sc-if>
+                    <sc-for list="{{ rosterStatusRows }}" as="rs" hint-placeholder-count="2">
+                      <div class="lm-roster-remove-row">
+                        <span class="lm-roster-remove-label">{{ rs.label }}</span>
+                        <span class="lm-roster-remove-state">{{ rs.stateLabel }}</span>
+                        <button onClick="{{ rs.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div>
+                    <div class="lm-roster-remove-title">ITENS</div>
+                    <sc-if value="{{ noRosterGear }}"><div class="lm-roster-empty">nenhum</div></sc-if>
+                    <sc-for list="{{ rosterGearRows }}" as="rg" hint-placeholder-count="3">
+                      <div class="lm-roster-remove-row">
+                        <span class="lm-roster-remove-label">{{ rg.label }}</span>
+                        <span class="lm-roster-remove-state">{{ rg.typeLabel }}</span>
+                        <button onClick="{{ rg.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </sc-if>
+        </div>
+        </sc-if>
         <div class="flex-shrink-0 bg-cyber-surface border-b border-cyber-border flex items-center overflow-x-auto">
           <sc-for list="{{ sheetTabs }}" as="tab" hint-placeholder-count="6">
             <button onClick="{{ tab.onClick }}" class="{{ tab.style }}">{{ tab.label }}</button>
@@ -1912,6 +2289,9 @@
           </div>
           <sc-if value="{{ notSheetEditing }}">
             <div class="flex gap-1.5 flex-shrink-0">
+              <sc-if value="{{ canExportSheetPdf }}">
+                <button onClick="{{ exportSheetPdf }}" title="Baixar a ficha em PDF editavel" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ tx.exportSheetPdf }}</button>
+              </sc-if>
               <button onClick="{{ createSheetCharacter }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">{{ tx.newCharacter }}</button>
               <button onClick="{{ editSheet }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.editSheet }}</button>
             </div>

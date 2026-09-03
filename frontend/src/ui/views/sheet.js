@@ -27,6 +27,9 @@ import {
   programRunModifiers,
 } from '../../domain/netrunning/index.ts';
 import { ipCost as econIpCost, ipRoleCost as econIpRoleCost, formatIpLogRows as econFormatIpLogRows } from '../../domain/economy/index.ts';
+import { BODY_TYPES as TOXIN_BODY_TYPES } from '../../domain/toxins/index.ts';
+import { characterEffectDigest } from '../../domain/effects/index.ts';
+import { effectPresetCatalog } from '../../domain/effects/customEffects.ts';
 
 // SYS.01 // CHARACTER: the sheet drawer — core stats, skills, conditions,
 // IP purchases, installed chrome, trauma team coverage, and the
@@ -160,7 +163,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const isNetrunner = String(activeCharacter.role || '').toUpperCase() === 'NETRUNNER';
   const netrunnerRank = deps.asNumber(activeCharacter.roleAbilityRank, 0, 0, 10);
   const showNetrunningTab = isNetrunner && netrunnerRank > 0;
-  const sheetTabKeys = ['core', 'skills', 'conditions', 'ip', 'chrome', 'netrunning', 'notes'];
+  const sheetTabKeys = ['core', 'skills', 'conditions', 'ip', 'achievements', 'chrome', 'netrunning', 'notes'];
   const sheetTab = sheetTabKeys.includes(S.sheetTab) ? S.sheetTab : 'core';
   const sheetTabStyle = (active) => 'tab-btn text-[11px] uppercase px-4 py-3 tracking-wider' + (active ? ' active' : ' text-cyber-muted');
   const makeSheetTabs = (defs) => defs.map(tab => ({
@@ -174,6 +177,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     { key: 'skills', label: 'SKILLS' },
     { key: 'conditions', label: 'CONDICOES' },
     { key: 'ip', label: 'IP' },
+    { key: 'achievements', label: 'CONQUISTAS' },
     ...(showNetrunningTab ? [{ key: 'netrunning', label: 'NETRUNNING' }] : []),
     { key: 'notes', label: 'NOTES' },
   ]);
@@ -184,6 +188,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     { key: 'skills', label: 'SKILLS' },
     { key: 'conditions', label: 'CONDICOES' },
     { key: 'ip', label: 'IP' },
+    { key: 'achievements', label: 'CONQUISTAS' },
     { key: 'chrome', label: 'CHROME' },
     ...(showNetrunningTab ? [{ key: 'netrunning', label: 'NETRUNNING' }] : []),
     { key: 'notes', label: 'NOTES' },
@@ -332,8 +337,11 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const filteredInjuries = Object.values(CPRED_CRITICAL_INJURIES).filter(injury => injury.location === conditionLocation);
   const selectedInjuryId = filteredInjuries.some(injury => injury.id === S.conditionInjuryId) ? S.conditionInjuryId : (filteredInjuries[0] && filteredInjuries[0].id) || '';
   const conditionInjuryOptions = filteredInjuries.map(injury => ({ value: injury.id, label: injury.name_pt + ' // ' + injury.name_en, selected: injury.id === selectedInjuryId, notSelected: injury.id !== selectedInjuryId }));
-  const selectedStatusId = CPRED_STATUS_PRESETS.some(status => status.id === S.conditionStatusId) ? S.conditionStatusId : CPRED_STATUS_PRESETS[0].id;
-  const conditionStatusOptions = CPRED_STATUS_PRESETS.map(status => ({ value: status.id, label: status.label_pt, selected: status.id === selectedStatusId, notSelected: status.id !== selectedStatusId }));
+  // The campaign's own effects sit in the same picker as the book presets, so
+  // applying one is the same gesture — a "*" marks what this table authored.
+  const statusCatalog = effectPresetCatalog(CPRED_STATUS_PRESETS, S.customEffects);
+  const selectedStatusId = statusCatalog.some(status => status.id === S.conditionStatusId) ? S.conditionStatusId : statusCatalog[0].id;
+  const conditionStatusOptions = statusCatalog.map(status => ({ value: status.id, label: (status.custom ? '* ' : '') + status.label_pt, selected: status.id === selectedStatusId, notSelected: status.id !== selectedStatusId }));
   const durationLabel = (duration) => {
     if (!duration) return 'INDEFINIDO';
     const unit = duration.unit === 'hour' ? 'H' : duration.unit === 'min' ? 'MIN' : 'ROD';
@@ -362,6 +370,25 @@ export function sheetRenderVals(state = {}, deps = {}) {
       remove: () => deps.removeStatusEffect(entry.instanceId),
     };
   });
+  // One ledger of everything acting on this sheet, with the source of every
+  // number — the aggregate deltas below say "how much", this says "why".
+  const effects = characterEffectDigest({
+    character: activeCharacter,
+    derived,
+    installedCyberware: deps.installedCyberware ? deps.installedCyberware(activeCharacter) : [],
+  });
+  const effectRow = (row) => ({
+    ...row,
+    valueLabel: row.value > 0 ? '+' + row.value : row.value < 0 ? String(row.value) : '--',
+    valueColor: row.sign === 'positive' ? '#3fe0d0' : row.sign === 'negative' ? '#c0635b' : '#d6aa4e',
+    hasDetail: !!row.detail,
+    canRemove: !!row.removable && !!row.instanceId,
+    remove: () => deps.removeEffectRow(row),
+  });
+  const effectNegativeRows = effects.negatives.map(effectRow);
+  const effectPositiveRows = effects.positives.map(effectRow);
+  const effectNeutralRows = effects.neutral.map(effectRow);
+
   const conditionDeltas = [
     { label: 'SP CABECA', value: derived.currentHeadSp + '/' + derived.headSp, color: derived.currentHeadSp < derived.headSp ? '#c0635b' : '#3fe0d0' },
     { label: 'SP CORPO', value: derived.currentBodySp + '/' + derived.bodySp, color: derived.currentBodySp < derived.bodySp ? '#c0635b' : '#3fe0d0' },
@@ -579,6 +606,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     sheetTabSkills: sheetTab === 'skills',
     sheetTabConditions: sheetTab === 'conditions',
     sheetTabIp: sheetTab === 'ip',
+    sheetTabAchievements: sheetTab === 'achievements',
     sheetTabChrome: sheetTab === 'chrome',
     sheetTabNotes: sheetTab === 'notes',
     sheetTabNotesExisting: sheetTab === 'notes' && !S.sheetCreating,
@@ -598,6 +626,14 @@ export function sheetRenderVals(state = {}, deps = {}) {
     netProgramModifierLabels,
     hasNetProgramModifierLabels: netProgramModifierLabels.length > 0,
     conditionLocationOptions, conditionInjuryOptions, conditionStatusOptions,
+    effectNegativeRows, effectPositiveRows, effectNeutralRows,
+    hasEffectNegatives: effectNegativeRows.length > 0,
+    hasEffectPositives: effectPositiveRows.length > 0,
+    hasEffectNeutral: effectNeutralRows.length > 0,
+    effectsClean: effects.clean,
+    effectsHeadline: effects.headline_pt,
+    effectNegativeCount: effectNegativeRows.length,
+    effectPositiveCount: effectPositiveRows.length,
     criticalInjuryRows, noCriticalInjuries: criticalInjuryRows.length === 0,
     statusEffectRows, noStatusEffects: statusEffectRows.length === 0,
     conditionDeltas, woundFlags, passiveStatusBadges, hasPassiveStatusBadges, healingBreakdown,
@@ -605,7 +641,9 @@ export function sheetRenderVals(state = {}, deps = {}) {
     onConditionInjury: (e) => deps.setState({ conditionInjuryId: e.target.value }),
     onConditionStatus: (e) => deps.setState({ conditionStatusId: e.target.value }),
     addSelectedInjury: () => deps.addCriticalInjury(conditionLocation, selectedInjuryId),
-    addSelectedStatus: () => deps.addStatusEffect(selectedStatusId),
+    // Pass the resolved preset, not just the id: a campaign effect does not
+    // exist in CPRED_STATUS_PRESETS, which is all addStatusEffect can look up.
+    addSelectedStatus: () => deps.addStatusEffect(statusCatalog.find(status => status.id === selectedStatusId) || selectedStatusId),
     applyNaturalHealingRest: () => deps.applyNaturalHealingRest(activeCharacter.id),
     advanceRound: () => deps.advanceConditionTime('round'),
     advanceMinute: () => deps.advanceConditionTime('min'),
@@ -625,7 +663,15 @@ export function sheetRenderVals(state = {}, deps = {}) {
     sheetCharacterBtns, playerCharacterCards,
     sheetEditing: S.sheetEditing, notSheetEditing: !S.sheetEditing, sheetCreating: S.sheetCreating,
     editSheet: () => deps.editSheet(), createSheetCharacter: () => deps.createSheetCharacter(), createPlayerCharacter: () => deps.createPlayerCharacter(), cancelSheetEdit: () => deps.cancelSheetEdit(), saveSheetDraft: () => deps.saveSheetDraft(),
-    sheetName: sheetDraft.name, sheetRole: sheetDraft.role, sheetLevel: sheetDraft.level, sheetRoleAbilityRank: sheetDraft.roleAbilityRank, sheetCredits: sheetDraft.credits,
+    exportSheetPdf: () => deps.exportCharacterPdf(S.activeCharacterId), canExportSheetPdf: !!S.activeCharacterId,
+    sheetName: sheetDraft.name, sheetRole: sheetDraft.role, sheetLevel: sheetDraft.level,
+    // Only meat can be poisoned; a drone or Full Body Conversion is immune.
+    sheetBodyTypeOptions: TOXIN_BODY_TYPES.map(row => ({
+      value: row.id,
+      label: row.label_pt,
+      selected: (sheetDraft.bodyType || 'meat') === row.id,
+      notSelected: (sheetDraft.bodyType || 'meat') !== row.id,
+    })), sheetRoleAbilityRank: sheetDraft.roleAbilityRank, sheetCredits: sheetDraft.credits,
     sheetHealthCur: sheetDraft.healthCur, sheetRamUsed: sheetDraft.ramUsed, sheetHumanityLoss: sheetDraft.humanityLoss, sheetReputation: sheetDraft.reputation, sheetNotes: sheetDraft.notes,
     sheetAlliances: sheetDraft.alliances, sheetEnemies: sheetDraft.enemies, sheetPersonalTraits: sheetDraft.personalTraits, sheetHobbies: sheetDraft.hobbies,
     sheetNotesAutosaveLabel: S.sheetNotesAutosave === 'pending' ? tx.notesSaving : (S.sheetNotesAutosave === 'saved' ? tx.notesSaved : ''),
@@ -640,6 +686,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     sheetSkillSpend, sheetSkillBudget: CPRED_SKILL_BUDGET, sheetSkillRemaining, sheetSkillBudgetColor,
     onSheetName: (e) => updateSheetField('name', e.target.value),
     onSheetRole: (e) => updateSheetField('role', e.target.value),
+    onSheetBodyType: (e) => updateSheetField('bodyType', e.target.value),
     onSheetLevel: (e) => updateSheetField('level', e.target.value),
     onSheetRoleAbilityRank: (e) => updateSheetField('roleAbilityRank', e.target.value),
     onSheetCredits: (e) => updateSheetField('credits', e.target.value),
@@ -671,6 +718,7 @@ export function sheetHandlers(component) {
       id: c.id || '',
       name: c.name || '',
       role: c.role || 'Solo',
+      bodyType: c.bodyType || 'meat',
       level: String(c.level || 1),
       roleAbilityRank: String(c.roleAbilityRank ?? 4),
       credits: String(c.credits ?? component.state.credits ?? 0),
@@ -708,7 +756,7 @@ export function sheetHandlers(component) {
     const base = { INT: '6', REF: '8', DEX: '6', TECH: '6', COOL: '6', WILL: '7', LUCK: '5', MOVE: '6', BODY: '8', EMP: '4' };
     const derived = component.derivedStats(component.normalizeStats(base), { base, armor: CPRED_DEFAULT_ARMOR });
     return {
-      id: '', name: '', role: 'Solo', level: '1', credits: '12000',
+      id: '', name: '', role: 'Solo', bodyType: 'meat', level: '1', credits: '12000',
       roleAbilityRank: '4', healthCur: String(derived.hpMax), ramUsed: '0', humanityLoss: '0', traumaPlan: 'silver', notes: CPRED_STORY_TEMPLATE,
       alliances: '', enemies: '', personalTraits: '', hobbies: '',
       armor: component.normalizeArmor(CPRED_DEFAULT_ARMOR),
@@ -787,7 +835,7 @@ export function sheetHandlers(component) {
     const humanityLoss = component.asNumber(d.humanityLoss, 0, 0, 100);
     const reputation = component.asNumber(d.reputation, 0, 0, 10);
     const equipped = component.normalizeEquipped(d.equipped || active.equipped);
-    const skills = component.normalizeSkills(d.skills, base).map(s => ({ id: s.id, name: s.name, stat: s.stat, level: s.level, bonus: s.bonus, difficult: !!s.difficult, total: s.total }));
+    const skills = component.normalizeSkills(d.skills, base).map(s => ({ id: s.id, name: s.name, stat: s.stat, level: s.level, bonus: s.bonus, difficult: !!s.difficult, total: s.total, ...(s.origin ? { origin: true } : {}) }));
     const skillSpend = component.skillSpend(skills);
     if (component.state.sheetCreating && skillSpend !== CPRED_SKILL_BUDGET) {
       component.flash('Distribua exatamente ' + CPRED_SKILL_BUDGET + ' pontos de pericia. Atual: ' + skillSpend + '.', 3200);
@@ -809,6 +857,7 @@ export function sheetHandlers(component) {
       ...active,
       ...notesFields,
       id, name, role,
+      bodyType: d.bodyType || active.bodyType || 'meat',
       initials: (name.slice(0, 2) || 'OP'),
       level: component.asNumber(d.level, 1, 1, 99),
       roleAbilityRank: component.asNumber(d.roleAbilityRank, 4, 1, 10),
