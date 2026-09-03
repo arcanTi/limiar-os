@@ -33,6 +33,10 @@ class CampaignService:
             raise ApplicationError(403, "Apenas o mestre desta campanha pode editá-la")
         return self.campaigns.upsert_campaign(payload, dict(session))
 
+    def require_owner(self, campaign_id: str, session: Session) -> None:
+        """Public ownership gate, for callers that must check before acting."""
+        self._owner(campaign_id, session)
+
     def invite(self, campaign_id: str, username: str, session: Session) -> Record:
         self._owner(campaign_id, session)
         if not username.strip():

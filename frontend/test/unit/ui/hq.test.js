@@ -77,7 +77,7 @@ describe('ui/views/hq hqRenderVals', () => {
   });
 
   it('reflects the user draft role selection flags', () => {
-    const vals = hqRenderVals({ userDraft: { username: 'gm1', password: '', role: 'gm' } }, deps);
+    const vals = hqRenderVals({ userDraft: { username: 'gm1', role: 'gm' } }, deps);
     expect(vals.userDraftUsername).toBe('gm1');
     expect(vals.userRoleGmSelected).toBe(true);
     expect(vals.userRoleAdminSelected).toBe(false);
@@ -101,7 +101,11 @@ describe('ui/views/hq hqRenderVals', () => {
 function fakeComponent(overrides = {}) {
   const apiInstance = overrides.apiInstance || {
     hq: { set: vi.fn().mockResolvedValue(undefined) },
-    users: { upsert: vi.fn().mockResolvedValue(undefined), delete: vi.fn().mockResolvedValue(undefined) },
+    users: {
+      upsert: vi.fn().mockResolvedValue({ username: 'new', accessToken: 'A7K2QF' }),
+      delete: vi.fn().mockResolvedValue(undefined),
+      regenerateAccessToken: vi.fn().mockResolvedValue({ username: 'vesper', accessToken: 'QF7K2A' }),
+    },
   };
   return {
     state: { ipAward: {}, hqIp: { ip: 0, log: [] }, userDraft: {}, gmAuthenticated: true, ...overrides.state },
@@ -168,11 +172,35 @@ describe('ui/views/hq hqHandlers', () => {
   });
 
   it('saveUserDraft requires staff auth + a users api, then reloads the list', async () => {
-    const component = fakeComponent({ state: { userDraft: { username: 'new', password: 'x', role: 'player', email: 'new@example.com' } } });
+    const component = fakeComponent({ state: { userDraft: { username: 'new', role: 'player', email: 'new@example.com' } } });
     await hqHandlers(component).saveUserDraft();
-    expect(component.api().users.upsert).toHaveBeenCalledWith({ username: 'new', password: 'x', role: 'player', email: 'new@example.com' });
+    expect(component.api().users.upsert).toHaveBeenCalledWith({ username: 'new', role: 'player', email: 'new@example.com' });
     expect(component.loadUsers).toHaveBeenCalledTimes(1);
-    expect(component.state.userDraft).toEqual({ username: '', password: '', role: 'player', email: '' });
+    expect(component.state.userDraft).toEqual({ username: '', role: 'player', email: '', inviteToCampaign: true });
+  });
+
+  it('saveUserDraft surfaces the freshly minted token so the GM can read it out', async () => {
+    const component = fakeComponent({ state: { userDraft: { username: 'new', role: 'player' } } });
+    await hqHandlers(component).saveUserDraft();
+    expect(component.state.issuedAccessToken).toEqual({ username: 'new', accessToken: 'A7K2QF' });
+  });
+
+  it('saveUserDraft attaches the active campaign only when the invite box is on', async () => {
+    const withInvite = fakeComponent({ state: { userDraft: { username: 'new', role: 'player' }, activeCampaignId: 'camp-1' } });
+    await hqHandlers(withInvite).saveUserDraft();
+    expect(withInvite.api().users.upsert).toHaveBeenCalledWith(expect.objectContaining({ campaignId: 'camp-1' }));
+
+    const withoutInvite = fakeComponent({ state: { userDraft: { username: 'new', role: 'player', inviteToCampaign: false }, activeCampaignId: 'camp-1' } });
+    await hqHandlers(withoutInvite).saveUserDraft();
+    expect(withoutInvite.api().users.upsert).toHaveBeenCalledWith(expect.not.objectContaining({ campaignId: 'camp-1' }));
+  });
+
+  it('regenerateAccessToken swaps the token and refreshes the roster', async () => {
+    const component = fakeComponent();
+    await hqHandlers(component).regenerateAccessToken('vesper');
+    expect(component.api().users.regenerateAccessToken).toHaveBeenCalledWith('vesper');
+    expect(component.state.issuedAccessToken).toEqual({ username: 'vesper', accessToken: 'QF7K2A' });
+    expect(component.loadUsers).toHaveBeenCalledTimes(1);
   });
 
   it('saveUserDraft is a no-op for a non-staff session', async () => {
@@ -181,10 +209,10 @@ describe('ui/views/hq hqHandlers', () => {
     expect(component.loadUsers).not.toHaveBeenCalled();
   });
 
-  it('editUserDraft loads a user into the draft (password always blank)', () => {
+  it('editUserDraft loads an existing user into the draft', () => {
     const component = fakeComponent();
     hqHandlers(component).editUserDraft({ username: 'vesper', role: 'gm', email: 'vesper@example.com' });
-    expect(component.state.userDraft).toEqual({ username: 'vesper', password: '', role: 'gm', email: 'vesper@example.com' });
+    expect(component.state.userDraft).toEqual({ username: 'vesper', role: 'gm', email: 'vesper@example.com', inviteToCampaign: false });
   });
 
   it('deleteUser requires staff auth, then reloads the list', async () => {

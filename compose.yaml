@@ -33,11 +33,12 @@ services:
       PORT: 8765
       LIMIAR_DATABASE_URL: postgresql+psycopg://limiar:${POSTGRES_PASSWORD}@postgres:5432/limiar
       LIMIAR_GM_USER: ${LIMIAR_GM_USER:-mestre}
-      LIMIAR_GM_PASSWORD: ${LIMIAR_GM_PASSWORD:?define LIMIAR_GM_PASSWORD in .env}
+      # Optional: pin the master access token. Left unset, one is generated on
+      # first boot and written to the container log.
+      LIMIAR_MASTER_TOKEN: ${LIMIAR_MASTER_TOKEN:-}
       LIMIAR_SESSION_TTL: ${LIMIAR_SESSION_TTL:-28800}
       LIMIAR_SESSION_TOUCH_INTERVAL: ${LIMIAR_SESSION_TOUCH_INTERVAL:-900}
       LIMIAR_MAX_UPLOAD_MB: ${LIMIAR_MAX_UPLOAD_MB:-64}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     ports:
       - "${LIMIAR_PORT:-8765}:8765"
     volumes:

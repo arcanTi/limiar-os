@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from backend import db as db_module
 from backend.asgi import create_app
 from backend.repositories import campaign_sync
+from backend.security import ACCESS_TOKEN_ALPHABET, ACCESS_TOKEN_LENGTH
 
 
 def test_production_lifespan_requires_postgres(monkeypatch):
@@ -17,15 +18,18 @@ def test_production_lifespan_requires_postgres(monkeypatch):
         pass
 
 
-def test_production_lifespan_requires_explicit_admin_password(monkeypatch):
-    monkeypatch.setenv("LIMIAR_DATABASE_URL", "postgresql://limiar:test@postgres/limiar")
-    monkeypatch.delenv("LIMIAR_GM_PASSWORD", raising=False)
+def test_bootstrap_master_gets_a_random_token_when_none_is_configured(db_path, monkeypatch):
+    """No configured token must never mean a guessable one."""
+    monkeypatch.setattr(db_module, "DEFAULT_MASTER_TOKEN", "")
+    db_module.init_db()
 
-    with (
-        pytest.raises(RuntimeError, match="LIMIAR_GM_PASSWORD is required"),
-        TestClient(create_app()),
-    ):
-        pass
+    with db_module.db() as conn:
+        token = conn.execute(
+            "SELECT access_token FROM users WHERE role = 'admin'",
+        ).fetchone()["access_token"]
+
+    assert len(token) == ACCESS_TOKEN_LENGTH
+    assert set(token) <= set(ACCESS_TOKEN_ALPHABET)
 
 
 def test_session_route_is_native_fastapi(db_path, make_session):
@@ -46,10 +50,7 @@ def test_auth_and_campaign_routes_are_native_fastapi(db_path, make_session):
     gm = make_session("native-gm", role="gm")
 
     with TestClient(create_app()) as client:
-        login = client.post(
-            "/api/login",
-            json={"username": gm["username"], "password": gm["password"]},
-        )
+        login = client.post("/api/login", json={"token": gm["accessToken"]})
         token = login.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
         created = client.post(

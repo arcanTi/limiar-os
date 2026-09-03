@@ -77,9 +77,6 @@ def create_app() -> FastAPI:
                 "the new deployment does not import or fall back to SQLite"
             )
             raise RuntimeError(message)
-        if not os.environ.get("LIMIAR_GM_PASSWORD"):
-            message = "LIMIAR_GM_PASSWORD is required for a clean PostgreSQL deployment"
-            raise RuntimeError(message)
         await run_in_threadpool(init_db)
         yield
 

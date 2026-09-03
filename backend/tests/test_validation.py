@@ -14,48 +14,37 @@ from backend.domain.validation import (
 )
 
 
-def test_validate_login_accepts_required_credentials_without_stripping_password():
-    assert validate_login({"username": " alice ", "password": "  secret  "}) == (
-        "alice",
-        "  secret  ",
-    )
+def test_validate_login_normalizes_a_typed_access_token():
+    assert validate_login({"token": " a7k2-qf "}) == "A7K2QF"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"token": "A7K2Q"},
+        {"token": "A7K2QFX"},
+        {"token": 424242},
+        # 0/O/1/I/L never appear in a generated token, so they cannot be one.
+        {"token": "A7K2Q0"},
+    ],
+)
+def test_validate_login_rejects_tokens_of_the_wrong_shape(payload):
+    with pytest.raises(ValidationError, match="token"):
+        validate_login(payload)
+
+
+def test_validate_user_accepts_every_role():
+    assert validate_user({"username": " alice ", "role": "admin"}) == ("alice", "admin")
+    assert validate_user({"username": "alice", "role": "player"}) == ("alice", "player")
 
 
 @pytest.mark.parametrize(
     "payload, message",
     [
         ({}, "'username' is required"),
-        ({"username": "alice"}, "'password' is required"),
-        ({"username": 42, "password": "secret"}, "'username' must be a string"),
-    ],
-)
-def test_validate_login_rejects_invalid_payloads(payload, message):
-    with pytest.raises(ValidationError, match=message):
-        validate_login(payload)
-
-
-def test_validate_user_accepts_roles_and_optional_password_for_existing_users():
-    assert validate_user({"username": "alice", "password": "password-123", "role": "admin"}) == (
-        "alice",
-        "password-123",
-        "admin",
-    )
-    assert validate_user(
-        {"username": "alice", "password": "", "role": "player"},
-        password_optional=True,
-    ) == (
-        "alice",
-        None,
-        "player",
-    )
-
-
-@pytest.mark.parametrize(
-    "payload, message",
-    [
-        ({"username": "alice", "password": "short", "role": "player"}, "password"),
-        ({"username": "alice", "password": "password-123", "role": "owner"}, "role"),
-        ({"username": "alice", "role": "player"}, "password"),
+        ({"username": 42, "role": "player"}, "'username' must be a string"),
+        ({"username": "alice", "role": "owner"}, "role"),
     ],
 )
 def test_validate_user_rejects_invalid_payloads(payload, message):

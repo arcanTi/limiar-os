@@ -22,15 +22,11 @@ from backend.asgi import create_app
 
 PUBLIC_ROUTES = {
     ("GET", "/api/health"),
-    ("GET", "/api/meta/config"),
     ("GET", "/api/meta/login-art"),
     ("GET", "/api/session"),
     ("GET", "/api/i18n"),
     ("POST", "/api/login"),
     ("POST", "/api/logout"),
-    ("POST", "/api/register"),
-    ("POST", "/api/auth/google"),
-    ("POST", "/api/password-reset-requests"),
 }
 
 

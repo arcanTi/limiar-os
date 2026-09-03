@@ -2,6 +2,8 @@
 
 import re
 
+from ..security import ACCESS_TOKEN_LENGTH, is_access_token, normalize_access_token
+
 # C0/C1 control characters except \n and \t. The template engine already
 # writes text via textContent/setAttribute (safe against markup injection),
 # but free-form fields that skip per-key validation (gear notes, character
@@ -73,28 +75,22 @@ def _val_int(payload: dict[str, object], key: str, *, required: bool = False) ->
     return val
 
 
-def validate_login(payload: dict[str, object]) -> tuple[str, str]:
-    username = _val_str(payload, "username", required=True, max_len=100)
-    # Don't strip passwords — spaces are valid password characters.
-    password = payload.get("password")
-    if not isinstance(password, str) or not password:
-        raise ValidationError(["'password' is required"])
-    return username, password  # type: ignore[return-value]
+def validate_login(payload: dict[str, object]) -> str:
+    """Return the normalized access token carried by a login request."""
+    token = normalize_access_token(payload.get("token"))
+    if not is_access_token(token):
+        raise ValidationError(
+            [f"'token' must be {ACCESS_TOKEN_LENGTH} letters or digits"]
+        )
+    return token
 
 
-def validate_user(payload: dict[str, object], *, password_optional: bool = False) -> tuple[str, str | None, str]:
+def validate_user(payload: dict[str, object]) -> tuple[str, str]:
     username = _val_str(payload, "username", required=True, max_len=100)
     role = _val_str(payload, "role", required=True, max_len=20) or "player"
     if role not in ("admin", "gm", "player"):
         raise ValidationError(["'role' must be 'admin', 'gm', or 'player'"])
-    password = payload.get("password")
-    if password is None or password == "":
-        if not password_optional:
-            raise ValidationError(["'password' is required"])
-        return username, None, role
-    if not isinstance(password, str) or len(password) < 8:
-        raise ValidationError(["'password' must be at least 8 characters"])
-    return username, password, role
+    return username, role  # type: ignore[return-value]
 
 
 def validate_email(payload: dict[str, object], *, required: bool = False) -> str | None:

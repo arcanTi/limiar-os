@@ -11,11 +11,17 @@ from typing import Any, TypedDict
 
 from .config import (
     DATABASE_URL,
-    DEFAULT_GM_PASSWORD,
     DEFAULT_GM_USER,
+    DEFAULT_MASTER_TOKEN,
     SEED_PATH,
 )
-from .security import password_hash
+from .security import (
+    ACCESS_TOKEN_ALPHABET,
+    ACCESS_TOKEN_LENGTH,
+    generate_access_token,
+    is_access_token,
+    normalize_access_token,
+)
 from .util import slug
 
 _pool = None
@@ -105,7 +111,10 @@ class DomainConfig(TypedDict):
 
 
 _DOMAIN: dict[str, DomainConfig] = {
-    "characters": {"table": "characters", "typed": ("id", "name", "role", "level")},
+    "characters": {
+        "table": "characters",
+        "typed": ("id", "name", "role", "level", "campaignId"),
+    },
     "items": {"table": "items", "typed": ("id", "code", "name", "cat", "price", "stock")},
     "map": {"table": "map_locations", "typed": ("id", "name", "threat")},
     "assets": {
@@ -142,7 +151,15 @@ def _dict_to_upsert(
     params: dict[str, object] = {"id": record_id}
     for column in typed:
         if column != "id":
-            params[column] = payload.get(column)
+            value = payload.get(column)
+            # "No campaign" has exactly one representation in the column: NULL.
+            # The application layer carries it as "" (a real scope, not a
+            # wildcard), and writing that through would strand the row —
+            # list_records selects the campaign-less rows with IS NULL, so an
+            # edited sheet would vanish from every list that used to show it.
+            if column == "campaignId" and not value:
+                value = None
+            params[column] = value
     params["extra"] = json.dumps(
         {
             key: value
@@ -228,17 +245,49 @@ def init_db() -> None:
     with db() as conn:
         _seed_typed_tables(conn)
         _insert_missing_seed_items(conn)
-        user = conn.execute(
-            "SELECT username FROM users WHERE username = %s",
-            (DEFAULT_GM_USER,),
-        ).fetchone()
-        if user is None:
-            conn.execute(
-                "INSERT INTO users(username, password_hash, role) VALUES (%s, %s, 'admin')",
-                (DEFAULT_GM_USER, password_hash(DEFAULT_GM_PASSWORD)),
-            )
-        else:
-            conn.execute(
-                "UPDATE users SET role = 'admin' WHERE username = %s AND role = 'gm'",
-                (DEFAULT_GM_USER,),
-            )
+        _bootstrap_master(conn)
+
+
+def _bootstrap_master(conn: Any) -> None:  # noqa: ANN401
+    """Guarantee one admin account holding a usable access token.
+
+    Without this an empty deployment has nobody who can issue tokens, which
+    would make the whole install unreachable. The generated token is logged
+    once, at boot, because it is the only place an operator can read it.
+    """
+    configured = normalize_access_token(DEFAULT_MASTER_TOKEN)
+    if DEFAULT_MASTER_TOKEN and not is_access_token(configured):
+        # A token outside the alphabet can never be entered at the login form,
+        # so honouring it would lock the operator out of their own deployment.
+        logging.warning(
+            "[limiar] ignoring LIMIAR_MASTER_TOKEN: not %d characters of %s",
+            ACCESS_TOKEN_LENGTH,
+            ACCESS_TOKEN_ALPHABET,
+        )
+        configured = ""
+    user = conn.execute(
+        "SELECT username, access_token FROM users WHERE username = %s",
+        (DEFAULT_GM_USER,),
+    ).fetchone()
+    if user is None:
+        token = configured or generate_access_token()
+        conn.execute(
+            "INSERT INTO users(username, access_token, role) VALUES (%s, %s, 'admin')",
+            (DEFAULT_GM_USER, token),
+        )
+        logging.warning(
+            "[limiar] master account '%s' created with access token %s "
+            "(rotate it from the GM panel after first login)",
+            DEFAULT_GM_USER,
+            token,
+        )
+        return
+    conn.execute(
+        "UPDATE users SET role = 'admin' WHERE username = %s AND role = 'gm'",
+        (DEFAULT_GM_USER,),
+    )
+    if configured and user["access_token"] != configured:
+        conn.execute(
+            "UPDATE users SET access_token = %s WHERE username = %s",
+            (configured, DEFAULT_GM_USER),
+        )

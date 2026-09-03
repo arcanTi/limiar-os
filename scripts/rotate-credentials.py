@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
-"""Revoke every session and reset a user's password.
+"""Revoke every session and reissue a user's access token.
 
-`LIMIAR_GM_PASSWORD` only seeds the admin on a fresh database (`init_db` inserts
-it when the user does not exist yet), so it cannot rotate the password of an
-account that already exists. This script is the supported way to do that.
+`LIMIAR_MASTER_TOKEN` only seeds the admin on a fresh database (`init_db`
+inserts it when the user does not exist yet), so on an existing deployment this
+script is the supported way to rotate a token — in particular the master one,
+if it was ever pasted somewhere it should not have been.
 
-The password is read from an interactive prompt: it never lands in shell
-history, in the process list, or in a log.
-
-    python3 scripts/rotate-credentials.py            # revoke sessions + reset admin
+    python3 scripts/rotate-credentials.py            # revoke sessions + reissue master
     python3 scripts/rotate-credentials.py --user ana # pick a different account
     python3 scripts/rotate-credentials.py --sessions-only
 
-Stop the server before running this — the reset takes effect immediately and
-every client will need to log in again.
+The new token is printed once, here, because nothing else stores it in a form
+you can read back. Stop the server before running this: the rotation takes
+effect immediately and every client will need to log in again.
 """
 
 import argparse
-import getpass
 import sys
 from pathlib import Path
 from typing import Any
@@ -26,45 +24,44 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.config import DEFAULT_GM_USER
 from backend.db import db, using_postgres
-from backend.security import password_hash
-
-MIN_LENGTH = 12
+from backend.security import generate_access_token
 
 
-def revoke_sessions(conn: Any) -> int:  # noqa: ANN401 - shared SQLite/PostgreSQL facade
+def revoke_sessions(conn: Any) -> int:  # noqa: ANN401 - shared DB facade
     count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
     conn.execute("DELETE FROM sessions")
     return count
 
 
-def reset_password(conn: Any, username: str) -> None:  # noqa: ANN401 - shared DB facade
+def reissue_token(conn: Any, username: str) -> None:  # noqa: ANN401 - shared DB facade
     exists = conn.execute(
-        "SELECT 1 FROM users WHERE username = ?",
+        "SELECT 1 FROM users WHERE username = %s",
         (username,),
     ).fetchone()
     if not exists:
         sys.exit(f"user '{username}' not found in PostgreSQL")
 
-    first = getpass.getpass(f"New password for '{username}': ")
-    if len(first) < MIN_LENGTH:
-        sys.exit(f"password too short (minimum {MIN_LENGTH} characters)")
-    if first != getpass.getpass("Confirm: "):
-        sys.exit("passwords do not match")
+    token = generate_access_token()
+    while conn.execute(
+        "SELECT 1 FROM users WHERE access_token = %s",
+        (token,),
+    ).fetchone():
+        token = generate_access_token()
 
     conn.execute(
-        "UPDATE users SET password_hash = ? WHERE username = ?",
-        (password_hash(first), username),
+        "UPDATE users SET access_token = %s WHERE username = %s",
+        (token, username),
     )
-    print(f"password updated for '{username}'")
+    print(f"new access token for '{username}': {token}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--user", default=DEFAULT_GM_USER, help="account to reset")
+    parser.add_argument("--user", default=DEFAULT_GM_USER, help="account to reissue")
     parser.add_argument(
         "--sessions-only",
         action="store_true",
-        help="revoke sessions without touching any password",
+        help="revoke sessions without touching any access token",
     )
     args = parser.parse_args()
 
@@ -74,7 +71,7 @@ def main() -> None:
         revoked = revoke_sessions(conn)
         print(f"revoked {revoked} session(s)")
         if not args.sessions_only:
-            reset_password(conn, args.user)
+            reissue_token(conn, args.user)
 
 
 if __name__ == "__main__":

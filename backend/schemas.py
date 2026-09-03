@@ -55,12 +55,4 @@ class LoginArtResponse(BaseModel):
     images: list[str]
 
 
-class ConfigResponse(BaseModel):
-    """Public login configuration contract."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    google_client_id: str = Field(alias="googleClientId")
-
-
 JsonObject = dict[str, Any]

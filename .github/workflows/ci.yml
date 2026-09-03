@@ -46,7 +46,7 @@ jobs:
     env:
       LIMIAR_DATABASE_URL: postgresql+psycopg://limiar_test:limiar_test_password@127.0.0.1:5432/limiar_test
       LIMIAR_TEST_DATABASE_URL: postgresql+psycopg://limiar_test:limiar_test_password@127.0.0.1:5432/limiar_test
-      LIMIAR_GM_PASSWORD: ci-only-admin-password
+      LIMIAR_MASTER_TOKEN: CJ2779
       LIMIAR_FAIL_ON_SKIP: "1"
     steps:
       - uses: actions/checkout@v4
@@ -137,7 +137,7 @@ jobs:
           --network limiar-ci
           --publish 8765:8765
           --env LIMIAR_DATABASE_URL=postgresql+psycopg://limiar:limiar_ci_password@postgres:5432/limiar
-          --env LIMIAR_GM_PASSWORD=ci-only-admin-password
+          --env LIMIAR_MASTER_TOKEN=CJ2779
           limiar-os:ci
       - name: Smoke HTTP surfaces
         run: |

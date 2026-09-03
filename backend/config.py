@@ -28,12 +28,12 @@ HTML_ENTRY_FILES = {
 }
 
 DEFAULT_GM_USER = os.environ.get("LIMIAR_GM_USER", "mestre")
-DEFAULT_GM_PASSWORD = os.environ.get("LIMIAR_GM_PASSWORD", "limiar-master-2077")
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+# Access token of the bootstrap master account. Left empty, one is generated on
+# first boot and logged once — see backend/db.py.
+DEFAULT_MASTER_TOKEN = os.environ.get("LIMIAR_MASTER_TOKEN", "").strip().upper()
 CHAT_LIMIT = 200
 _MAX_BODY_BYTES = 256 * 1024  # 256 KB — hard cap on JSON request bodies
 _MAX_UPLOAD_BYTES = int(os.environ.get("LIMIAR_MAX_UPLOAD_MB", "64")) * 1024 * 1024
-_PBKDF2_ITERATIONS = 260_000  # OWASP 2024 minimum for PBKDF2-SHA256
 _ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -45,6 +45,12 @@ _ALLOWED_IMAGE_TYPES = {
 # uploads are served inline at /uploads/ without CSP protection.
 # Rate limiting: (max_requests, window_seconds)
 _LOGIN_RATE = (10, 60)  # 10 login attempts per minute per IP (anti brute-force)
+# A 6-character token only holds ~2^29.7 of entropy, so a per-IP window alone
+# would still fall to a botnet spreading guesses over many addresses. This
+# second, deployment-wide window caps the total guess rate no matter how many
+# IPs take part; legitimate traffic never approaches it because a table only
+# logs in a handful of times per session.
+_LOGIN_GLOBAL_RATE = (60, 60)
 _CHAT_RATE = (30, 60)  # 30 chat messages per minute per IP (anti spam)
 # Idle lifetime of a GM session. Every authenticated request slides this window
 # forward (a "silent handshake"), so an active client - even across a 4-6h game
