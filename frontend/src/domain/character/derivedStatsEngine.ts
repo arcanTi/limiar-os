@@ -13,6 +13,7 @@ import type {
 import {
   applyCyberwareStatMods,
   cyberwareHumanityLoss,
+  linearFrameBody,
   naturalHealingPerRest,
 } from '../cyberware/index.ts';
 import type { InstalledCyberwareItem } from '../cyberware/index.ts';
@@ -23,6 +24,8 @@ export interface DerivedStatsCharacter {
   base?: DerivedStatsInputStats;
   humanityLoss?: unknown;
   deathSavesPassed?: unknown;
+  /** Hits taken while Mortally Wounded; each adds +1 to the Death Save penalty. */
+  deathSaveWoundPenalty?: unknown;
   armor?: Partial<CharacterArmor> | null;
   shield?: Partial<CharacterShield> | null;
   equipped?: unknown[] | Record<string, unknown>;
@@ -60,6 +63,13 @@ export interface DerivedStats {
   deathSaveModifier: number;
   /** Death Saves passed while Mortally Wounded; each adds +1 to the penalty. */
   deathSavesPassed: number;
+  /** Damage taken while Mortally Wounded; each hit adds +1 to the penalty. */
+  deathSaveWoundPenalty: number;
+  /** BODY the Death Save and effective stats use (organic, or the running Linear Frame's). */
+  effectiveBody: number;
+  /** BODY the HP maximum was computed from (keeps the frame's value even when the frame is EMP-disabled). */
+  hpBody: number;
+  linearFrameSources: string[];
   humanityMax: number;
   humanityCurrent: number;
   cyberpsychosisActive: boolean;
@@ -109,12 +119,19 @@ export function deriveStats({ stats, character, installedCyberware = [] }: Deriv
   const humanityCurrent = humanityMax - humanityLoss;
   const cyberpsychosisActive = humanityCurrent === 0;
   const cyberpsychosisExtreme = humanityCurrent < 0;
-  const hpMax = 10 + (5 * Math.ceil(((base.BODY || 0) + (base.WILL || 0)) / 2));
+  // Implanted Linear Frame: BODY becomes the frame's value while it runs.
+  // HP max follows the highest frame ever installed even if it is currently
+  // EMP-disabled (RAW: the HP the frame granted stays; BODY and Death Save
+  // fall back to organic at once).
+  const frame = linearFrameBody(installedCyberware);
+  const hpBody = Math.max(base.BODY || 0, frame.installed);
+  const effectiveBody = Math.max(base.BODY || 0, frame.active);
+  const hpMax = 10 + (5 * Math.ceil((hpBody + (base.WILL || 0)) / 2));
   const armor = normalizeArmor(c.armor);
   const shield = normalizeShield(c.shield);
   const penalty = Math.max(armor.head.penalty || 0, armor.body.penalty || 0);
   const aggregate = aggregateConditions(c);
-  const adjusted = { ...base };
+  const adjusted = { ...base, BODY: effectiveBody };
   CPRED_ARMOR_PENALTY_STATS.forEach(k => { adjusted[k] = Math.max(0, (adjusted[k] || 0) - penalty); });
   Object.keys(aggregate.statPenalties).forEach(k => { adjusted[k as CpredStat] = Math.max(0, (adjusted[k as CpredStat] || 0) - aggregate.statPenalties[k]); });
   const seriouslyWounded = Math.ceil(hpMax / 2);
@@ -133,16 +150,23 @@ export function deriveStats({ stats, character, installedCyberware = [] }: Deriv
   // Each Death Save passed adds +1 to the penalty until stabilized;
   // the counter lives on the record and only bites while Mortally Wounded.
   const deathSavesPassed = mortal ? asNumber(c.deathSavesPassed, 0, 0, 50) : 0;
-  const deathSaveModifier = -(aggregate.deathSavePenalty + deathSavesPassed);
+  // Every hit that gets damage through while Mortally Wounded adds +1 as
+  // well (CPR RAW p.176); like the streak above it only bites while mortal.
+  const deathSaveWoundPenalty = mortal ? asNumber(c.deathSaveWoundPenalty, 0, 0, 50) : 0;
+  const deathSaveModifier = -(aggregate.deathSavePenalty + deathSavesPassed + deathSaveWoundPenalty);
   const healingBody = applyCyberwareStatMods(base, installedCyberware).BODY || 0;
   const naturalHealing = naturalHealingPerRest(installedCyberware, healingBody);
   return {
     hpMax,
     seriouslyWounded,
     woundState,
-    deathSave: Math.max(0, (base.BODY || 0) + deathSaveModifier),
+    deathSave: Math.max(0, effectiveBody + deathSaveModifier),
     deathSaveModifier,
     deathSavesPassed,
+    deathSaveWoundPenalty,
+    effectiveBody,
+    hpBody,
+    linearFrameSources: frame.sources,
     humanityMax,
     humanityCurrent,
     cyberpsychosisActive,

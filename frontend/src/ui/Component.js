@@ -595,6 +595,9 @@ class Component extends DCLogic {
       rarity: src.rarity || LIMIAR_TIER_COLORS[profile.tier] || (profile.sides ? '#c0635b' : type.includes('CONSUMABLE') ? '#3fe0d0' : '#d6aa4e'),
       notes: String(src.notes || src.desc || '').trim(),
       lastUsedAt: src.lastUsedAt || '',
+      // Poor-quality malfunction (CPR RAW): a natural 1 on the attack jams
+      // the weapon; clearing it costs a full Action (combat.js unjamWeapon).
+      jammed: !!src.jammed,
     };
     normalized.dmg = src.dmg || this.gearDamageText(normalized);
     // Ammo tracking only applies to gear with a numeric magazine (catalog
@@ -1259,9 +1262,9 @@ class Component extends DCLogic {
     const current = (this.state.characters || []).find(c => c.id === characterId) || this.activeCharacter();
     // Leaving Mortally Wounded (HP back to 1+) by any route resets the Death
     // Save streak, so a later collapse starts clean.
-    if (patch && patch.health && patch.health.cur != null && Number(patch.health.cur) >= 1
-        && patch.deathSavesPassed == null && Number(current && current.deathSavesPassed)) {
-      patch = { ...patch, deathSavesPassed: 0 };
+    if (patch && patch.health && patch.health.cur != null && Number(patch.health.cur) >= 1) {
+      if (patch.deathSavesPassed == null && Number(current && current.deathSavesPassed)) patch = { ...patch, deathSavesPassed: 0 };
+      if (patch.deathSaveWoundPenalty == null && Number(current && current.deathSaveWoundPenalty)) patch = { ...patch, deathSaveWoundPenalty: 0 };
     }
     const next = this.normalizeCharacter({ ...current, ...patch });
     const applySaved = (savedRaw) => {
@@ -1383,6 +1386,7 @@ class Component extends DCLogic {
       health: { cur: 1, max: hpMax },
       statusEffects: [...(target.statusEffects || []), entry],
       deathSavesPassed: 0,
+      deathSaveWoundPenalty: 0,
     });
   }
   // Death Save streak: +1 per save passed while Mortally Wounded. Players

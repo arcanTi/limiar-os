@@ -862,7 +862,7 @@
                   <div class="lm-combat-stat"><div class="lm-combat-stat-label">COND</div><div class="lm-combat-stat-value lm-combat-stat-value--teal">{{ combatFocusCard.conditions }}</div></div>
                   <div class="lm-combat-stat"><div class="lm-combat-stat-label">SP CABECA</div><div class="lm-combat-stat-value lm-combat-stat-value--gold">{{ combatFocusCard.headSp }}</div></div>
                   <div class="lm-combat-stat"><div class="lm-combat-stat-label">SP CORPO</div><div class="lm-combat-stat-value lm-combat-stat-value--gold">{{ combatFocusCard.bodySp }}</div></div>
-                  <sc-if value="{{ combatFocusCard.hasShield }}"><div class="lm-combat-stat"><div class="lm-combat-stat-label">ESCUDO</div><div class="lm-combat-stat-value" style="color:{{ combatFocusCard.shieldColor }};">{{ combatFocusCard.shieldHp }}</div></div></sc-if>
+                  <sc-if value="{{ combatFocusCard.hasShield }}"><div class="lm-combat-stat"><div class="lm-combat-stat-label">{{ combatFocusCard.shieldKindLabel }}</div><div class="lm-combat-stat-value" style="color:{{ combatFocusCard.shieldColor }};">{{ combatFocusCard.shieldHp }}</div></div></sc-if>
                   <sc-if value="{{ combatFocusCard.netActions.isNetrunner }}"><div class="lm-combat-stat"><div class="lm-combat-stat-label">NET ACTIONS</div><div class="lm-combat-stat-value lm-combat-stat-value--teal">{{ combatFocusCard.netActions.perTurn }}</div></div></sc-if>
                 </div>
                 <sc-if value="{{ combatFocusCard.hasPsychosis }}"><div class="lm-combat-meta" style="color:#c0635b;margin-top:4px;">{{ combatFocusCard.psychosisLabel }}</div></sc-if>
@@ -921,16 +921,28 @@
                       </sc-for>
                     </div>
                   </sc-if>
-                  <sc-if value="{{ combatFocusCard.hasWeapons }}">
+                  <sc-if value="{{ combatFocusCard.hasAttackBudget }}"><div class="lm-combat-row-meta" style="margin-bottom:6px;color:#d6aa4e;">{{ combatFocusCard.attackBudgetLabel }}</div></sc-if>
+<sc-if value="{{ combatFocusCard.grapple.hasTarget }}">
+  <div class="lm-combat-subtitle lm-combat-subtitle--teal">AGARRE<sc-if value="{{ combatFocusCard.grapple.canChoke }}"> :: {{ combatFocusCard.grapple.holdingLabel }}</sc-if></div>
+  <div class="lm-combat-check-row">
+    <sc-if value="{{ combatFocusCard.grapple.canGrab }}"><button onClick="{{ combatFocusCard.grapple.grab }}" title="Marca o agarre depois do ataque de Brawling bem-sucedido" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">AGARRAR</button></sc-if>
+    <sc-if value="{{ combatFocusCard.grapple.canChoke }}"><button onClick="{{ combatFocusCard.grapple.choke }}" title="Automatico: BODY de dano direto; 1 HP + inconsciente se cairia abaixo de 0; 3 turnos = inconsciente" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">ESTRANGULAR</button></sc-if>
+    <sc-if value="{{ combatFocusCard.grapple.canThrow }}"><button onClick="{{ combatFocusCard.grapple.throwTarget }}" title="Automatico: BODY de dano direto, encerra o agarre" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">ARREMESSAR</button></sc-if>
+    <sc-if value="{{ combatFocusCard.grapple.canHumanShield }}"><button onClick="{{ combatFocusCard.grapple.useHumanShield }}" title="1 acao: alvo agarrado vira escudo com HP = BODY" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">ESCUDO HUMANO</button></sc-if>
+    <sc-if value="{{ combatFocusCard.grapple.canRelease }}"><button onClick="{{ combatFocusCard.grapple.release }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">SOLTAR</button></sc-if>
+  </div>
+</sc-if>
+<sc-if value="{{ combatFocusCard.hasWeapons }}">
                     <div class="lm-combat-subtitle lm-combat-subtitle--danger">{{ tx.weapons }}</div>
                     <sc-if value="{{ combatFocusCard.hasEvasionStatus }}"><div class="lm-combat-row-meta" style="margin-bottom:6px;">{{ combatFocusCard.evasionStatus.label }}</div></sc-if>
                     <div class="lm-combat-kit-list">
                       <sc-for list="{{ combatFocusCard.weaponRows }}" as="w" hint-placeholder-count="2">
                         <div class="lm-combat-row lm-combat-row--weapon">
                           <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}<sc-if value="{{ w.hasAmmo }}"> // {{ w.ammoLabel }}</sc-if></div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
-                          <sc-if value="{{ w.isMelee }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
+                          <sc-if value="{{ w.canRequestEvasion }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
                           <sc-if value="{{ w.hasSuppressiveFire }}"><button onClick="{{ w.suppressiveFire }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">SUPRESSAO</button></sc-if>
-                          <button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
+                          <sc-if value="{{ w.jammed }}"><button onClick="{{ w.unjam }}" title="Arma travada (falha critica com qualidade Poor): destravar custa 1 acao" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">TRAVADA // DESTRAVAR</button></sc-if>
+<button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
                           <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                           <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
                           <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RECARREGAR</button></sc-if>
@@ -995,7 +1007,7 @@
                     <div class="lm-combat-stat"><div class="lm-combat-stat-label">HP</div><div class="lm-combat-stat-value">{{ c.hp }}</div></div>
                     <div class="lm-combat-stat"><div class="lm-combat-stat-label">SP CABECA</div><div class="lm-combat-stat-value lm-combat-stat-value--gold">{{ c.headSp }}</div></div>
                     <div class="lm-combat-stat"><div class="lm-combat-stat-label">SP CORPO</div><div class="lm-combat-stat-value lm-combat-stat-value--gold">{{ c.bodySp }}</div></div>
-                    <sc-if value="{{ c.hasShield }}"><div class="lm-combat-stat"><div class="lm-combat-stat-label">ESCUDO</div><div class="lm-combat-stat-value" style="color:{{ c.shieldColor }};">{{ c.shieldHp }}</div></div></sc-if>
+                    <sc-if value="{{ c.hasShield }}"><div class="lm-combat-stat"><div class="lm-combat-stat-label">{{ c.shieldKindLabel }}</div><div class="lm-combat-stat-value" style="color:{{ c.shieldColor }};">{{ c.shieldHp }}</div></div></sc-if>
                     <div class="lm-combat-stat"><div class="lm-combat-stat-label">COND</div><div class="lm-combat-stat-value lm-combat-stat-value--teal">{{ c.conditions }}</div></div>
                     <sc-if value="{{ c.netActions.isNetrunner }}"><div class="lm-combat-stat"><div class="lm-combat-stat-label">NET ACTIONS</div><div class="lm-combat-stat-value lm-combat-stat-value--teal">{{ c.netActions.perTurn }}</div></div></sc-if>
                   </div>
@@ -1035,16 +1047,28 @@
                         </sc-for>
                       </div>
                     </sc-if>
-                    <sc-if value="{{ c.hasWeapons }}">
+                    <sc-if value="{{ c.hasAttackBudget }}"><div class="lm-combat-row-meta" style="margin-bottom:6px;color:#d6aa4e;">{{ c.attackBudgetLabel }}</div></sc-if>
+<sc-if value="{{ c.grapple.hasTarget }}">
+  <div class="lm-combat-subtitle lm-combat-subtitle--teal">AGARRE<sc-if value="{{ c.grapple.canChoke }}"> :: {{ c.grapple.holdingLabel }}</sc-if></div>
+  <div class="lm-combat-check-row">
+    <sc-if value="{{ c.grapple.canGrab }}"><button onClick="{{ c.grapple.grab }}" title="Marca o agarre depois do ataque de Brawling bem-sucedido" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">AGARRAR</button></sc-if>
+    <sc-if value="{{ c.grapple.canChoke }}"><button onClick="{{ c.grapple.choke }}" title="Automatico: BODY de dano direto; 1 HP + inconsciente se cairia abaixo de 0; 3 turnos = inconsciente" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">ESTRANGULAR</button></sc-if>
+    <sc-if value="{{ c.grapple.canThrow }}"><button onClick="{{ c.grapple.throwTarget }}" title="Automatico: BODY de dano direto, encerra o agarre" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">ARREMESSAR</button></sc-if>
+    <sc-if value="{{ c.grapple.canHumanShield }}"><button onClick="{{ c.grapple.useHumanShield }}" title="1 acao: alvo agarrado vira escudo com HP = BODY" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">ESCUDO HUMANO</button></sc-if>
+    <sc-if value="{{ c.grapple.canRelease }}"><button onClick="{{ c.grapple.release }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">SOLTAR</button></sc-if>
+  </div>
+</sc-if>
+<sc-if value="{{ c.hasWeapons }}">
                       <div class="lm-combat-subtitle lm-combat-subtitle--danger">{{ tx.weapons }}</div>
                       <sc-if value="{{ c.hasEvasionStatus }}"><div class="lm-combat-row-meta" style="margin-bottom:6px;">{{ c.evasionStatus.label }}</div></sc-if>
                       <div class="lm-combat-kit-list">
                         <sc-for list="{{ c.weaponRows }}" as="w" hint-placeholder-count="2">
                           <div class="lm-combat-row lm-combat-row--weapon">
                             <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}<sc-if value="{{ w.hasAmmo }}"> // {{ w.ammoLabel }}</sc-if></div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
-                            <sc-if value="{{ w.isMelee }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
+                            <sc-if value="{{ w.canRequestEvasion }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
                             <sc-if value="{{ w.hasSuppressiveFire }}"><button onClick="{{ w.suppressiveFire }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">SUPRESSAO</button></sc-if>
-                            <button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
+                            <sc-if value="{{ w.jammed }}"><button onClick="{{ w.unjam }}" title="Arma travada (falha critica com qualidade Poor): destravar custa 1 acao" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">TRAVADA // DESTRAVAR</button></sc-if>
+<button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
                             <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                             <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
                             <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RECARREGAR</button></sc-if>
@@ -1503,6 +1527,43 @@
               </sc-if>
               <button onClick="{{ sendNexusChallenge }}" style="font:600 12px 'Share Tech Mono',monospace;letter-spacing:2px;color:#080a07;background:#3fe0d0;border:none;padding:12px 22px;cursor:pointer;white-space:nowrap;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));" style-hover="filter:brightness(1.1);">ENVIAR DESAFIO &#8594;</button>
             </div>
+            <sc-if value="{{ nexusArchitectureMode }}">
+            <div style="margin-top:12px;border:1px solid rgba(214,170,78,0.18);background:rgba(8,10,7,.6);padding:10px 12px;">
+              <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;">WATCHERS // GOING QUIET</div>
+              <div style="font:300 12px/1.5 'Chakra Petch',sans-serif;color:#9a9883;margin-top:4px;max-width:620px;">Demonios e netrunners inimigos que vigiam a architecture. O Quietly Jack In do operativo e contestado contra cada um (Interface + 1d10); depois cada Watcher pode gastar uma busca ativa por turno.</div>
+              <sc-if value="{{ hasNexusWatchers }}">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                  <sc-for list="{{ nexusWatcherRows }}" as="w" hint-placeholder-count="3">
+                    <button onClick="{{ w.remove }}" class="lm-chip" title="remover" style="color:#d6aa4e;border-color:rgba(214,170,78,0.34);background:rgba(214,170,78,0.045);">{{ w.label }} &times;</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <div style="display:grid;grid-template-columns:minmax(170px,1.2fr) minmax(140px,1.2fr) 90px 90px auto;gap:8px;align-items:end;margin-top:10px;">
+                <label style="display:flex;flex-direction:column;gap:4px;">
+                  <span style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;">TIPO</span>
+                  <select onChange="{{ onNexusWatcherPreset }}" style="min-height:36px;border:1px solid rgba(214,170,78,0.28);background:#080a07;color:#f0ead8;padding:0 8px;font:700 11px 'Share Tech Mono',monospace;">
+                    <sc-for list="{{ nexusWatcherPresetOptions }}" as="wp" hint-placeholder-count="4">
+                      <sc-if value="{{ wp.selected }}"><option value="{{ wp.id }}" selected>{{ wp.label }}</option></sc-if>
+                      <sc-if value="{{ wp.notSelected }}"><option value="{{ wp.id }}">{{ wp.label }}</option></sc-if>
+                    </sc-for>
+                  </select>
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;">
+                  <span style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;">NOME</span>
+                  <input value="{{ nexusWatcherDraftName }}" onInput="{{ onNexusWatcherName }}" placeholder="vazio = nome do tipo" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;">
+                  <span style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;">INTERFACE</span>
+                  <input type="number" min="0" max="10" value="{{ nexusWatcherDraftInterface }}" onInput="{{ onNexusWatcherInterface }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;">
+                  <span style="font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;">+PATHFINDER</span>
+                  <input type="number" min="0" max="10" value="{{ nexusWatcherDraftPathfinder }}" onInput="{{ onNexusWatcherPathfinder }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+                </label>
+                <button onClick="{{ addNexusWatcher }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">+ WATCHER</button>
+              </div>
+            </div>
+            </sc-if>
             <sc-if value="{{ gmHasChallenge }}"><div style="font:11px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:12px;border-top:1px solid rgba(63,224,208,0.12);padding-top:10px;">ATIVO &#8594; <span style="color:#3fe0d0;">{{ nexusSummary }}</span> &middot; alvo <span style="color:#d6aa4e;">{{ nexusTargetName }}</span></div></sc-if>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;">
               <div style="font:11px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;min-width:0;">
@@ -1574,6 +1635,48 @@
                     <button onClick="{{ atk.damage }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ atk.name }} DANO</button>
                   </sc-for>
                 </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stealthPanel.show }}">
+          <div style="margin-bottom:18px;border:1px solid rgba(63,224,208,0.24);background:linear-gradient(160deg,rgba(63,224,208,.06),rgba(8,10,7,.88));padding:14px 18px;">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+              <div style="min-width:0;">
+                <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0;">GOING QUIET // NETRUNNING FURTIVO // {{ stealthPanel.turnLabel }}</div>
+                <div style="font:700 22px 'Chakra Petch',sans-serif;color:{{ stealthPanel.statusColor }};margin-top:4px;">{{ stealthPanel.statusLabel }}</div>
+                <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;margin-top:4px;">{{ stealthPanel.netrunnerLabel }}</div>
+                <div style="font:11px/1.5 'Chakra Petch',sans-serif;color:#9a9883;margin-top:7px;max-width:640px;">Cloak (Interface + Eraser) + 1d10 contra PER do Black ICE ou Interface + Pathfinder do Watcher. Control Node e qualquer ataque quebram o stealth na hora.</div>
+              </div>
+              <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;">
+                <sc-if value="{{ stealthPanel.canEncounterIce }}"><button onClick="{{ stealthPanel.encounterIce }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">ENCONTRO COM BLACK ICE</button></sc-if>
+                <sc-if value="{{ stealthPanel.iceBypassed }}"><span class="lm-chip" style="cursor:default;color:#3fe0d0;border-color:rgba(63,224,208,0.34);background:rgba(63,224,208,0.045);">ICE EVITADO</span></sc-if>
+                <sc-if value="{{ stealthPanel.active }}"><button onClick="{{ stealthPanel.controlNode }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">CONTROL NODE (QUEBRA)</button></sc-if>
+                <sc-if value="{{ stealthPanel.isGm }}">
+                  <button onClick="{{ stealthPanel.nextTurn }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">PROXIMO TURNO</button>
+                  <sc-if value="{{ stealthPanel.active }}"><button onClick="{{ stealthPanel.breakManual }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">QUEBRAR STEALTH</button></sc-if>
+                </sc-if>
+              </div>
+            </div>
+            <sc-if value="{{ stealthPanel.hasWatchers }}">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:12px;">
+                <sc-for list="{{ stealthPanel.watchers }}" as="sw" hint-placeholder-count="3">
+                  <div style="border:1px solid rgba(214,170,78,0.16);background:#080a07;padding:9px;min-width:0;">
+                    <div style="font:700 11px 'Share Tech Mono',monospace;letter-spacing:1px;color:#f0ead8;">{{ sw.label }}</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                      <sc-if value="{{ sw.canEncounter }}"><button onClick="{{ sw.encounter }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ENCONTRO</button></sc-if>
+                      <sc-if value="{{ sw.canSearch }}"><button onClick="{{ sw.search }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ sw.searchLabel }}</button></sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ stealthPanel.hasHistory }}">
+              <div style="margin-top:10px;display:flex;flex-direction:column;gap:3px;">
+                <sc-for list="{{ stealthPanel.history }}" as="sh" hint-placeholder-count="3">
+                  <div style="font:10px 'Share Tech Mono',monospace;color:#8b8a78;">// {{ sh }}</div>
+                </sc-for>
               </div>
             </sc-if>
           </div>

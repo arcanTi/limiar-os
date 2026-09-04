@@ -29,6 +29,31 @@ export function rollD10(rng: () => number = Math.random): number {
   return Math.floor(rng() * 10) + 1;
 }
 
+export interface CheckDieResult {
+  die: number;
+  /** Second d10 rolled on a natural 10 (added) or natural 1 (subtracted); 0 otherwise. */
+  extra: number;
+  total: number;
+  crit: boolean;
+  fumble: boolean;
+}
+
+// CPR RAW check die: a natural 10 rolls again and adds, a natural 1 rolls
+// again and subtracts. Same math Component.commitRoll applies to animated
+// checks, exposed here for the silent batch rolls (suppressive fire saves).
+export function rollCheckD10(rng: () => number = Math.random): CheckDieResult {
+  const die = rollD10(rng);
+  if (die === 10) {
+    const extra = rollD10(rng);
+    return { die, extra, total: die + extra, crit: true, fumble: false };
+  }
+  if (die === 1) {
+    const extra = rollD10(rng);
+    return { die, extra, total: die - extra, crit: false, fumble: true };
+  }
+  return { die, extra: 0, total: die, crit: false, fumble: false };
+}
+
 export interface DiceExpressionResult {
   rolls: number[];
   total: number;

@@ -1,11 +1,17 @@
 import { programRunModifiers } from './programs.ts';
 import { selectBlackIceForTier } from './blackIce.ts';
 import type { BlackIceId } from './blackIce.ts';
+import { STEALTH_PREP_ABILITY_ID, STEALTH_TRACE_MULTIPLIER, normalizeWatchers } from './stealth.ts';
+import type { NetWatcher } from './stealth.ts';
 
 export type BreachTierId = 'basic' | 'standard' | 'uncommon' | 'advanced';
 export type BreachTokenSet = 'standard' | 'military' | 'ghost';
 export type BreachContinuity = 'blocked' | 'linked';
-export type BreachPrepAbilityId = 'backdoor' | 'cloak' | 'pathfinder' | 'scanner';
+// `stealth` is the Going Quiet "Quietly Jack In" NET Action: it competes for
+// the same prep budget as the four Core Interface Abilities.
+export type BreachPrepAbilityId = 'backdoor' | 'cloak' | 'pathfinder' | 'scanner' | 'stealth';
+
+const PREP_ABILITY_IDS: readonly string[] = ['backdoor', 'cloak', 'pathfinder', 'scanner', STEALTH_PREP_ABILITY_ID];
 
 export interface BreachTier {
   id: BreachTierId;
@@ -52,6 +58,8 @@ export interface BreachConfig {
   blackIceId: BlackIceId | null;
   blackIceRevealed: boolean;
   prepResults: BreachPrepResult[];
+  watchers: NetWatcher[];
+  stealthActive: boolean;
 }
 
 const SCRIPT_NAMES = ['ACCESS', 'DATA', 'CONTROL', 'ROOT', 'WATCHDOG'];
@@ -124,7 +132,7 @@ export function breachTierOptions(): BreachTier[] {
   return ['basic', 'standard', 'uncommon', 'advanced'].map(id => BREACH_TIERS[id as BreachTierId]);
 }
 
-export function buildBreachConfig(tier: unknown, interfaceRank: unknown, prepResults: BreachPrepResult[] = [], installedPrograms: unknown = [], blackIceSelection: unknown = 'auto'): BreachConfig {
+export function buildBreachConfig(tier: unknown, interfaceRank: unknown, prepResults: BreachPrepResult[] = [], installedPrograms: unknown = [], blackIceSelection: unknown = 'auto', watchers: unknown = []): BreachConfig {
   const tierId = normalizeBreachTier(tier);
   const base = BREACH_TIERS[tierId];
   const rank = Math.max(0, Math.min(10, Number(interfaceRank) || 0));
@@ -137,6 +145,7 @@ export function buildBreachConfig(tier: unknown, interfaceRank: unknown, prepRes
   let extraNodes = base.extraNodes;
   let secondaryObjectives = false;
   let scannerRevealed = false;
+  let stealthActive = false;
   const blackIceId = selectBlackIceForTier(tierId, blackIceSelection);
 
   cleanPrep.forEach(result => {
@@ -151,11 +160,17 @@ export function buildBreachConfig(tier: unknown, interfaceRank: unknown, prepRes
         scannerRevealed = true;
         extraNodes = Math.max(0, extraNodes - 1);
       }
+    } else if (result.abilityId === STEALTH_PREP_ABILITY_ID) {
+      if (result.success) stealthActive = true;
     }
   });
 
   traceRate *= programMods.traceMultiplier;
   traceRate = Math.max(baseTraceFloor, traceRate);
+  // Going Quiet: a silent connection keeps the system asleep, so the abstract
+  // trace climbs at half speed until something breaks cover. Applied after
+  // the tier floor on purpose: silence is allowed to go below "noisy minimum".
+  if (stealthActive) traceRate *= STEALTH_TRACE_MULTIPLIER;
   const scriptLengths = Array.from({ length: scriptCount }, (_, index) => base.scriptLengths[index % base.scriptLengths.length]);
   const scriptNames = scannerRevealed ? scriptLengths.map((_, index) => SCRIPT_NAMES[index] || ('SCRIPT ' + (index + 1))) : [];
   const revealedScripts = scannerRevealed ? scriptLengths.map((length, index) => ({ name: scriptNames[index], length })) : [];
@@ -183,6 +198,8 @@ export function buildBreachConfig(tier: unknown, interfaceRank: unknown, prepRes
     blackIceId,
     blackIceRevealed: scannerRevealed,
     prepResults: cleanPrep,
+    watchers: normalizeWatchers(watchers),
+    stealthActive,
   };
 }
 
@@ -190,7 +207,7 @@ function normalizePrepResults(results: BreachPrepResult[]): BreachPrepResult[] {
   const seen = new Set<string>();
   return (Array.isArray(results) ? results : []).filter(result => {
     const id = String(result && result.abilityId || '').toLowerCase();
-    if (!['backdoor', 'cloak', 'pathfinder', 'scanner'].includes(id) || seen.has(id)) return false;
+    if (!PREP_ABILITY_IDS.includes(id) || seen.has(id)) return false;
     seen.add(id);
     result.abilityId = id;
     result.success = !!result.success;

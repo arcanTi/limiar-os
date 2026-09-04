@@ -58,20 +58,50 @@ export function normalizeArmor(armor: Partial<CharacterArmor> | null | undefined
   };
 }
 
+// Shield kinds (CPR RAW p.179): a Bulletproof Shield is gear with its own HP
+// (10, or 15 High-Density) that intercepts ranged attacks; a Human Shield is
+// a grappled person held in front of you, with HP equal to their BODY, which
+// takes an Action to "equip" and becomes a Corpse Shield (same BODY-worth of
+// HP again) once it drops to 0 while held.
+export type CharacterShieldKind = 'bulletproof' | 'human' | 'corpse';
+
 export interface CharacterShield {
   itemId: string;
   hp: number;
   maxHp: number;
+  kind: CharacterShieldKind;
+  name?: string;
+  sourceCharacterId?: string | null;
 }
+
+export const HUMAN_SHIELD_ITEM_PREFIX = 'HUMAN-SHIELD:';
 
 export function normalizeShield(shield: Partial<CharacterShield> | null | undefined): CharacterShield | null {
   if (!shield || !shield.itemId) return null;
   const maxHp = asNumber(shield.maxHp, 0, 0, 999);
   if (maxHp <= 0) return null;
+  const kind: CharacterShieldKind = shield.kind === 'human' || shield.kind === 'corpse' ? shield.kind : 'bulletproof';
   return {
     itemId: String(shield.itemId),
     hp: asNumber(shield.hp, maxHp, 0, maxHp),
     maxHp,
+    kind,
+    ...(shield.name ? { name: String(shield.name) } : {}),
+    ...(shield.sourceCharacterId ? { sourceCharacterId: String(shield.sourceCharacterId) } : {}),
+  };
+}
+
+export function humanShieldFrom(source: { id?: string; name?: string; base?: Record<string, unknown> | null } | null | undefined): CharacterShield | null {
+  if (!source || !source.id) return null;
+  const body = asNumber(source.base && source.base.BODY, 0, 0, 99);
+  if (body <= 0) return null;
+  return {
+    itemId: HUMAN_SHIELD_ITEM_PREFIX + source.id,
+    hp: body,
+    maxHp: body,
+    kind: 'human',
+    name: source.name || source.id,
+    sourceCharacterId: source.id,
   };
 }
 
@@ -79,7 +109,13 @@ export function damageShield(shield: Partial<CharacterShield> | null | undefined
   const current = normalizeShield(shield);
   if (!current) return null;
   const damage = Math.max(0, Number(amount) || 0);
-  return { ...current, hp: Math.max(0, current.hp - damage) };
+  const hp = Math.max(0, current.hp - damage);
+  // A Human Shield that dies in your hands keeps working as a Corpse Shield
+  // with a fresh BODY-worth of HP (the body still stops bullets).
+  if (hp <= 0 && current.kind === 'human') {
+    return { ...current, kind: 'corpse', hp: current.maxHp, name: (current.name || 'Escudo humano') + ' (cadaver)' };
+  }
+  return { ...current, hp };
 }
 
 export function repairShield(shield: Partial<CharacterShield> | null | undefined, amount: unknown): CharacterShield | null {

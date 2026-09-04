@@ -1005,3 +1005,159 @@ describe('ui/views/combat random NPC generator', () => {
     expect(component.state.characters.filter(c => c.kind === 'npc')).toHaveLength(0);
   });
 });
+
+describe('ui/views/combat RAW rules: ROF budget, jams, evasion gate, grapple, ticks, shields', () => {
+  beforeEach(() => {
+    global.document = { querySelectorAll: vi.fn(() => []) };
+    global.window = {};
+  });
+  afterEach(() => {
+    delete global.document;
+    delete global.window;
+  });
+
+  const S = (extra) => ({ characters: [mira, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState(), comms: [], ...extra });
+  const pistol = { id: 'pistol', name: 'Heavy Pistol', sides: 6, count: 3, skill: 'Handgun', rof: 2 };
+  const shotgun = { id: 'shotgun', name: 'Shotgun', sides: 6, count: 5, skill: 'Shoulder Arms', rof: 1 };
+
+  it('a jammed weapon cannot attack until unjammed, and unjamming burns the Attack Action', () => {
+    const applyCharacterPatch = vi.fn();
+    const component = fakeComponent({ applyCharacterPatch, state: S({ characters: [{ ...mira, gear: [{ ...pistol, jammed: true }] }, rook] }) });
+    const h = combatHandlers(component);
+    h.rollCombatAttack('mira', { ...pistol, jammed: true });
+    expect(component.roll).not.toHaveBeenCalled();
+    expect(component.flash).toHaveBeenCalledWith(expect.stringContaining('travada'));
+    h.unjamWeapon('mira', 'pistol');
+    expect(applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...pistol, jammed: false }] });
+    expect(h.attacksThisTurn('mira')).toEqual([{ weaponId: 'pistol', rof: 1 }]);
+    expect(h.attackBudgetFor('mira', pistol).allowed).toBe(false);
+  });
+
+  it('a natural 1 with a poor-quality weapon jams it', () => {
+    const applyCharacterPatch = vi.fn();
+    const component = fakeComponent({ applyCharacterPatch, weaponRuntimeQuality: vi.fn(() => 'poor'), state: S({ characters: [{ ...mira, gear: [pistol] }, rook] }) });
+    const h = combatHandlers(component);
+    h.rollCombatAttack('mira', pistol);
+    const opts = component.roll.mock.calls[0][0];
+    opts.onResolved({ label: 'x', detail: '', total: 3, fumble: true, crit: false });
+    expect(applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...pistol, jammed: true }] });
+    expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('arma travada') }));
+  });
+
+  it('ROF 2 allows two attacks; a ROF 1 weapon spends the whole action (players blocked, GM warned)', () => {
+    const player = fakeComponent({ state: S({ gm: false, characters: [{ ...mira, gear: [pistol, shotgun] }, rook] }) });
+    const h = combatHandlers(player);
+    h.rollCombatAttack('mira', pistol);
+    h.rollCombatAttack('mira', pistol);
+    expect(player.roll).toHaveBeenCalledTimes(2);
+    expect(h.attackBudgetLabel('mira')).toContain('ATAQUES 2/2');
+    h.rollCombatAttack('mira', pistol);
+    expect(player.roll).toHaveBeenCalledTimes(2);
+    expect(player.flash).toHaveBeenCalledWith(expect.stringContaining('Limite de 2 ataques'), 3200);
+
+    const gm = fakeComponent({ state: S({ gm: true, characters: [{ ...mira, gear: [pistol, shotgun] }, rook] }) });
+    const g = combatHandlers(gm);
+    g.rollCombatAttack('mira', shotgun);
+    g.rollCombatAttack('mira', pistol);
+    expect(gm.roll).toHaveBeenCalledTimes(2);
+    expect(gm.flash).toHaveBeenCalledWith(expect.stringContaining('GM: seguindo mesmo assim'), 3200);
+  });
+
+  it('ranged evasion is offered only when the target may dodge bullets (REF 8+), and its result replaces the range DV', () => {
+    const slowRook = { ...rook, base: { REF: 7 } };
+    const component = fakeComponent({ state: S({ characters: [{ ...mira, gear: [pistol] }, slowRook], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    expect(h.canRequestRangedEvasion('mira', pistol)).toBe(false);
+    h.requestEvasion('mira', pistol);
+    expect(component.postChat).not.toHaveBeenCalled();
+    expect(component.flash).toHaveBeenCalledWith(expect.stringContaining('REF abaixo de 8'), 3200);
+
+    const fastRook = { ...rook, base: { REF: 8 } };
+    const quick = fakeComponent({ state: S({ characters: [{ ...mira, gear: [pistol] }, fastRook], combatTargets: { mira: 'rook' }, evasionResults: { mira: { targetId: 'rook', total: 16 } } }) });
+    const q = combatHandlers(quick);
+    expect(q.canRequestRangedEvasion('mira', pistol)).toBe(true);
+    q.rollCombatAttack('mira', pistol);
+    expect(quick.roll).toHaveBeenCalledWith(expect.objectContaining({ dv: 16 }));
+  });
+
+  it('a surprised target or one hiding behind a bulletproof shield cannot evade ranged attacks', () => {
+    const surprised = { ...rook, base: { REF: 9 }, statusEffects: [{ id: 'surprised', modifiers: { cannotEvade: true } }] };
+    const component = fakeComponent({ state: S({ characters: [mira, surprised], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    h.requestEvasion('mira', { id: 'knife', name: 'Knife', melee: true });
+    expect(component.flash).toHaveBeenCalledWith(expect.stringContaining('surpreendido'), 3200);
+    const shielded = { ...rook, base: { REF: 9 }, shield: { itemId: 'BULLETPROOF-SHIELD', hp: 10, maxHp: 10 } };
+    const s = combatHandlers(fakeComponent({ state: S({ characters: [mira, shielded], combatTargets: { mira: 'rook' } }) }));
+    expect(s.canRequestRangedEvasion('mira', pistol)).toBe(false);
+    expect(s.evasionBlockFor('mira', { melee: true })).toBe('');
+  });
+
+  it('a held shield intercepts ranged damage instead of the target HP', () => {
+    const shielded = { ...rook, shield: { itemId: 'BULLETPROOF-SHIELD', hp: 10, maxHp: 10 }, derived: { currentHeadSp: 0, currentBodySp: 0 } };
+    const applyCombatDamage = { execute: vi.fn() };
+    const component = fakeComponent({ app: () => ({ applyCombatDamage }), state: S({ characters: [mira, shielded], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    h.autoApplyCombatDamage('mira', pistol, { total: 7, dice: [] });
+    expect(applyCombatDamage.execute).not.toHaveBeenCalled();
+    expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('INTERCEPTA O ATAQUE') }));
+    expect(component.state.characters.find(c => c.id === 'rook').shield.hp).toBe(3);
+  });
+
+  it('damage on a Mortally Wounded target opens an automatic body critical', () => {
+    const dying = { ...rook, health: { cur: 0, max: 45 }, derived: { currentHeadSp: 0, currentBodySp: 0 } };
+    const applyCombatDamage = { execute: vi.fn(() => ({ hpLoss: 3, spAblated: 0, characterPatch: { health: { cur: 0, max: 45 }, deathSaveWoundPenalty: 1 }, mortalWoundCritical: true, mortalWoundPenaltyDelta: 1 })) };
+    const component = fakeComponent({ app: () => ({ applyCombatDamage }), state: S({ characters: [mira, dying], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    h.autoApplyCombatDamage('mira', pistol, { total: 3, dice: [] });
+    expect(component.state.critInjuryPending).toMatchObject({ targetId: 'rook', location: 'body', automatic: true });
+    expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('Death Save +1') }));
+  });
+
+  it('grab marks the hold, choke deals BODY direct damage automatically and tracks the streak, throw releases', () => {
+    const addStatusEffect = vi.fn();
+    const applyCharacterPatch = vi.fn();
+    const strongMira = { ...mira, derived: { effectiveStats: { BODY: 7 } } };
+    const heldRook = { ...rook, health: { cur: 20, max: 45 }, statusEffects: [{ instanceId: 'se-g', id: 'grappled', modifiers: { grappledBy: 'mira', chokeTurns: 1, lastChokeRound: 1 } }] };
+    const component = fakeComponent({ addStatusEffect, applyCharacterPatch, state: S({ characters: [strongMira, heldRook], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    expect(h.grappleVals('mira', 'rook')).toMatchObject({ canGrab: false, canChoke: true, canThrow: true, canHumanShield: true, holdingLabel: 'AGARRANDO ROOK // CHOKE x1' });
+    h.chokeTarget('mira');
+    const patch = applyCharacterPatch.mock.calls[0][1];
+    expect(patch.health.cur).toBe(13);
+    expect(patch.statusEffects[0].modifiers).toMatchObject({ chokeTurns: 2, lastChokeRound: 2 });
+    expect(h.attacksThisTurn('mira')).toEqual([{ weaponId: 'grapple:choke', rof: 1 }]);
+
+    applyCharacterPatch.mockClear();
+    h.throwTarget('mira');
+    const thrown = applyCharacterPatch.mock.calls[0][1];
+    expect(thrown.health.cur).toBe(13);
+    expect(thrown.statusEffects).toEqual([]);
+
+    const fresh = fakeComponent({ addStatusEffect, state: S({ characters: [strongMira, rook], combatTargets: { mira: 'rook' } }) });
+    combatHandlers(fresh).grabTarget('mira');
+    expect(addStatusEffect).toHaveBeenCalledWith(expect.objectContaining({ id: 'grappled', modifiers: expect.objectContaining({ grappledBy: 'mira' }) }), expect.objectContaining({ targetId: 'rook' }));
+    expect(addStatusEffect).toHaveBeenCalledWith(expect.objectContaining({ id: 'grappling' }), expect.objectContaining({ targetId: 'mira' }));
+  });
+
+  it('a grappled target can be used as a human shield with HP = BODY', () => {
+    const applyCharacterPatch = vi.fn();
+    const heldRook = { ...rook, base: { BODY: 6 }, statusEffects: [{ instanceId: 'se-g', id: 'grappled', modifiers: { grappledBy: 'mira' } }] };
+    const component = fakeComponent({ applyCharacterPatch, state: S({ characters: [mira, heldRook], combatTargets: { mira: 'rook' } }) });
+    combatHandlers(component).useHumanShield('mira');
+    expect(applyCharacterPatch).toHaveBeenCalledWith('mira', { shield: expect.objectContaining({ kind: 'human', hp: 6, maxHp: 6, sourceCharacterId: 'rook' }) });
+  });
+
+  it('end-of-turn fire damage and start-of-turn asphyxiation are direct HP hits, applied once per round', () => {
+    const applyCharacterPatch = vi.fn();
+    const burning = { ...mira, statusEffects: [{ instanceId: 'se-f', id: 'strong_on_fire', label_pt: 'Em chamas', modifiers: { directHpPerTurn: 4, tick: 'end' } }] };
+    const choking = { ...rook, base: { BODY: 5 }, statusEffects: [{ instanceId: 'se-a', id: 'asphyxiating', label_pt: 'Asfixiando', modifiers: { directHpPerTurnStat: 'BODY', tick: 'start' } }] };
+    const component = fakeComponent({ applyCharacterPatch, state: S({ characters: [burning, choking] }) });
+    const h = combatHandlers(component);
+    h.applyTurnTick('mira', 'end');
+    expect(applyCharacterPatch).toHaveBeenCalledWith('mira', { health: { cur: 23, max: 35 } });
+    h.applyTurnTick('rook', 'start', 2);
+    h.applyTurnTick('rook', 'start', 2);
+    expect(applyCharacterPatch).toHaveBeenCalledTimes(2);
+    expect(applyCharacterPatch).toHaveBeenLastCalledWith('rook', { health: { cur: 30, max: 45 } });
+  });
+});

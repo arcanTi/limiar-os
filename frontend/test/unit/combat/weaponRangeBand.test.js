@@ -21,7 +21,10 @@ describe('combat weaponRangeBand', () => {
   });
 
   it('shares the same DV with the combat resolver', () => {
-    const result = resolveAttackCheck({ weapon, rangeMeters: 7, useWeaponRangeTable: true, attackRoll: { total: 15 } });
-    expect(result).toMatchObject({ defenseDV: 15, hit: true, margin: 0 });
+    const beat = resolveAttackCheck({ weapon, rangeMeters: 7, useWeaponRangeTable: true, attackRoll: { total: 16 } });
+    expect(beat).toMatchObject({ defenseDV: 15, hit: true, margin: 1 });
+    // CPR RAW: meeting the range DV is not enough, the defender wins a tie.
+    const tie = resolveAttackCheck({ weapon, rangeMeters: 7, useWeaponRangeTable: true, attackRoll: { total: 15 } });
+    expect(tie).toMatchObject({ defenseDV: 15, hit: false, margin: 0 });
   });
 });

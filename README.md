@@ -262,6 +262,24 @@ ablation, criticals and status before persisting to `/api/tarot-state`.
 `/api/nexus-challenge` and `/api/nexus-result`. Its lifecycle preserves
 the minigame's canvas, timers and listeners when the main UI updates.
 
+Stealth netrunning (DLC *Going Quiet*) lives in
+`frontend/src/domain/netrunning/stealth.ts` and the Nexus tab:
+
+- The GM adds **Watchers** (Imp/Efreet/Balron demons or an enemy Netrunner
+  with Interface + Pathfinder bonus) to the published architecture.
+- **Quietly Jack In** is a fifth prep row: it spends one NET Action and is
+  contested (Interface + 1d10) against every Watcher; a tie favors them.
+  Success halves the run's trace rate and flags `stealthActive`.
+- While hidden, **Encontro com Black ICE** rolls Interface + Cloak bonus
+  (Eraser) + 1d10 against the ICE's PER + 1d10. Passing marks the ICE as
+  bypassed (out of initiative); failing breaks stealth and the ICE attacks.
+  Watcher encounters use the Watcher's Interface + Pathfinder instead.
+- Control Nodes and any attack (Zap, attacker programs) break stealth on the
+  spot. The GM has a once-per-turn **Busca Ativa** per Watcher (Netrunner
+  defends, so ties keep them hidden) and a **Proximo Turno** button.
+- Stealth state is client-local like the Black ICE panel; every resolution
+  is posted to chat with both totals.
+
 ## Architecture
 
 ```text

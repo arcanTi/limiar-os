@@ -1,5 +1,6 @@
 import { applyArmorToDamage, combatDamageContributions } from '../domain/combat/index.ts';
 import type { DamageContributionRow } from '../domain/combat/index.ts';
+import { mortallyWoundedDamageEffects } from '../domain/combat/mortalWound.ts';
 import { evaluateRollTriggers } from '../domain/combat/constants.ts';
 import { rollDiceMeta, rollFaces } from '../domain/dice/index.ts';
 import type { DiceContributionInput } from '../domain/dice/index.ts';
@@ -74,6 +75,7 @@ interface DamageTarget {
   criticalInjuries?: CriticalInjuryInstance[];
   health?: DamageTargetHealth;
   spDamage?: Record<string, number>;
+  deathSaveWoundPenalty?: number;
   [extra: string]: unknown;
 }
 
@@ -115,6 +117,10 @@ export interface ApplyCombatDamageResult {
   criticalInjuryTriggered: boolean;
   tarotTriggered: boolean;
   criticalInjury: CriticalInjuryOutcome | null;
+  /** CPR RAW p.176: target was already Mortally Wounded and this hit still got damage through — an automatic Body Critical Injury is owed. */
+  mortalWoundCritical: boolean;
+  /** +1 Death Save penalty owed for damage taken while Mortally Wounded (already folded into characterPatch). */
+  mortalWoundPenaltyDelta: number;
   characterPatch?: Record<string, unknown>;
 }
 
@@ -188,9 +194,14 @@ export default class ApplyCombatDamage {
       }
     }
 
+    // Mortally Wounded aggravation: classify against the HP the target had
+    // BEFORE this hit, so a hit that drops someone to 0 does not also count.
+    const mortal = mortallyWoundedDamageEffects({ hpBefore: target && target.health ? target.health.cur : 1, hpLoss });
     const breakdown: ApplyCombatDamageResult = {
       total, faces, dice, hpLoss, spAblated: armor.spAblated, location,
       criticalInjuryTriggered, tarotTriggered, criticalInjury,
+      mortalWoundCritical: mortal.autoCriticalInjury,
+      mortalWoundPenaltyDelta: mortal.deathSavePenaltyDelta,
     };
 
     if (target && this.api && this.api.characters) {
@@ -199,7 +210,10 @@ export default class ApplyCombatDamage {
       const nextCriticalInjuries = criticalInjury && criticalInjury.entry
         ? [...(target.criticalInjuries || []), criticalInjury.entry]
         : (target.criticalInjuries || []);
-      const characterPatch = { health: nextHealth, spDamage: nextSpDamage, criticalInjuries: nextCriticalInjuries };
+      const characterPatch: Record<string, unknown> = { health: nextHealth, spDamage: nextSpDamage, criticalInjuries: nextCriticalInjuries };
+      if (mortal.deathSavePenaltyDelta) {
+        characterPatch.deathSaveWoundPenalty = (Number(target.deathSaveWoundPenalty) || 0) + mortal.deathSavePenaltyDelta;
+      }
       this.api.characters.upsert({ ...target, ...characterPatch });
       breakdown.characterPatch = characterPatch;
     }

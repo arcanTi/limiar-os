@@ -57,6 +57,50 @@ export type {
   NetrunnerIceAttackResolution,
 } from './blackIce.ts';
 
+export {
+  QUIET_JACK_IN_NET_ACTION_COST,
+  STEALTH_BREAKING_ACTIONS,
+  STEALTH_PREP_ABILITY_ID,
+  STEALTH_TRACE_MULTIPLIER,
+  WATCHER_PRESETS,
+  actionBreaksStealth,
+  advanceStealthTurn,
+  breakReasonLabel,
+  breakStealth,
+  buildWatcher,
+  canWatcherSearch,
+  cloakBonus,
+  establishStealth,
+  failStealthAttempt,
+  markIceBypassed,
+  markWatcherSearched,
+  normalizeStealthState,
+  normalizeWatchers,
+  pathfinderBonus,
+  resolveQuietJackIn,
+  resolveStealthEncounter,
+  resolveWatcherSearch,
+  rollCheckD10,
+  rollNpcCheck,
+  rollWatcherJackInChecks,
+  rollWatcherPathfinderCheck,
+  stealthStatusLabel,
+  stealthTraceMultiplier,
+  watcherPresetById,
+} from './stealth.ts';
+export type {
+  NetWatcher,
+  NpcCheckRoll,
+  StealthBreakReason,
+  StealthContestResult,
+  StealthOpposedResult,
+  StealthState,
+  WatcherKind,
+  WatcherPreset,
+  WatcherPresetId,
+  WatcherSearchResult,
+} from './stealth.ts';
+
 export { CPRED_NETRUNNING_ABILITIES };
 export type { NetInterfaceAbility };
 

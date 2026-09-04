@@ -14,6 +14,32 @@ import {
   selectBlackIceForTier,
 } from '../../domain/netrunning/index.ts';
 import { netActionsPerTurn } from '../../domain/netrunning/index.ts';
+// Going Quiet (stealth netrunning DLC): Watchers, Quietly Jack In, Cloak
+// contests against Black ICE/Watchers, and the once-per-turn Watcher Search.
+import {
+  QUIET_JACK_IN_NET_ACTION_COST,
+  STEALTH_PREP_ABILITY_ID,
+  WATCHER_PRESETS,
+  advanceStealthTurn,
+  breakStealth,
+  buildWatcher,
+  canWatcherSearch,
+  cloakBonus,
+  establishStealth,
+  failStealthAttempt,
+  markIceBypassed,
+  markWatcherSearched,
+  normalizeStealthState,
+  normalizeWatchers,
+  resolveQuietJackIn,
+  resolveStealthEncounter,
+  resolveWatcherSearch,
+  rollNpcCheck,
+  rollWatcherJackInChecks,
+  rollWatcherPathfinderCheck,
+  stealthStatusLabel,
+  watcherPresetById,
+} from '../../domain/netrunning/index.ts';
 
 export function nexusRenderVals(state = {}, deps = {}) {
   const S = state;
@@ -35,11 +61,14 @@ export function nexusRenderVals(state = {}, deps = {}) {
   const prepDone = !!S.nexusPrepFinalized || !architectureChallenge;
   const showPrepPanel = !S.gm && playerHasChallenge && architectureChallenge && !prepDone;
   const prepUsed = new Set(prepResults.map(result => result.abilityId));
+  const challengeWatchers = normalizeWatchers(nexusChallenge && nexusChallenge.watchers);
+  const watcherCountLabel = challengeWatchers.length ? challengeWatchers.length + ' Watcher' + (challengeWatchers.length > 1 ? 's' : '') : 'sem Watchers';
   const prepRows = [
     { id: 'backdoor', name: 'Backdoor', effect: 'sucesso: -1 script; falha por 5+: trace inicia em 10%' },
     { id: 'cloak', name: 'Cloak', effect: 'sucesso: trace x0.75; falha: trace x1.1' },
     { id: 'pathfinder', name: 'Pathfinder', effect: 'sucesso: objetivos secundarios ligados' },
     { id: 'scanner', name: 'Scanner', effect: 'sucesso: scripts revelados e -1 no auxiliar' },
+    { id: STEALTH_PREP_ABILITY_ID, name: 'Quietly Jack In', effect: 'Going Quiet: +' + QUIET_JACK_IN_NET_ACTION_COST + ' NET Action; Interface+1d10 vs cada Watcher (' + watcherCountLabel + '); sucesso: stealth ativo, trace x0.5' },
   ].map(row => {
     const used = prepUsed.has(row.id);
     const exhausted = prepResults.length >= prepLimit;
@@ -50,7 +79,7 @@ export function nexusRenderVals(state = {}, deps = {}) {
       available: !used && !exhausted && !prepDone,
       label: result ? (result.success ? 'OK +' + result.margin : 'FAIL ' + result.margin) : (exhausted ? 'SEM ACOES' : 'ROLAR'),
       style: result && result.success ? 'lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact' : result ? 'lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact' : 'lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact',
-      roll: () => deps.runNexusPrep(row.id),
+      roll: row.id === STEALTH_PREP_ABILITY_ID ? () => deps.runQuietJackIn() : () => deps.runNexusPrep(row.id),
     };
   });
   const prepCountLabel = prepResults.length + '/' + prepLimit;
@@ -60,7 +89,22 @@ export function nexusRenderVals(state = {}, deps = {}) {
     length: row.length || 0,
   }));
   const hasScannerReveal = scannerRevealRows.length > 0;
-  const nexusPreviewConfig = buildBreachConfig(nexusTier, nexusTargetRank, [], nexusTarget.netPrograms, nexusBlackIceSelection);
+  const nexusDraftWatchers = normalizeWatchers(S.nexusWatchers);
+  const nexusPreviewConfig = buildBreachConfig(nexusTier, nexusTargetRank, [], nexusTarget.netPrograms, nexusBlackIceSelection, nexusDraftWatchers);
+  const watcherDraft = S.nexusWatcherDraft || {};
+  const draftPreset = watcherPresetById(watcherDraft.presetId) || WATCHER_PRESETS[0];
+  const nexusWatcherPresetOptions = WATCHER_PRESETS.map(preset => ({
+    id: preset.id,
+    label: preset.name.toUpperCase() + ' // INT ' + preset.interface + (preset.pathfinder ? ' +PF ' + preset.pathfinder : ''),
+    selected: preset.id === draftPreset.id,
+    notSelected: preset.id !== draftPreset.id,
+  }));
+  const watcherLabel = (watcher) => watcher.name + ' // INT ' + watcher.interface + (watcher.pathfinder ? ' +PF ' + watcher.pathfinder : '') + ' // ' + (watcher.kind === 'demon' ? 'DEMONIO' : 'NETRUNNER');
+  const nexusWatcherRows = nexusDraftWatchers.map(watcher => ({
+    ...watcher,
+    label: watcherLabel(watcher),
+    remove: () => deps.removeNexusWatcher(watcher.id),
+  }));
   const nexusPreviewProgramLabels = (nexusPreviewConfig.programModifierLabels || []).concat(nexusPreviewConfig.traceMitigation || []);
   const hasNexusPreviewProgramLabels = nexusPreviewProgramLabels.length > 0;
   const nexusBlackIceOptions = [
@@ -82,7 +126,10 @@ export function nexusRenderVals(state = {}, deps = {}) {
     const programs = (nx.programModifierLabels || []).concat(nx.traceMitigation || []);
     const ice = blackIceById(nx.blackIceId);
     const showIce = ice && (S.gm || nx.blackIceRevealed || (S.nexusResult && (S.nexusResult.reason === 'trace' || Number(S.nexusResult.trace) >= 100)));
-    return arch + (nx.scriptCount || '?') + ' scripts · matriz ' + nx.matrixSize + '×' + nx.matrixSize + ' · ' + time + ' · trace ' + nx.traceRate + 'x · ' + continuity + (nx.secondaryObjectives ? ' · bônus' : '') + (programs.length ? ' · ' + programs.join(' · ') : '') + (showIce ? ' · ICE ' + ice.name : '');
+    const watchers = normalizeWatchers(nx.watchers);
+    const watcherNote = watchers.length ? ' · ' + watchers.length + ' watcher' + (watchers.length > 1 ? 's' : '') : '';
+    const stealthNote = nx.stealthActive ? ' · stealth' : '';
+    return arch + (nx.scriptCount || '?') + ' scripts · matriz ' + nx.matrixSize + '×' + nx.matrixSize + ' · ' + time + ' · trace ' + nx.traceRate + 'x · ' + continuity + (nx.secondaryObjectives ? ' · bônus' : '') + (programs.length ? ' · ' + programs.join(' · ') : '') + (showIce ? ' · ICE ' + ice.name : '') + watcherNote + stealthNote;
   })() : '';
 
   const nexusTargetName = (() => {
@@ -143,8 +190,8 @@ export function nexusRenderVals(state = {}, deps = {}) {
     statsLabel: blackIceVisible && blackIceBase ? 'PER ' + blackIceBase.per + ' // SPD ' + blackIceBase.spd + ' // ATK ' + blackIceBase.atk + ' // DEF ' + blackIceBase.def : 'oculto ate Scanner/Eye-Dee ou trace',
     effect: blackIceVisible && blackIceBase ? blackIceBase.effect : 'O sistema tem contramedidas ocultas.',
     rezLabel: blackIceState ? blackIceState.rez + '/' + blackIceState.maxRez : (blackIceVisible && blackIceBase ? blackIceBase.rez + '/' + blackIceBase.rez : '--'),
-    statusLabel: blackIceState && blackIceState.derezzed ? 'DEREZZED' : blackIceState ? 'ATIVO' : 'ARMADO',
-    statusColor: blackIceState && blackIceState.derezzed ? '#3fe0d0' : tracedResult ? '#c0635b' : '#d6aa4e',
+    statusLabel: blackIceState && blackIceState.derezzed ? 'DEREZZED' : blackIceState && blackIceState.bypassed ? 'EVITADO // FORA DA INICIATIVA' : blackIceState ? 'ATIVO' : 'ARMADO',
+    statusColor: blackIceState && (blackIceState.derezzed || blackIceState.bypassed) ? '#3fe0d0' : tracedResult ? '#c0635b' : '#d6aa4e',
     targetName: blackIceTarget.name || 'OPERATIVO',
     programOptions: blackIcePrograms,
     hasProgramOptions: blackIcePrograms.length > 0,
@@ -158,6 +205,45 @@ export function nexusRenderVals(state = {}, deps = {}) {
     damageZap: deps.damageBlackIceWithZap,
     applyIceEffect: deps.applyBlackIceEffect,
     onTargetProgram: (e) => deps.setNexusBlackIceTargetProgram(e.target.value),
+  };
+
+  // Going Quiet panel: shared by GM and player. Stealth state is local to each
+  // client (like the Black ICE panel) and every resolution is posted to chat.
+  const stealth = normalizeStealthState(S.nexusStealth);
+  const stealthCloak = cloakBonus(blackIceTarget.netPrograms);
+  const stealthRank = (nexusChallenge && Number(nexusChallenge.interfaceRank)) || (deps.interfaceRankFor ? deps.interfaceRankFor(blackIceTarget) : (Number(blackIceTarget.roleAbilityRank) || 0));
+  const stealthWatcherRows = challengeWatchers.map(watcher => {
+    const searchable = canWatcherSearch(stealth, watcher.id);
+    return {
+      ...watcher,
+      label: watcherLabel(watcher),
+      canSearch: !!S.gm && searchable,
+      searchLabel: searchable ? 'BUSCA ATIVA' : stealth.active ? 'BUSCA USADA' : 'SEM ALVO',
+      canEncounter: stealth.active,
+      search: () => deps.watcherSearch(watcher.id),
+      encounter: () => deps.resolveStealthVsWatcher(watcher.id),
+    };
+  });
+  const stealthHistory = stealth.history.slice(-5).reverse();
+  const stealthPanel = {
+    show: !!nexusChallenge && (S.gm || playerHasChallenge) && (stealth.attempted || challengeWatchers.length > 0),
+    isGm: !!S.gm,
+    active: stealth.active,
+    broken: !!stealth.brokenBy,
+    statusLabel: stealthStatusLabel(stealth),
+    statusColor: stealth.active ? '#3fe0d0' : stealth.brokenBy ? '#c0635b' : '#6f7a64',
+    turnLabel: 'TURNO ' + stealth.turn,
+    netrunnerLabel: (blackIceTarget.name || 'OPERATIVO') + ' // INTERFACE ' + stealthRank + ' // CLOAK +' + stealthCloak,
+    watchers: stealthWatcherRows,
+    hasWatchers: stealthWatcherRows.length > 0,
+    canEncounterIce: stealth.active && !!blackIceBase && !(blackIceState && (blackIceState.bypassed || blackIceState.derezzed)),
+    iceBypassed: !!(blackIceState && blackIceState.bypassed),
+    encounterIce: deps.resolveStealthVsIce,
+    controlNode: () => deps.breakNexusStealth('control'),
+    breakManual: () => deps.breakNexusStealth('manual'),
+    nextTurn: deps.advanceNexusTurn,
+    history: stealthHistory,
+    hasHistory: stealthHistory.length > 0,
   };
 
   return {
@@ -185,6 +271,17 @@ export function nexusRenderVals(state = {}, deps = {}) {
     nexusBlackIceOptions,
     onNexusBlackIce: (e) => deps.setNexusBlackIce(e.target.value),
     nexusPreviewBlackIceLabel,
+    nexusWatcherPresetOptions,
+    nexusWatcherRows,
+    hasNexusWatchers: nexusWatcherRows.length > 0,
+    nexusWatcherDraftName: watcherDraft.name || '',
+    nexusWatcherDraftInterface: watcherDraft.interface == null || watcherDraft.interface === '' ? draftPreset.interface : watcherDraft.interface,
+    nexusWatcherDraftPathfinder: watcherDraft.pathfinder == null || watcherDraft.pathfinder === '' ? draftPreset.pathfinder : watcherDraft.pathfinder,
+    onNexusWatcherPreset: (e) => deps.setNexusWatcherPreset(e.target.value),
+    onNexusWatcherName: (e) => deps.setNexusWatcherDraft('name', e.target.value),
+    onNexusWatcherInterface: (e) => deps.setNexusWatcherDraft('interface', e.target.value),
+    onNexusWatcherPathfinder: (e) => deps.setNexusWatcherDraft('pathfinder', e.target.value),
+    addNexusWatcher: deps.addNexusWatcher,
     nexusTargetRank,
     nexusPreviewConfig,
     nexusPreviewProgramLabels,
@@ -211,6 +308,7 @@ export function nexusRenderVals(state = {}, deps = {}) {
     markerPos: g.pos, zoneLo: g.zoneLo, zoneW: g.zoneW,
     breachMsg, breachMsgColor, breachBtnLabel, breachBtnBg, breachAction, breachPips,
     blackIcePanel,
+    stealthPanel,
   };
 }
 
@@ -266,6 +364,20 @@ export function nexusHandlers(component) {
     const next = normalizeBlackIceState({ revealed: true }, id);
     component.setState({ nexusBlackIce: next });
     return next;
+  };
+
+  // Going Quiet helpers. `component.random` lets tests pin the NPC dice.
+  const random = () => (typeof component.random === 'function' ? component.random() : Math.random());
+  const flash = (message) => { if (component.flash) component.flash(message); };
+  const stealthState = () => normalizeStealthState(component.state.nexusStealth);
+  const challengeWatchers = () => normalizeWatchers((component.state.nexusChallenge || {}).watchers);
+  const stealthChat = (text) => component.postChat({ kind: 'text', text: 'GOING QUIET :: ' + text });
+  const netrunnerStealthMod = (target) => interfaceRankFor(target) + cloakBonus(target && target.netPrograms);
+  const noteAttackBreaksStealth = (label) => {
+    const current = stealthState();
+    if (!current.active) return;
+    component.setState({ nexusStealth: breakStealth(current, 'attack', 'ataque: ' + label) });
+    stealthChat('STEALTH QUEBRADO :: ataque (' + label + ')');
   };
 
   const programAttackDamageDice = (programId) => {
@@ -356,11 +468,12 @@ export function nexusHandlers(component) {
       }
       const { targetId, target } = targetForChallenge();
       const rank = interfaceRankFor(target);
+      const watchers = normalizeWatchers(component.state.nexusWatchers);
       const config = architectureMode()
-        ? { ...buildBreachConfig(component.state.nexusTier || 'standard', rank, [], target && target.netPrograms, component.state.nexusBlackIceId || 'auto'), targetId, interfaceRank: rank, prepRequired: true }
+        ? { ...buildBreachConfig(component.state.nexusTier || 'standard', rank, [], target && target.netPrograms, component.state.nexusBlackIceId || 'auto', watchers), targetId, interfaceRank: rank, prepRequired: true }
         : { ...window.NexusBreach.readConfig(), targetId, configMode: 'custom' };
       const saved = (component.api() && component.api().nexus) ? await component.api().nexus.set(config) : config;
-      component.setState({ nexusChallenge: saved, nexusResult: null, nexusPrepResults: [], nexusPrepFinalized: false, gmStatus: 'Desafio enviado para ' + ((target && target.name) || 'operativo') });
+      component.setState({ nexusChallenge: saved, nexusResult: null, nexusPrepResults: [], nexusPrepFinalized: false, nexusStealth: null, nexusBlackIce: null, gmStatus: 'Desafio enviado para ' + ((target && target.name) || 'operativo') });
     },
 
     setNexusTarget: (value) => component.setState({ nexusTargetId: value }),
@@ -373,6 +486,172 @@ export function nexusHandlers(component) {
       if (mode === 'custom') mountNexus();
     },
     setNexusTier: (value) => component.setState({ nexusTier: value }),
+
+    // GM: Watcher roster for the next published challenge (Going Quiet).
+    setNexusWatcherPreset(value) {
+      const preset = watcherPresetById(value) || WATCHER_PRESETS[0];
+      component.setState(s => ({ nexusWatcherDraft: { ...(s.nexusWatcherDraft || {}), presetId: preset.id, interface: preset.interface, pathfinder: preset.pathfinder } }));
+    },
+    setNexusWatcherDraft(field, value) {
+      component.setState(s => ({ nexusWatcherDraft: { ...(s.nexusWatcherDraft || {}), [field]: value } }));
+    },
+    addNexusWatcher() {
+      const draft = component.state.nexusWatcherDraft || {};
+      const list = normalizeWatchers(component.state.nexusWatchers);
+      const watcher = buildWatcher({ presetId: draft.presetId || WATCHER_PRESETS[0].id, name: draft.name, interface: draft.interface, pathfinder: draft.pathfinder }, list.length);
+      if (!watcher) return flash('Watcher invalido: nome e Interface obrigatorios');
+      const id = list.some(row => row.id === watcher.id) ? watcher.id + '-' + Date.now().toString(36) : watcher.id;
+      component.setState({ nexusWatchers: [...list, { ...watcher, id }], nexusWatcherDraft: { ...draft, name: '' } });
+    },
+    removeNexusWatcher(id) {
+      component.setState(s => ({ nexusWatchers: normalizeWatchers(s.nexusWatchers).filter(row => row.id !== id) }));
+    },
+
+    // Player: Quietly Jack In. Costs one NET Action from the prep budget and is
+    // contested against every Watcher's Interface + 1d10 (ties favor them).
+    runQuietJackIn() {
+      const challenge = component.state.nexusChallenge || {};
+      const rank = Number(challenge.interfaceRank) || interfaceRankFor(component.activeCharacter());
+      const current = nexusPrepResults();
+      const limit = netActionsPerTurn(rank);
+      if (!challengeForActivePlayer(challenge)) return flash('Nenhuma architecture publicada para este operativo');
+      if (component.state.nexusPrepFinalized) return flash('Preparacao ja finalizada');
+      if (current.some(result => result.abilityId === STEALTH_PREP_ABILITY_ID)) return flash('Quietly Jack In ja tentado nesta conexao');
+      if (current.length + QUIET_JACK_IN_NET_ACTION_COST > limit) return flash('NET Actions insuficientes para Quietly Jack In');
+      const watchers = challengeWatchers();
+      component.roll({
+        actorId: component.state.activeCharacterId,
+        label: 'GOING QUIET :: QUIETLY JACK IN',
+        sides: 10,
+        count: 1,
+        mod: rank,
+        check: true,
+        onResolved: (result) => {
+          const rolls = rollWatcherJackInChecks(watchers, random);
+          const contest = resolveQuietJackIn(result.total, rolls);
+          const best = rolls.reduce((max, roll) => Math.max(max, roll.total), 0);
+          const entry = { abilityId: STEALTH_PREP_ABILITY_ID, success: contest.success, margin: (Number(result.total) || 0) - best };
+          component.setState(s => ({
+            nexusPrepResults: [...(s.nexusPrepResults || []), entry],
+            nexusStealth: contest.success ? establishStealth(s.nexusStealth, 'jack in silencioso') : failStealthAttempt(s.nexusStealth, 'detectado ao conectar'),
+          }));
+          const versus = rolls.length ? rolls.map(roll => roll.name + ' ' + roll.total).join(' / ') : 'sem Watchers';
+          stealthChat('QUIETLY JACK IN :: ' + result.total + ' vs ' + versus + ' :: ' + (contest.success ? 'STEALTH ATIVO' : 'DETECTADO') + ' // ' + contest.note);
+        },
+      });
+    },
+
+    // Hidden Netrunner meets the armed Black ICE: Interface + Cloak + 1d10 vs
+    // PER + 1d10. Pass: ICE stays out of initiative. Fail: cover blown, ICE
+    // attacks at once (GM uses the regular ICE ATK controls).
+    resolveStealthVsIce() {
+      const current = stealthState();
+      if (!current.active) return flash('Stealth nao esta ativo');
+      const ice = blackIceById(currentChallengeBlackIceId());
+      if (!ice) return flash('Nenhum Black ICE armado neste desafio');
+      const existing = activeBlackIceState();
+      if (existing && existing.bypassed) return flash(ice.name + ' ja foi evitado nesta run');
+      const target = blackIceTarget();
+      component.roll({
+        actorId: target.id,
+        label: 'GOING QUIET :: CLOAK VS ' + ice.name.toUpperCase(),
+        sides: 10,
+        count: 1,
+        mod: netrunnerStealthMod(target),
+        check: true,
+        skipActionPenalty: true,
+        onResolved: (result) => {
+          const iceRoll = rollNpcCheck(ice.id, ice.name, ice.per, random);
+          const outcome = resolveStealthEncounter(result.total, iceRoll.total);
+          const base = activeBlackIceState() || {};
+          if (outcome.passed) {
+            component.setState({
+              nexusBlackIce: normalizeBlackIceState({ ...base, revealed: true, bypassed: true }, ice.id),
+              nexusStealth: markIceBypassed(current, 'passou por ' + ice.name),
+            });
+            stealthChat('CLOAK ' + result.total + ' vs ' + ice.name + ' PER ' + iceRoll.total + ' :: ICE EVITADO, fora da iniciativa');
+          } else {
+            component.setState({
+              nexusBlackIce: normalizeBlackIceState({ ...base, revealed: true, bypassed: false }, ice.id),
+              nexusStealth: breakStealth(current, 'black-ice', ice.name + ' percebeu o Netrunner'),
+            });
+            stealthChat('CLOAK ' + result.total + ' vs ' + ice.name + ' PER ' + iceRoll.total + ' :: STEALTH QUEBRADO, ' + ice.name + ' ataca imediatamente');
+          }
+        },
+      });
+    },
+
+    // Hidden Netrunner meets a Watcher: Interface + Cloak + 1d10 vs the
+    // Watcher's Interface + Pathfinder + 1d10.
+    resolveStealthVsWatcher(watcherId) {
+      const current = stealthState();
+      if (!current.active) return flash('Stealth nao esta ativo');
+      const watcher = challengeWatchers().find(row => row.id === watcherId);
+      if (!watcher) return flash('Watcher nao encontrado');
+      const target = blackIceTarget();
+      component.roll({
+        actorId: target.id,
+        label: 'GOING QUIET :: CLOAK VS ' + watcher.name.toUpperCase(),
+        sides: 10,
+        count: 1,
+        mod: netrunnerStealthMod(target),
+        check: true,
+        skipActionPenalty: true,
+        onResolved: (result) => {
+          const watcherRoll = rollWatcherPathfinderCheck(watcher, random);
+          const outcome = resolveStealthEncounter(result.total, watcherRoll.total);
+          component.setState({
+            nexusStealth: outcome.passed
+              ? { ...current, history: current.history.concat('passou por ' + watcher.name).slice(-20) }
+              : breakStealth(current, 'watcher', watcher.name + ' percebeu o Netrunner'),
+          });
+          stealthChat('CLOAK ' + result.total + ' vs ' + watcher.name + ' PATHFINDER ' + watcherRoll.total + ' :: ' + (outcome.passed ? 'PASSOU DESPERCEBIDO' : 'STEALTH QUEBRADO por ' + watcher.name));
+        },
+      });
+    },
+
+    // GM: Watcher Search, once per Turn per Watcher. Watcher acts (Interface +
+    // Pathfinder + 1d10), Netrunner defends with Cloak, so ties keep them hidden.
+    watcherSearch(watcherId) {
+      if (!component.ensureGm('Login do mestre necessario para busca ativa')) return;
+      const current = stealthState();
+      if (!current.active) return flash('Stealth nao esta ativo: nada a buscar');
+      const watcher = challengeWatchers().find(row => row.id === watcherId);
+      if (!watcher) return flash('Watcher nao encontrado');
+      if (!canWatcherSearch(current, watcher.id)) return flash(watcher.name + ' ja gastou a busca deste turno');
+      const target = blackIceTarget();
+      component.roll({
+        actorId: target.id,
+        label: 'GOING QUIET :: CLOAK VS BUSCA DE ' + watcher.name.toUpperCase(),
+        sides: 10,
+        count: 1,
+        mod: netrunnerStealthMod(target),
+        check: true,
+        skipActionPenalty: true,
+        onResolved: (result) => {
+          const watcherRoll = rollWatcherPathfinderCheck(watcher, random);
+          const outcome = resolveWatcherSearch(watcherRoll.total, result.total);
+          const searched = markWatcherSearched(current, watcher.id, watcher.name + ' buscou (turno ' + current.turn + ')');
+          component.setState({ nexusStealth: outcome.found ? breakStealth(searched, 'search', watcher.name + ' localizou o Netrunner') : searched });
+          stealthChat('BUSCA ATIVA :: ' + watcher.name + ' ' + watcherRoll.total + ' vs CLOAK ' + result.total + ' :: ' + (outcome.found ? 'NETRUNNER LOCALIZADO, stealth quebrado' : 'nao encontrou'));
+        },
+      });
+    },
+
+    advanceNexusTurn() {
+      const next = advanceStealthTurn(stealthState());
+      component.setState({ nexusStealth: next });
+      stealthChat('TURNO ' + next.turn + ' :: buscas dos Watchers renovadas');
+    },
+
+    // Control Nodes and attacks blow cover outright (no roll).
+    breakNexusStealth(reason) {
+      const current = stealthState();
+      if (!current.active) return flash('Stealth nao esta ativo');
+      const why = reason === 'control' ? 'Control Node assumido' : reason === 'attack' ? 'ataque' : 'quebra manual pelo mestre';
+      component.setState({ nexusStealth: breakStealth(current, reason === 'control' || reason === 'attack' ? reason : 'manual', why) });
+      stealthChat('STEALTH QUEBRADO :: ' + why);
+    },
 
     runNexusPrep(abilityId) {
       const challenge = component.state.nexusChallenge || {};
@@ -409,7 +688,7 @@ export function nexusHandlers(component) {
       const challenge = component.state.nexusChallenge || {};
       if (!challengeForActivePlayer(challenge)) return;
       const finalConfig = {
-        ...buildBreachConfig(challenge.architectureTier || 'standard', challenge.interfaceRank || interfaceRankFor(component.activeCharacter()), nexusPrepResults(), component.activeCharacter().netPrograms, challenge.blackIceId || 'none'),
+        ...buildBreachConfig(challenge.architectureTier || 'standard', challenge.interfaceRank || interfaceRankFor(component.activeCharacter()), nexusPrepResults(), component.activeCharacter().netPrograms, challenge.blackIceId || 'none', challenge.watchers),
         targetId: challenge.targetId || null,
         interfaceRank: challenge.interfaceRank || interfaceRankFor(component.activeCharacter()),
         prepRequired: true,
@@ -438,7 +717,7 @@ export function nexusHandlers(component) {
     async refreshNexusChallenge() {
       if (!(component.api() && component.api().nexus)) return;
       const cfg = await component.api().nexus.get();
-      component.setState({ nexusChallenge: cfg, nexusPrepResults: [], nexusPrepFinalized: false, gmStatus: cfg ? 'Desafio atualizado' : 'Nenhum desafio publicado' });
+      component.setState({ nexusChallenge: cfg, nexusPrepResults: [], nexusPrepFinalized: false, nexusStealth: null, nexusBlackIce: null, gmStatus: cfg ? 'Desafio atualizado' : 'Nenhum desafio publicado' });
       if (component.state.view === 'games' && component.state.gameTab === 'nexus' && !component.state.gm) {
         teardownNexus();
         mountNexus();
@@ -473,6 +752,7 @@ export function nexusHandlers(component) {
 
     rollNetrunnerZapAttack() {
       const target = blackIceTarget();
+      noteAttackBreaksStealth('Zap');
       component.roll({ actorId: target.id, label: 'NETRUNNER :: ZAP VS BLACK ICE', sides: 10, count: 1, mod: interfaceRankFor(target), check: true, skipActionPenalty: true });
     },
 
@@ -480,10 +760,12 @@ export function nexusHandlers(component) {
       const target = blackIceTarget();
       const program = netrunningProgramById(programId);
       if (!program) return;
+      noteAttackBreaksStealth(program.name);
       component.roll({ actorId: target.id, label: 'NETRUNNER :: ' + program.name.toUpperCase() + ' VS BLACK ICE', sides: 10, count: 1, mod: interfaceRankFor(target) + (Number(program.atk) || 0), check: true, skipActionPenalty: true });
     },
 
     damageBlackIceWithZap() {
+      noteAttackBreaksStealth('Zap');
       damageBlackIce('ZAP DAMAGE :: BLACK ICE REZ', 1);
     },
 
@@ -494,6 +776,7 @@ export function nexusHandlers(component) {
         component.flash && component.flash('Programa sem dano anti-Black ICE automatizado');
         return;
       }
+      noteAttackBreaksStealth(program.name);
       damageBlackIce(program.name.toUpperCase() + ' DAMAGE :: BLACK ICE REZ', dice);
     },
 

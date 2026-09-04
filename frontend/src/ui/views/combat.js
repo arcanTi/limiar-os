@@ -31,6 +31,13 @@ import {
   npcStatLine,
 } from '../../domain/combat/npcGenerator.ts';
 import { resolveStabilizationDV } from '../../domain/combat/stabilizationEngine.ts';
+import { attackBudget, ATTACK_BUDGET_REASON_PT } from '../../domain/combat/attackBudget.ts';
+import { evasionBlockedReason, EVASION_BLOCK_REASON_PT } from '../../domain/combat/evasionRules.ts';
+import { resolveGrappleAction } from '../../domain/combat/grapple.ts';
+import { getAvailableAttacksThisAction } from '../../domain/combat/combatAmmoEngine.ts';
+import { applyStatDrain, resolveTurnTick } from '../../domain/conditions/turnTick.ts';
+import { CPRED_STATUS_PRESETS, removeStatusEffect, statusEffectEntry } from '../../domain/conditions/index.ts';
+import { humanShieldFrom, skillCanonicalName as charSkillCanonicalName } from '../../domain/character/index.ts';
 import { eligibleToxinAmmoFor as toxinEligibleAmmoFor, toxinAmmunitionFor } from '../../domain/toxins/index.ts';
 import { weaponRangeBand } from '../../domain/combat/combatAttackEngine.ts';
 import { canFireWeapon as combatCanFireWeapon, spendAmmo as combatSpendAmmo } from '../../domain/combat/combatAmmoEngine.ts';
@@ -102,9 +109,16 @@ export function combatRenderVals(state = {}, deps = {}) {
         ammoLabel: hasAmmo ? (item.currentAmmo ?? item.magazine) + '/' + item.magazine : '',
         needsReload: hasAmmo && Number(item.currentAmmo ?? item.magazine) <= 0,
         reload: () => deps.reloadWeapon(id, item.id),
+        // Poor-quality malfunction: a natural 1 jams the weapon until the
+        // wielder spends a full Action clearing it (unjamWeapon).
+        jammed: !!item.jammed,
+        unjam: () => (deps.unjamWeapon ? deps.unjamWeapon(id, item.id) : null),
         // Melee weapons expose an evasion request for the
         // defender's own device instead of the GM eyeballing the chat.
+        // Ranged weapons get the same button only when the selected target
+        // may dodge bullets (REF 8+, not surprised, no shield in the way).
         isMelee: !!item.melee,
+        canRequestEvasion: !!item.melee || !!(deps.canRequestRangedEvasion && deps.canRequestRangedEvasion(id, item)),
         requestEvasion: () => deps.requestEvasion(id, item),
         // Weapons flagged suppressiveFire by item normalization
         // "Suppressive Fire" special-rule text) get a batch WILL-save action.
@@ -214,6 +228,12 @@ export function combatRenderVals(state = {}, deps = {}) {
       };
     });
     const hasKit = weaponRows.length || utilityRows.length || checkRows.length;
+    // Attacks already spent this turn vs what the last weapon's ROF allows
+    // (CPR RAW: ROF 2 = up to two attacks, ROF 1 = the whole Attack Action).
+    const attackBudgetLabel = deps.attackBudgetLabel ? deps.attackBudgetLabel(id) : '';
+    // Grapple follow-ups against the selected target (Choke/Throw succeed
+    // automatically once the grab is held) and the Human Shield action.
+    const grapple = deps.grappleVals ? deps.grappleVals(id, selectedTargetId) : { hasTarget: false, canGrab: false, canChoke: false, canThrow: false, canRelease: false, canHumanShield: false, holdingLabel: '' };
     const manuallyExpanded = (S.combatExpandedIds || []).includes(id);
     const expanded = isCurrent || manuallyExpanded;
     return {
@@ -239,6 +259,19 @@ export function combatRenderVals(state = {}, deps = {}) {
       bodySp: d.currentBodySp + '/' + d.bodySp,
       hasShield: !!ownShield,
       shieldHp: ownShield ? ownShield.hp + '/' + ownShield.maxHp : '',
+      shieldKindLabel: ownShield ? (ownShield.kind === 'corpse' ? 'ESCUDO CADAVER' : ownShield.kind === 'human' ? 'ESCUDO HUMANO' : 'ESCUDO') : '',
+      shieldName: ownShield && ownShield.name ? String(ownShield.name).toUpperCase() : '',
+      dropShield: () => (deps.dropShield ? deps.dropShield(id) : null),
+      attackBudgetLabel,
+      hasAttackBudget: !!attackBudgetLabel,
+      grapple: {
+        ...grapple,
+        grab: () => (deps.grabTarget ? deps.grabTarget(id) : null),
+        choke: () => (deps.chokeTarget ? deps.chokeTarget(id) : null),
+        throwTarget: () => (deps.throwTarget ? deps.throwTarget(id) : null),
+        release: () => (deps.releaseGrapple ? deps.releaseGrapple(id) : null),
+        useHumanShield: () => (deps.useHumanShield ? deps.useHumanShield(id) : null),
+      },
       shieldStatus: ownShield ? (ownShield.hp <= 0 ? 'DESTRUIDO' : 'OCUPA BRACO') : '',
       shieldColor: ownShield && ownShield.hp <= 0 ? '#c0635b' : ownShield && ownShield.hp < ownShield.maxHp ? '#d6aa4e' : '#3fe0d0',
       conditions: critCount + 'CI / ' + statusCount + 'SE',
@@ -753,11 +786,17 @@ export function combatHandlers(component) {
     if (!targetId) return component.flash('Selecione um alvo antes de pedir evasao');
     const target = combatCharacter(targetId);
     if (!target) return component.flash('Alvo invalido');
+    // RAW gates: surprised targets never Evade; a Bulletproof Shield forbids
+    // dodging ranged attacks; a Human Shield forbids dodging head shots;
+    // dodging bullets at all needs REF 8+.
+    const blocked = evasionBlockFor(actorId, weapon);
+    if (blocked) return component.flash('Alvo nao pode esquivar: ' + (EVASION_BLOCK_REASON_PT[blocked] || blocked), 3200);
     const actor = combatCharacter(actorId) || component.activeCharacter();
     const mod = combatCheckMod(target, 'Evasion');
     const requestId = actorId + ':' + targetId + ':' + Date.now();
+    const ranged = !(weapon && weapon.melee);
     const text = 'EVASAO :: ' + (actor.name || actorId).toUpperCase() + ' ataca ' + (target.name || targetId).toUpperCase()
-      + ' corpo a corpo' + ((weapon && weapon.name) ? ' (' + weapon.name + ')' : '');
+      + (ranged ? ' a distancia (REF 8+: esquivar projeteis)' : ' corpo a corpo') + ((weapon && weapon.name) ? ' (' + weapon.name + ')' : '');
     component.postChat({
       kind: 'request',
       text,
@@ -827,12 +866,26 @@ export function combatHandlers(component) {
     const hasCustomRangeTable = !!(weapon && weapon.rangeTable && typeof weapon.rangeTable === 'object' && weapon.rangeTable.custom);
     if (mapContext && hasCustomRangeTable && !range) return component.flash('Esta arma nao possui uma banda valida para a distancia medida');
     const actor = combatCharacter(actorId) || component.activeCharacter();
+    // Poor-quality malfunction: a jammed weapon cannot fire until a full
+    // Action is spent clearing it (unjamWeapon).
+    if (weapon && weapon.jammed) return component.flash((weapon.name || 'Arma') + ' esta travada: gaste 1 acao para destravar');
+    // Attacks per turn (CPR RAW ROF): players are held to the budget, the
+    // GM only gets the warning so a house ruling can still go through.
+    const budget = attackBudgetFor(actorId, weapon);
+    if (!budget.allowed) {
+      const reason = ATTACK_BUDGET_REASON_PT[budget.reason] || 'Limite de ataques deste turno atingido';
+      if (!component.state.gm) return component.flash(reason, 3200);
+      component.flash(reason + ' (GM: seguindo mesmo assim)', 3200);
+    }
     const mod = combatAttackMod(actor, weapon);
     const ctx = cyberContextToHit(actor);
     const pending = consumePendingRollMods(actorId);
-    // A captured evasion result becomes this melee attack's
-    // DV — one-shot, only when it's still for the currently selected target.
-    const evasion = (!range && weapon && weapon.melee) ? consumeEvasionResult(actorId, combatTargetFor(actorId)) : null;
+    // A captured evasion result becomes this attack's DV — one-shot, only
+    // when it's still for the currently selected target. Melee is always
+    // opposed; a ranged shot only if the target may dodge bullets (REF 8+).
+    // RAW: the Evasion result replaces the range DV outright.
+    const evasionApplies = !!(weapon && (weapon.melee || canRequestRangedEvasion(actorId, weapon)));
+    const evasion = evasionApplies ? consumeEvasionResult(actorId, combatTargetFor(actorId)) : null;
     // Ammo is spent on the shot fired (attack roll), never on damage.
     // Advisory only — a warning is added to the breakdown, the roll still
     // happens (canFireWeapon/spendAmmo never take the count below 0).
@@ -848,17 +901,85 @@ export function combatHandlers(component) {
       sides: 10,
       count: 1,
       mod: mod.mod + ctx.mod + pending.luck + pending.adHoc,
-      ...(range ? { dv: range.dv } : evasion ? { dv: evasion.total } : {}),
+      ...(evasion ? { dv: evasion.total } : range ? { dv: range.dv } : {}),
       breakdown: component.cyberSourceBreakdown(mod.sources.concat(ctx.sources))
         .concat(range ? [`RANGE ${mapContext.rangeMeters}m // ${range.range} // DV ${range.dv}`] : [])
-        .concat(evasion ? [`EVASAO DO ALVO: ${evasion.total}`] : [])
+        .concat(evasion ? [`EVASAO DO ALVO: ${evasion.total}` + (range ? ' (substitui o DV de alcance)' : '')] : [])
         .concat(pendingModBreakdown(pending))
         .concat(ammoCheck && ammoCheck.needsReload ? [`SEM MUNICAO (${ammoCheck.currentAmmo}/${weapon.magazine}) — recarregue`] : []),
       label: (((actor.name || 'OPERATIVO') + ' :: ' + ((weapon && weapon.name) || 'ARMA') + ' ATAQUE').toUpperCase()) + combatTargetLabelSuffix(actorId),
-      onResolved: (result) => { const reporter = combatGmRollReporter(actor); if (reporter) reporter(result); if (mapContext) component.setState(s => ({ mapAttackContexts: { ...(s.mapAttackContexts || {}), [actorId]: null } })); },
+      onResolved: (result) => {
+        const reporter = combatGmRollReporter(actor);
+        if (reporter) reporter(result);
+        if (mapContext) component.setState(s => ({ mapAttackContexts: { ...(s.mapAttackContexts || {}), [actorId]: null } }));
+        // Poor quality (CPR RAW): a natural 1 on the attack die jams the
+        // weapon — the grip slips, the blade bends, the action locks up.
+        if (result && result.fumble && component.weaponRuntimeQuality(weapon) === 'poor') {
+          persistGearPatch(actorId, weapon.id, { jammed: true });
+          component.postChat({
+            kind: 'text',
+            sender: 'SISTEMA',
+            text: ((actor.name || 'OPERATIVO') + ' :: ' + ((weapon && weapon.name) || 'ARMA')).toUpperCase() + ' :: FALHA CRITICA COM ARMA POOR: arma travada (1 acao para destravar)',
+          });
+        }
+      },
     });
+    recordAttack(actorId, weapon);
     // Per-roll reset: to-hit toggles are consumed by this attack.
     setAttackContext({ beyond51m: false, aimedShot: false });
+  }
+  // --- Attacks per turn (CPR RAW ROF) -------------------------------------
+  // The log is keyed by combatant + round + turn slot, so it resets on its own
+  // whenever the tracker moves on; nothing is persisted.
+  function attackLogKey(actorId) {
+    const state = normalizeCombatState(component.state.combatState);
+    return String(actorId || '') + ':' + state.round + ':' + state.turnIndex;
+  }
+  function attacksThisTurn(actorId) {
+    const entry = (component.state.combatAttackLog || {})[actorId];
+    return entry && entry.key === attackLogKey(actorId) && Array.isArray(entry.attacks) ? entry.attacks : [];
+  }
+  function weaponAttackRof(weapon) {
+    const ctx = attackContextState();
+    const mode = ctx.aimedShot ? 'aimedShot' : (weapon && charSkillCanonicalName(weapon.skill) === 'Autofire') ? 'autofire' : 'singleShot';
+    return Math.max(1, Math.min(2, Number(getAvailableAttacksThisAction(weapon || {}, mode)) || 1));
+  }
+  function attackBudgetFor(actorId, weapon) {
+    return attackBudget(attacksThisTurn(actorId), weaponAttackRof(weapon));
+  }
+  function recordAttack(actorId, weapon, rof) {
+    const key = attackLogKey(actorId);
+    const attacks = attacksThisTurn(actorId).concat({ weaponId: weapon && weapon.id, rof: rof || weaponAttackRof(weapon) });
+    component.setState(s => ({ combatAttackLog: { ...(s.combatAttackLog || {}), [actorId]: { key, attacks } } }));
+  }
+  function attackBudgetLabel(actorId) {
+    const attacks = attacksThisTurn(actorId);
+    if (!attacks.length) return '';
+    const max = attacks.some(row => (Number(row.rof) || 1) <= 1) ? 1 : 2;
+    return 'ATAQUES ' + attacks.length + '/' + max + (attacks.length >= max ? ' // ACAO DE ATAQUE GASTA' : '');
+  }
+  // Clearing a jam is a full Action (CPR RAW): it burns the turn's attack
+  // budget the same way a ROF 1 shot would.
+  function unjamWeapon(actorId, itemId) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode destravar seu proprio equipamento');
+    const actor = combatCharacter(actorId);
+    const item = actor && component.normalizeGearList(actor.gear || []).find(row => row.id === itemId);
+    if (!item || !item.jammed) return;
+    persistGearPatch(actorId, itemId, { jammed: false });
+    recordAttack(actorId, item, 1);
+    component.postChat({ kind: 'text', sender: 'SISTEMA', text: ((actor.name || actorId) + ' :: ' + item.name).toUpperCase() + ' :: DESTRAVADA (1 acao gasta)' });
+    component.flash((item.name || 'Arma') + ' destravada');
+  }
+  // --- Ranged evasion gate (CPR RAW REF 8+, ambush, shields) --------------
+  function evasionBlockFor(actorId, weapon) {
+    const targetId = combatTargetFor(actorId);
+    const target = targetId ? component.normalizeCharacter(combatCharacter(targetId) || {}) : null;
+    if (!target || !target.id) return 'no_target';
+    return evasionBlockedReason(target, { ranged: !(weapon && weapon.melee), aimedHead: !!attackContextState().aimedShot });
+  }
+  function canRequestRangedEvasion(actorId, weapon) {
+    if (!weapon || weapon.melee) return false;
+    return evasionBlockFor(actorId, weapon) === '';
   }
   function rollCombatDamage(actorId, weapon) {
     if (!canRollCombatActor(actorId)) return component.flash('Voce so pode rolar pelo seu proprio combatente');
@@ -927,7 +1048,7 @@ export function combatHandlers(component) {
     setAttackContext({ cover: false });
   }
 
-  function applyCombatShieldDamage(targetId, amount) {
+  function applyCombatShieldDamage(targetId, amount, options = {}) {
     const target = component.normalizeCharacter(combatCharacter(targetId) || {});
     const shield = component.normalizeShield(target.shield);
     if (!target.id || !shield) return;
@@ -936,13 +1057,18 @@ export function combatHandlers(component) {
     const soaked = Math.min(shield.hp, damage);
     const overflow = Math.max(0, damage - shield.hp);
     const nextShield = component.damageShield(shield, damage);
+    const becameCorpse = shield.kind === 'human' && nextShield && nextShield.kind === 'corpse';
     component.setState(s => ({
       characters: (s.characters || []).map(c => c.id === target.id ? component.normalizeCharacter({ ...c, shield: nextShield }) : c),
     }));
+    const kindLabel = shield.kind === 'corpse' ? 'ESCUDO CADAVER' : shield.kind === 'human' ? 'ESCUDO HUMANO' : 'ESCUDO';
     component.postChat({
       kind: 'text',
       sender: 'SISTEMA',
-      text: (target.name || 'ALVO') + ' :: ESCUDO -' + damage + ' // HP ' + nextShield.hp + '/' + nextShield.maxHp + (nextShield.hp <= 0 ? ' // DESTRUIDO' : '') + (overflow ? ' // EXCESSO ' + overflow + ' A CRITERIO DO GM' : '') + (soaked ? ' // ABSORVIDO ' + soaked : ''),
+      text: (target.name || 'ALVO') + ' :: ' + kindLabel + (options.intercepted ? ' INTERCEPTA O ATAQUE' : '') + ' -' + damage
+        + ' // HP ' + nextShield.hp + '/' + nextShield.maxHp
+        + (becameCorpse ? ' // ESCUDO HUMANO MORREU: vira escudo cadaver com ' + nextShield.maxHp + ' HP' : nextShield.hp <= 0 ? ' // DESTRUIDO' : '')
+        + (overflow ? ' // EXCESSO ' + overflow + ' A CRITERIO DO GM' : '') + (soaked ? ' // ABSORVIDO ' + soaked : ''),
     });
   }
 
@@ -962,6 +1088,14 @@ export function combatHandlers(component) {
     }
     const target = component.normalizeCharacter(combatCharacter(targetId) || {});
     if (!target.id) return;
+    // Shields (CPR RAW p.179): a held Bulletproof/Human/Corpse Shield
+    // intercepts ranged attacks — the damage lands on the shield's HP, not
+    // the target, until it is destroyed. Melee goes around it.
+    const shield = component.normalizeShield(target.shield);
+    if (shield && shield.hp > 0 && !(weapon && weapon.melee)) {
+      applyCombatShieldDamage(target.id, result.total, { intercepted: true });
+      return;
+    }
     const location = component.state.attackContext && component.state.attackContext.aimedShot ? 'head' : 'body';
     const currentSp = location === 'head' ? target.derived.currentHeadSp : target.derived.currentBodySp;
     const applied = component.app().applyCombatDamage.execute({
@@ -980,8 +1114,33 @@ export function combatHandlers(component) {
     component.postChat({
       kind: 'text',
       sender: 'SISTEMA',
-      text: (target.name || 'ALVO') + ' :: HP -' + applied.hpLoss + (applied.spAblated ? ' // armadura ablada -1' : ''),
+      text: (target.name || 'ALVO') + ' :: HP -' + applied.hpLoss + (applied.spAblated ? ' // armadura ablada -1' : '')
+        + (applied.mortalWoundPenaltyDelta ? ' // MORTALLY WOUNDED: Death Save +1 de penalidade' : ''),
     });
+    // Mortally Wounded aggravation (CPR RAW p.176): any hit that gets damage
+    // through while below 1 HP is an automatic Body Critical Injury — no
+    // 2-sixes check, no GM confirm; the table roll itself stays animated.
+    if (applied.mortalWoundCritical && component.state.gm) {
+      const actor = combatCharacter(actorId);
+      component.setState({
+        critInjuryPending: {
+          actorId,
+          actorName: (actor && actor.name) || 'OPERATIVO',
+          weaponLabel: ((weapon && weapon.name) || 'ARMA') + ' // MORTALLY WOUNDED',
+          area: false,
+          location: 'body',
+          targetId: target.id,
+          targetIds: [],
+          automatic: true,
+        },
+      });
+      component.postChat({ kind: 'text', sender: 'SISTEMA', text: (target.name || 'ALVO') + ' :: LESAO CRITICA AUTOMATICA (dano sofrido em Mortally Wounded) — role na tabela de corpo' });
+    }
+    // Thermal Dagger sets the target Strongly On Fire on a damaging hit
+    // (REDmas rule the resolver already knows as statusPending).
+    if (applied.hpLoss > 0 && String((weapon && weapon.code) || '').toUpperCase() === 'THERMAL-DAGGER') {
+      component.addStatusEffect('strong_on_fire', { targetId: target.id, source: 'THERMAL-DAGGER' });
+    }
   }
   function combatDamageContributions(weapon, bonusContributions, actor) {
     return combatDamageRows(weapon, bonusContributions, combatDomainOptions({ actor }));
@@ -1215,6 +1374,11 @@ export function combatHandlers(component) {
     if (!result.ok) { if (result.error) component.flash(result.error, 3200); return; }
     if (result.combatState) component.setState(combatStatePatch(result.combatState));
     if (result.chatMessage) await component.postChat({ kind: 'text', text: result.chatMessage });
+    // Own end-of-turn conditions (burning, vacuum drain) are the player's to
+    // apply — it's their character. The next combatant's start-of-turn tick
+    // is the GM client's job (advanceTurn), which is the only one that can
+    // patch other people's sheets.
+    applyTurnTick(currentId, 'end');
   }
   // GM-only: apply end-turn requests posted by players once their turn
   // actually still matches (guards against stale/duplicate requests).
@@ -1268,6 +1432,9 @@ export function combatHandlers(component) {
   async function advanceTurn() {
     const state = normalizeCombatState(component.state.combatState);
     const currentId = currentCombatantId(state);
+    // End-of-turn conditions on whoever is finishing (On Fire damage, vacuum
+    // stat drain) land before the pointer moves.
+    if (currentId) applyTurnTick(currentId, 'end');
     const result = await component.app().endTurn.execute({
       session: { authAuthenticated: component.state.authAuthenticated, authUser: component.state.authUser },
       combatState: state,
@@ -1278,6 +1445,171 @@ export function combatHandlers(component) {
     const nextState = normalizeCombatState(result.combatState);
     const nextId = currentCombatantId(nextState);
     if (nextId && nextId !== currentId) maybeAutoDeathSave(nextId, nextState.round);
+    // Start-of-turn conditions on whoever is up next (asphyxiation / vacuum
+    // BODY damage) — keyed per round so a re-render can't double-tick.
+    if (nextId) applyTurnTick(nextId, 'start', nextState.round);
+  }
+  // --- Ongoing-condition ticks (CPR RAW p.180-181) ------------------------
+  // Direct HP damage: no SP, no ablation. The vacuum drain is persisted as an
+  // accumulating `vacuum_stat_drain` status (statBonus negatives), which the
+  // conditions aggregate already turns into effective-stat penalties.
+  function applyTurnTick(characterId, phase, roundNumber) {
+    const raw = combatCharacter(characterId);
+    if (!raw) return null;
+    const character = component.normalizeCharacter(raw);
+    if (phase === 'start') {
+      const key = characterId + ':' + phase + ':' + (roundNumber ?? normalizeCombatState(component.state.combatState).round);
+      if (!component._turnTickApplied) component._turnTickApplied = new Set();
+      if (component._turnTickApplied.has(key)) return null;
+      component._turnTickApplied.add(key);
+    }
+    const tick = resolveTurnTick(character, phase);
+    if (!tick.hpLoss && !tick.statDrain.length) return tick;
+    const patch = {};
+    const lines = [];
+    if (tick.hpLoss) {
+      const cur = (character.health && character.health.cur) || 0;
+      patch.health = { ...(character.health || {}), cur: Math.max(0, cur - tick.hpLoss) };
+      lines.push(...tick.lines.map(line => line.label.toUpperCase() + ' :: -' + line.amount + ' HP direto (ignora SP)'));
+    }
+    if (tick.statDrain.length) {
+      patch.statusEffects = applyStatDrain(character.statusEffects || [], tick.statDrain);
+      lines.push('VACUO :: ' + tick.statDrain.map(row => row.stat + ' -' + row.roll).join(' / '));
+      if (tick.lethal) lines.push('INT chegou a 0 no vacuo :: MORTE PERMANENTE');
+    }
+    component.applyCharacterPatch(character.id, patch);
+    component.postChat({
+      kind: 'text',
+      sender: 'SISTEMA',
+      text: (phase === 'end' ? 'FIM DE TURNO' : 'INICIO DE TURNO') + ' :: ' + (character.name || characterId).toUpperCase() + '\n' + lines.join('\n'),
+    });
+    return tick;
+  }
+  // --- Grapple: Choke / Throw / Human Shield (CPR RAW p.172-173, p.179) ---
+  function grappleStatusOn(target, actorId) {
+    return (target && target.statusEffects || []).find(status => status && status.id === 'grappled' && status.modifiers && String(status.modifiers.grappledBy || '') === String(actorId)) || null;
+  }
+  function grappleVals(actorId, targetId) {
+    const actor = combatCharacter(actorId);
+    const target = targetId ? combatCharacter(targetId) : null;
+    const holding = target ? grappleStatusOn(target, actorId) : null;
+    const chokeTurns = holding ? Number(holding.modifiers.chokeTurns) || 0 : 0;
+    const ownShield = actor ? component.normalizeShield(actor.shield) : null;
+    return {
+      hasTarget: !!target,
+      canGrab: !!target && !holding,
+      canChoke: !!holding,
+      canThrow: !!holding,
+      canRelease: !!holding,
+      canHumanShield: !!holding && !ownShield,
+      holdingLabel: holding ? ('AGARRANDO ' + (target.name || targetId).toUpperCase() + (chokeTurns ? ' // CHOKE x' + chokeTurns : '')) : '',
+    };
+  }
+  function grappleTargetFor(actorId, requireHold) {
+    if (!canRollCombatActor(actorId)) { component.flash('Voce so pode agir pelo seu proprio combatente'); return null; }
+    const targetId = combatTargetFor(actorId);
+    const target = targetId ? combatCharacter(targetId) : null;
+    if (!target) { component.flash('Selecione um alvo'); return null; }
+    if (requireHold && !grappleStatusOn(target, actorId)) { component.flash('Voce precisa estar agarrando o alvo (AGARRAR primeiro)'); return null; }
+    return target;
+  }
+  function presetWithModifiers(presetId, modifiers) {
+    const preset = CPRED_STATUS_PRESETS.find(item => item.id === presetId);
+    return preset ? { ...preset, modifiers: { ...(preset.modifiers || {}), ...modifiers } } : null;
+  }
+  // Marks the hold. The Grab itself is a Brawling attack the GM already
+  // resolves with the normal attack/evasion rolls; this records the result.
+  function grabTarget(actorId) {
+    const target = grappleTargetFor(actorId, false);
+    if (!target) return;
+    const actor = combatCharacter(actorId);
+    component.addStatusEffect(presetWithModifiers('grappled', { grappledBy: actorId, chokeTurns: 0, lastChokeRound: null }), { targetId: target.id, source: 'grapple:' + actorId });
+    component.addStatusEffect(presetWithModifiers('grappling', { grappling: target.id }), { targetId: actorId, source: 'grapple' });
+    component.postChat({ kind: 'text', sender: 'SISTEMA', text: ((actor && actor.name) || actorId).toUpperCase() + ' AGARROU ' + (target.name || target.id).toUpperCase() + ' :: Choke/Throw agora sao automaticos' });
+  }
+  function releaseGrapple(actorId) {
+    const target = grappleTargetFor(actorId, true);
+    if (!target) return;
+    clearGrapple(actorId, target);
+    component.postChat({ kind: 'text', sender: 'SISTEMA', text: (target.name || target.id).toUpperCase() + ' :: AGARRE SOLTO' });
+  }
+  function clearGrapple(actorId, target) {
+    const held = grappleStatusOn(target, actorId);
+    if (held) component.applyCharacterPatch(target.id, { statusEffects: removeStatusEffect(target.statusEffects || [], held.instanceId) });
+    const actor = combatCharacter(actorId);
+    const holding = (actor && actor.statusEffects || []).find(status => status && status.id === 'grappling' && status.modifiers && String(status.modifiers.grappling || '') === String(target.id));
+    if (holding) component.applyCharacterPatch(actorId, { statusEffects: removeStatusEffect(actor.statusEffects || [], holding.instanceId) });
+  }
+  function grappleDamageAction(actorId, action) {
+    const target = grappleTargetFor(actorId, true);
+    if (!target) return;
+    const actor = component.normalizeCharacter(combatCharacter(actorId) || {});
+    const held = grappleStatusOn(target, actorId);
+    const state = normalizeCombatState(component.state.combatState);
+    const attackerBody = component.asNumber(actor.derived && actor.derived.effectiveStats && actor.derived.effectiveStats.BODY, 0, 0, 99);
+    const result = resolveGrappleAction({
+      action,
+      attackerBody,
+      targetHp: target.health && target.health.cur,
+      chokeTurns: held.modifiers.chokeTurns,
+      lastChokeRound: held.modifiers.lastChokeRound,
+      round: state.round,
+    });
+    let statusEffects = (target.statusEffects || []).slice();
+    if (result.releasesGrapple) {
+      statusEffects = removeStatusEffect(statusEffects, held.instanceId);
+    } else {
+      statusEffects = statusEffects.map(status => status.instanceId === held.instanceId
+        ? { ...status, modifiers: { ...status.modifiers, chokeTurns: result.chokeTurns, lastChokeRound: state.round } }
+        : status);
+    }
+    if (result.unconscious && !statusEffects.some(status => status && status.id === 'unconscious')) {
+      const preset = CPRED_STATUS_PRESETS.find(item => item.id === 'unconscious');
+      if (preset) statusEffects.push(statusEffectEntry(preset, { source: 'choke' }));
+    }
+    component.applyCharacterPatch(target.id, {
+      health: { ...(target.health || {}), cur: result.hpAfter },
+      statusEffects,
+    });
+    if (result.releasesGrapple) {
+      const holding = (actor.statusEffects || []).find(status => status && status.id === 'grappling' && status.modifiers && String(status.modifiers.grappling || '') === String(target.id));
+      if (holding) component.applyCharacterPatch(actorId, { statusEffects: removeStatusEffect(actor.statusEffects || [], holding.instanceId) });
+    }
+    const verb = action === 'choke' ? 'ESTRANGULA' : 'ARREMESSA';
+    component.postChat({
+      kind: 'text',
+      sender: 'SISTEMA',
+      text: (actor.name || actorId).toUpperCase() + ' ' + verb + ' ' + (target.name || target.id).toUpperCase()
+        + ' :: sucesso automatico :: -' + result.damage + ' HP direto (BODY, ignora SP) :: HP ' + result.hpBefore + ' -> ' + result.hpAfter
+        + (result.unconsciousReason === 'hp' ? ' // travado em 1 HP: INCONSCIENTE' : '')
+        + (result.unconsciousReason === 'chokeTurns' ? ' // 3 turnos de choke: INCONSCIENTE' : '')
+        + (action === 'choke' && !result.unconscious ? ' // choke x' + result.chokeTurns : '')
+        + (result.releasesGrapple ? ' // agarre termina' : ''),
+    });
+    recordAttack(actorId, { id: 'grapple:' + action }, 1);
+  }
+  function chokeTarget(actorId) { grappleDamageAction(actorId, 'choke'); }
+  function throwTarget(actorId) { grappleDamageAction(actorId, 'throw'); }
+  // Human Shield (CPR RAW p.179): takes an Action to bring the grappled
+  // target in front of you; HP = their BODY; if they die in your hands the
+  // body keeps working as a Corpse Shield (domain/character damageShield).
+  function useHumanShield(actorId) {
+    const target = grappleTargetFor(actorId, true);
+    if (!target) return;
+    const actor = combatCharacter(actorId);
+    if (actor && component.normalizeShield(actor.shield)) return component.flash('Ja empunhando um escudo');
+    const shield = humanShieldFrom(target);
+    if (!shield) return component.flash('Alvo sem BODY para servir de escudo');
+    component.applyCharacterPatch(actorId, { shield });
+    recordAttack(actorId, { id: 'human-shield' }, 1);
+    component.postChat({ kind: 'text', sender: 'SISTEMA', text: ((actor && actor.name) || actorId).toUpperCase() + ' USA ' + (target.name || target.id).toUpperCase() + ' COMO ESCUDO HUMANO :: ' + shield.hp + ' HP (BODY) :: 1 acao gasta :: nao esquiva tiros na cabeca' });
+  }
+  function dropShield(actorId) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode agir pelo seu proprio combatente');
+    const actor = combatCharacter(actorId);
+    if (!actor || !component.normalizeShield(actor.shield)) return;
+    component.applyCharacterPatch(actorId, { shield: null });
+    component.flash('Escudo largado');
   }
   // When a turn advances to a Mortally Wounded combatant,
   // auto-post their Death Save as a request (same prompt mechanism as
@@ -2145,6 +2477,21 @@ export function combatHandlers(component) {
       component.flash(next ? 'Carregado: ' + next.name : 'Toxina removida da arma');
     },
     requestSuppressiveFire,
+    attacksThisTurn,
+    attackBudgetFor,
+    attackBudgetLabel,
+    recordAttack,
+    unjamWeapon,
+    canRequestRangedEvasion,
+    evasionBlockFor,
+    applyTurnTick,
+    grappleVals,
+    grabTarget,
+    chokeTarget,
+    throwTarget,
+    releaseGrapple,
+    useHumanShield,
+    dropShield,
     mapAoeResolveVals,
     toggleMapAoeTarget,
     setMapAoeDamageDice,

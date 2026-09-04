@@ -2,7 +2,8 @@ import { asNumber } from '../shared/num.ts';
 import { parseGearDamage, skillCanonicalName, normalizeSkills } from '../character/index.ts';
 import type { CharacterSkill } from '../character/index.ts';
 import { slug } from '../shared/text.ts';
-import { rollD10 } from './combatDice.ts';
+import { rollCheckD10, rollD10 } from './combatDice.ts';
+import type { CheckDieResult } from './combatDice.ts';
 
 export interface CombatantEntry {
   side: 'pc' | 'enemy';
@@ -320,6 +321,74 @@ export function advanceCombatTurn(state: CombatState, currentId: string | null):
   const resetCombatants: Record<string, CombatantEntry> = {};
   Object.keys(combatants).forEach(id => { resetCombatants[id] = { ...combatants[id], acted: false }; });
   return { ...state, combatants: resetCombatants, round: Math.max(1, state.round) + 1, turnIndex: combatFirstActiveIndex(order, resetCombatants) };
+}
+
+// CPR RAW: combat starts on Round 1, there is no Round 0. Activating a
+// tracker that never rolled initiative (round still 0) lands on 1; a
+// tracker resumed mid-fight keeps its round.
+export function startCombatState(state: CombatState): CombatState {
+  return { ...state, active: true, round: Math.max(1, state.round) };
+}
+
+// Inverse of advanceCombatTurn: step the turn pointer back to the previous
+// undefeated combatant. Wrapping from the first active slot back to the last
+// one means we re-entered the previous round, so the round counter steps
+// down too (never below 1). acted flags are left alone — the GM is undoing a
+// pointer mistake, not rewinding what everybody already did.
+export function retreatCombatTurn(state: CombatState): CombatState {
+  const order = state.order;
+  const combatants = state.combatants;
+  if (combatFirstActiveIndex(order, combatants) < 0) return { ...state, turnIndex: -1 };
+  const start = state.turnIndex >= 0 && state.turnIndex < order.length ? state.turnIndex : 0;
+  for (let offset = 1; offset <= order.length; offset++) {
+    const idx = (start - offset + order.length) % order.length;
+    const entry = combatants[order[idx]];
+    if (!entry || entry.defeated) continue;
+    const wrapped = state.turnIndex >= 0 && idx > start;
+    const round = wrapped ? Math.max(1, state.round - 1) : Math.max(1, state.round);
+    return { ...state, round, turnIndex: idx };
+  }
+  return { ...state, turnIndex: -1 };
+}
+
+export interface SuppressiveFireDefender {
+  id: string;
+  mod: number;
+}
+
+export interface SuppressiveFireDefenderResult extends CheckDieResult {
+  id: string;
+  mod: number;
+  /** WILL + Concentration + 1d10 must beat the attacker's total; a tie fails. */
+  resisted: boolean;
+}
+
+export interface SuppressiveFireResult {
+  attackerTotal: number;
+  defenders: SuppressiveFireDefenderResult[];
+}
+
+// Suppressive Fire (CPR RAW p.174): the attacker's REF + Autofire + 1d10
+// result is the DV. Every defender in the 25m area rolls WILL +
+// Concentration + 1d10 against it; beating it resists, a tie or less means
+// they must dive for cover next turn (the app marks them "suppressed").
+// The attacker's roll is rolled by the caller (it goes through the animated
+// roll overlay); only the defender saves are batch-rolled here.
+export function resolveSuppressiveFire(
+  attackerTotal: unknown,
+  defenders: SuppressiveFireDefender[] = [],
+  rng: () => number = Math.random,
+): SuppressiveFireResult {
+  const dv = Number(attackerTotal) || 0;
+  return {
+    attackerTotal: dv,
+    defenders: (defenders || []).map(defender => {
+      const mod = Number(defender.mod) || 0;
+      const roll = rollCheckD10(rng);
+      const total = roll.total + mod;
+      return { ...roll, id: defender.id, mod, total, resisted: total > dv };
+    }),
+  };
 }
 
 export interface FacedownContestResult {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { advanceCombatTurn, applyArmorToDamage, normalizeCombatState } from '../../../src/domain/combat/index.ts';
+import { advanceCombatTurn, applyArmorToDamage, normalizeCombatState, resolveSuppressiveFire, retreatCombatTurn, startCombatState } from '../../../src/domain/combat/index.ts';
 import { ROLL_TRIGGERS, evaluateRollTriggers } from '../../../src/domain/combat/constants.ts';
 
 function combatant(overrides = {}) {
@@ -96,5 +96,62 @@ describe('domain/combat normalizeCombatState', () => {
 
   it('preserves an existing updatedAt value', () => {
     expect(normalizeCombatState({ updatedAt: 'saved' }, [], 'now').updatedAt).toBe('saved');
+  });
+});
+
+describe('domain/combat startCombatState', () => {
+  it('starts on round 1 when the tracker never rolled initiative (no round 0, CPR RAW)', () => {
+    const state = normalizeCombatState({ active: false, round: 0, order: ['a'], combatants: { a: combatant() } });
+    expect(startCombatState(state)).toMatchObject({ active: true, round: 1 });
+  });
+
+  it('keeps the current round when resuming a fight already in progress', () => {
+    const state = normalizeCombatState({ active: false, round: 3, order: ['a'], combatants: { a: combatant() } });
+    expect(startCombatState(state)).toMatchObject({ active: true, round: 3 });
+  });
+});
+
+describe('domain/combat retreatCombatTurn', () => {
+  it('steps back to the previous undefeated combatant within the same round', () => {
+    const state = { round: 2, turnIndex: 2, order: ['a', 'b', 'c'], combatants: { a: combatant(), b: combatant({ defeated: true }), c: combatant() } };
+    expect(retreatCombatTurn(state)).toMatchObject({ round: 2, turnIndex: 0 });
+  });
+
+  it('steps the round down when wrapping from the first slot back to the last one', () => {
+    const state = { round: 2, turnIndex: 0, order: ['a', 'b', 'c'], combatants: { a: combatant(), b: combatant(), c: combatant() } };
+    expect(retreatCombatTurn(state)).toMatchObject({ round: 1, turnIndex: 2 });
+  });
+
+  it('never goes below round 1', () => {
+    const state = { round: 1, turnIndex: 0, order: ['a', 'b'], combatants: { a: combatant(), b: combatant() } };
+    expect(retreatCombatTurn(state)).toMatchObject({ round: 1, turnIndex: 1 });
+  });
+
+  it('sets turnIndex to -1 when every combatant is defeated', () => {
+    const state = { round: 1, turnIndex: 1, order: ['a', 'b'], combatants: { a: combatant({ defeated: true }), b: combatant({ defeated: true }) } };
+    expect(retreatCombatTurn(state).turnIndex).toBe(-1);
+  });
+});
+
+describe('domain/combat resolveSuppressiveFire', () => {
+  const queuedRng = (values) => {
+    const queue = values.slice();
+    return () => (queue.length ? (queue.shift() - 1) / 10 : 0);
+  };
+
+  it('uses the attacker total as the DV: beating it resists, a tie or less is suppressed (CPR RAW p.174)', () => {
+    const result = resolveSuppressiveFire(17, [{ id: 'beats', mod: 9 }, { id: 'ties', mod: 8 }, { id: 'under', mod: 4 }], queuedRng([9, 9, 3]));
+    expect(result.attackerTotal).toBe(17);
+    expect(result.defenders.map(row => [row.id, row.total, row.resisted])).toEqual([
+      ['beats', 18, true],
+      ['ties', 17, false],
+      ['under', 7, false],
+    ]);
+  });
+
+  it('explodes the defender die on a natural 10 and subtracts on a natural 1', () => {
+    const result = resolveSuppressiveFire(10, [{ id: 'crit', mod: 2 }, { id: 'fumble', mod: 12 }], queuedRng([10, 4, 1, 3]));
+    expect(result.defenders[0]).toMatchObject({ die: 10, extra: 4, total: 16, crit: true, resisted: true });
+    expect(result.defenders[1]).toMatchObject({ die: 1, extra: 3, total: 10, fumble: true, resisted: false });
   });
 });

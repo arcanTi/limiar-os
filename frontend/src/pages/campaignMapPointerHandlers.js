@@ -1,8 +1,10 @@
 // Map-canvas pointer lifecycle. Page-specific reads and actions
 // are injected so hover, press, drag and release no longer close over the
 // campaign-map composition root.
+import { segmentMovementCost } from '../domain/movement/index.ts';
+
 export function createPointerHandlers(deps) {
-  const { canvas, state, pointer, ui, screenToWorld, tokenAt, snap, renderTokens, syncTokenForm, renderTokenHud, updateSelectedMove, drawOnce, canMove, templateAt, canEditTemplate, syncTemplateForm, renderTemplateList, wallAt, toggleDoor, openPromptModal, savePin, toggleTerrainAtWorld, pixelsToMeters, sceneSize, moveTokenGroup, saveTemplatePlacement, saveWall, saveProp, saveLight, saveDrawing, saveFog, buildAttackMeasure, prepareMapAttack, status } = deps;
+  const { recordMoveSpent, canvas, state, pointer, ui, screenToWorld, tokenAt, snap, renderTokens, syncTokenForm, renderTokenHud, updateSelectedMove, drawOnce, canMove, templateAt, canEditTemplate, syncTemplateForm, renderTemplateList, wallAt, toggleDoor, openPromptModal, savePin, toggleTerrainAtWorld, pixelsToMeters, sceneSize, moveTokenGroup, saveTemplatePlacement, saveWall, saveProp, saveLight, saveDrawing, saveFog, buildAttackMeasure, prepareMapAttack, status } = deps;
 
   function onHover(event) {
     if (pointer.down) return;
@@ -63,7 +65,7 @@ export function createPointerHandlers(deps) {
     if (!pointer.down) return;
     const token = state.tokens.find(item => item.id === pointer.id), fog = state.fogDraft, wall = state.wallDraft, prop = state.propDraft, light = state.lightDraft, drawing = state.drawingDraft, mode = pointer.mode;
     pointer.down = false; state.fogDraft = null; state.wallDraft = null; state.propDraft = null; state.lightDraft = null; state.drawingDraft = null;
-    if (mode === 'token' && token) { const moved = (pointer.group || [{ id: token.id }]).map(item => state.tokens.find(current => current.id === item.id)).filter(Boolean); moveTokenGroup(moved).catch(error => status(error.message, 'err')); }
+    if (mode === 'token' && token) { const moved = (pointer.group || [{ id: token.id }]).map(item => state.tokens.find(current => current.id === item.id)).filter(Boolean); if (pointer.dragOrigin && typeof recordMoveSpent === 'function') { const cost = segmentMovementCost(pointer.dragOrigin, { x: token.x, y: token.y }, sceneSize().g, state.difficultCells); moved.forEach(item => recordMoveSpent(item, cost.costCells)); } moveTokenGroup(moved).catch(error => status(error.message, 'err')); }
     if (mode === 'templateMove') { const template = state.templates.find(item => item.id === pointer.templateId); if (template) saveTemplatePlacement({ id: template.id, kind: template.kind, x: template.x, y: template.y, directionDeg: template.directionDeg, distanceUnits: template.distanceUnits, angleDeg: template.angleDeg, widthUnits: template.widthUnits, color: template.color, label: template.label, hidden: template.hidden, lifecycle: template.lifecycle }); }
     if (mode === 'wall' && wall && Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1) >= 4) saveWall(wall).catch(error => status(error.message, 'err'));
     if (mode === 'prop' && prop && prop.w >= 4 && prop.h >= 4) saveProp(prop).catch(error => status(error.message, 'err'));
