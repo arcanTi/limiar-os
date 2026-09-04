@@ -11,6 +11,7 @@
 
 import { CPRED_CREATION_CASH } from './constants.ts';
 import { resolveInstalledCyberware } from '../items/cyberwareInstallEngine.ts';
+import { catalogLabel, installBlockText } from '../items/installBlockText.ts';
 import type { CanonicalRules } from '../items/canonicalRulesTypes.ts';
 import type { LegacyCatalogItem } from '../items/legacyCatalogTypes.ts';
 import type { ValidationIssue } from '../items/itemTypes.ts';
@@ -128,6 +129,8 @@ export interface ChromeBlock {
   issues?: ValidationIssue[];
   /** The enhancement already holding the piece, when the reason is `occupied`. */
   occupant?: ChromeItem;
+  /** Eurodollars missing, when the reason is `funds`. */
+  short?: number;
 }
 
 function issueSignature(issue: ValidationIssue): string {
@@ -201,29 +204,82 @@ export function chromeBlock(
       return { reason: 'occupied', occupant: enhancementOccupant(current, parents[0].code) as ChromeItem };
     }
   }
-  if (item.price > creationCashLeft(current, budget)) return { reason: 'funds' };
+  const left = creationCashLeft(current, budget);
+  if (item.price > left) return { reason: 'funds', short: item.price - left };
   const rows = (Array.isArray(catalog) ? catalog : []) as LegacyCatalogItem[];
   const issues = newInstallErrors(current, [...current, item], rows, canonicalRules);
   if (issues.length) return { reason: 'install', issues };
   return { reason: null };
 }
 
-export function chromeBlockMessage(block: ChromeBlock, item: ChromeItem | null | undefined): string {
+/** Short tag for the blocked card — the headline above the explanation. */
+export function chromeBlockLabel(block: ChromeBlock): string {
+  if (!block || !block.reason) return '';
+  if (block.reason === 'duplicate') return 'JÁ INSTALADO';
+  if (block.reason === 'soldout') return 'ESGOTADO';
+  if (block.reason === 'funds') return 'SEM SALDO';
+  if (block.reason === 'parent') return 'FALTA A PEÇA BASE';
+  if (block.reason === 'occupied') return 'PEÇA OCUPADA';
+  return 'REQUISITO NÃO CUMPRIDO';
+}
+
+/**
+ * The same reason written for the tag on the card, where the item's name is
+ * already on screen: no "X cannot be installed", just what to do about it.
+ */
+export function chromeBlockDetail(
+  block: ChromeBlock,
+  item: ChromeItem | null | undefined,
+  { catalog }: { catalog?: unknown } = {},
+): string {
+  if (!block || !block.reason) return '';
+  if (block.reason === 'duplicate') return 'Já está instalado.';
+  if (block.reason === 'soldout') return 'Esgotado no catálogo.';
+  if (block.reason === 'funds') {
+    const short = Math.max(0, Math.trunc(Number(block.short) || 0));
+    return short ? `Faltam ${short}eb. Remova outra compra ou fique sem ele.` : 'Sem eurodólares para esta compra.';
+  }
+  if (block.reason === 'parent') {
+    const parents = ((item && item.attachesTo) || [])
+      .map((code) => catalogLabel(catalog, code) || code)
+      .filter(Boolean)
+      .join(' ou ');
+    return `É um aprimoramento: instale ${parents || 'o cyberware base'} primeiro.`;
+  }
+  if (block.reason === 'occupied') {
+    const occupant = (block.occupant && block.occupant.name) || 'Outro aprimoramento';
+    return `${occupant} já ocupa essa peça — uma peça aceita um aprimoramento por vez.`;
+  }
+  const detail = installBlockText(block.issues, catalog);
+  if (!detail) return 'Não pode ser instalado agora.';
+  return detail.charAt(0).toUpperCase() + detail.slice(1) + '.';
+}
+
+export function chromeBlockMessage(
+  block: ChromeBlock,
+  item: ChromeItem | null | undefined,
+  { catalog }: { catalog?: unknown } = {},
+): string {
   const name = (item && item.name) || 'Este implante';
   if (!block || !block.reason) return '';
   if (block.reason === 'duplicate') return `${name} já está instalado.`;
   if (block.reason === 'soldout') return `${name} está esgotado no catálogo.`;
   if (block.reason === 'funds') return `Sem eurodólares para ${name}. Remova outro implante ou fique sem ele.`;
   if (block.reason === 'parent') {
-    const parents = (item && item.attachesTo.join(', ')) || 'o cyberware base';
-    return `${name} é um aprimoramento: instale ${parents} primeiro.`;
+    // Named, not coded: the player has to find the base piece in this same
+    // list, and the catalog code is not what the card in front of them says.
+    const parents = ((item && item.attachesTo) || [])
+      .map((code) => catalogLabel(catalog, code) || code)
+      .filter(Boolean)
+      .join(' ou ');
+    return `${name} é um aprimoramento: instale ${parents || 'o cyberware base'} primeiro.`;
   }
   if (block.reason === 'occupied') {
     const occupant = (block.occupant && block.occupant.name) || 'outro aprimoramento';
     return `Cada peça de cyberware aceita um aprimoramento por vez: ${occupant} já ocupa essa peça.`;
   }
-  const detail = (block.issues || []).map((issue) => issue.message).join('; ');
-  return `${name} não pode ser instalado${detail ? ': ' + detail : '.'}`;
+  const detail = installBlockText(block.issues, catalog);
+  return `${name} não pode ser instalado${detail ? ': ' + detail + '.' : '.'}`;
 }
 
 export function canBuyChrome(

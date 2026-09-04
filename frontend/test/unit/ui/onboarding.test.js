@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildCharacterPayload, createWizardController, wizardCopy } from '../../../src/ui/views/onboarding.js';
+import { buildCharacterPayload, createWizardController, render, restoreScroll, scrollAnchor, wizardCopy } from '../../../src/ui/views/onboarding.js';
 import { createWizardDraft, rollStats, setSkillLevel, skillFloor } from '../../../src/domain/character/characterWizard.ts';
 
 function completeDraft(name = 'V Angel') {
@@ -261,7 +261,8 @@ describe('passo de chrome', () => {
 
     controller.handlers.buyChrome('ENH-TUNGSTEN');
     expect(controller.state.draft.chrome).toEqual([]);
-    expect(controller.state.chromeHint).toContain('GORILLA-ARMS');
+    // Named, not coded: the player has to find that card in the same list.
+    expect(controller.state.chromeHint).toContain('Gorilla Arms');
 
     controller.handlers.buyChrome('GORILLA-ARMS');
     controller.handlers.buyChrome('ENH-TUNGSTEN');
@@ -270,6 +271,66 @@ describe('passo de chrome', () => {
 
     controller.handlers.sellChrome('GORILLA-ARMS');
     expect(controller.state.draft.chrome).toEqual([]);
+  });
+
+  it('a carta bloqueada diz na tela por que nao da para instalar', async () => {
+    const controller = createWizardController({ api: chromeApi() });
+    await controller.loadCatalog();
+    controller.state.step = 'chrome';
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    expect(root.innerHTML).toContain('FALTA A PEÇA BASE');
+    // The tag says what to do; the name is already the card's own headline.
+    expect(root.innerHTML).toContain('É um aprimoramento: instale Gorilla Arms primeiro.');
+
+    controller.handlers.buyChrome('GORILLA-ARMS');
+    render(root, controller.state);
+    expect(root.innerHTML).not.toContain('FALTA A PEÇA BASE');
+  });
+
+  it('cada carta traz categoria, preco e humanidade como etiquetas', async () => {
+    const controller = createWizardController({ api: chromeApi() });
+    await controller.loadCatalog();
+    controller.state.step = 'chrome';
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    expect(root.innerHTML).toContain('>LIMBS<');
+    expect(root.innerHTML).toContain('>1.000eb<');
+    expect(root.innerHTML).toContain('−14 HUMANITY');
+    // The enhancement names its base piece, not the catalog code.
+    expect(root.innerHTML).toContain('APRIMORAMENTO · Gorilla Arms');
+  });
+
+  it('a carta bloqueada e coberta inteira, com o motivo no centro', async () => {
+    const controller = createWizardController({ api: chromeApi() });
+    await controller.loadCatalog();
+    controller.state.step = 'chrome';
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    const overlays = root.innerHTML.match(/data-block-tag/g) || [];
+    expect(overlays).toHaveLength(1);
+    expect(root.innerHTML).toContain('absolute inset-0 z-10');
+    expect(root.innerHTML).toContain('✕ FALTA A PEÇA BASE');
+
+    controller.handlers.buyChrome('GORILLA-ARMS');
+    render(root, controller.state);
+    expect(root.innerHTML).not.toContain('data-block-tag');
+  });
+
+  it('sem saldo a carta diz quanto falta em vez de so apagar o botao', async () => {
+    const controller = createWizardController({ api: chromeApi() });
+    await controller.loadCatalog();
+    controller.state.step = 'chrome';
+    controller.handlers.buyChrome('GORILLA-ARMS');
+    controller.state.draft = { ...controller.state.draft, gear: [{ code: 'CASH-SINK', name: 'Sumidouro', price: 1500, qty: 1 }] };
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    expect(root.innerHTML).toContain('SEM SALDO');
+    expect(root.innerHTML).toContain('Faltam 450eb.');
   });
 
   it('manda chrome instalado, codigos e o dinheiro que sobrou no payload', async () => {
@@ -347,6 +408,115 @@ describe('passo de arsenal', () => {
   });
 });
 
+describe('etiquetas da prateleira de arsenal', () => {
+  const SHELF_ROWS = [
+    {
+      code: 'LIGHT-MELEE', name: 'Light Melee Weapon', cat: 'WEAPONS', kind: 'weapon', weaponClass: 'Light Melee Weapon',
+      skill: 'Melee Weapon', price: 50, dmg: '1d6', rof: 2, hands: 'varies', concealable: true, stock: 'IN STOCK',
+      desc: 'arma melee leve; usa Melee Weapon, dano 1d6, ROF 2.',
+    },
+    {
+      code: 'ASSAULT-RIFLE', name: 'Assault Rifle', cat: 'WEAPONS', kind: 'weapon', weaponClass: 'Assault Rifle',
+      skill: 'Shoulder Arms', price: 500, dmg: '5d6', rof: 1, hands: 2, mag: 25, stock: 'IN STOCK',
+    },
+    {
+      code: 'FLAK', name: 'Flak', cat: 'ARMOR', price: 500, stock: 'IN STOCK',
+      armor: { headSP: 15, bodySP: 15, ablates: true, armorPenalty: { REF: -4, DEX: -4, MOVE: -4 } },
+    },
+    {
+      code: 'KEVLAR', name: 'Kevlar', cat: 'ARMOR', price: 50, stock: 'IN STOCK',
+      armor: { headSP: 7, bodySP: 7, ablates: true, armorPenalty: { REF: 0, DEX: 0, MOVE: 0 } },
+    },
+    { code: 'AMMO-RIFLE', name: 'Rifle Ammunition', cat: 'AMMUNITION', ammoType: 'Rifle', packSize: 10, price: 10, stock: 'IN STOCK' },
+    { code: 'AGENT', name: 'Agent', cat: 'GEAR', price: 100, stock: 'IN STOCK' },
+  ];
+
+  async function shelf() {
+    const controller = createWizardController({ api: fakeApi({ items: { list: vi.fn(async () => SHELF_ROWS) } }) });
+    await controller.loadCatalog();
+    controller.state.step = 'arsenal';
+    return controller;
+  }
+
+  it('separa arma branca de arma de fogo com etiqueta propria', async () => {
+    const controller = await shelf();
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    expect(root.innerHTML).toContain('>MELEE<');
+    expect(root.innerHTML).toContain('>DISTÂNCIA<');
+    // The skill, ROF and grip stop being a grey sentence and become chips.
+    expect(root.innerHTML).toContain('>Melee Weapon<');
+    expect(root.innerHTML).toContain('>ROF 2<');
+    expect(root.innerHTML).toContain('>MÃOS VARIAM<');
+    expect(root.innerHTML).toContain('>2 MÃOS<');
+    expect(root.innerHTML).toContain('>MAG 25<');
+    expect(root.innerHTML).toContain('>OCULTÁVEL<');
+  });
+
+  it('o dano da arma sai do texto cinza e vira selo proprio', async () => {
+    const controller = await shelf();
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    const badges = root.innerHTML.match(/data-wiz-dmg/g) || [];
+    // One badge per weapon on the shelf, and nothing else carries damage.
+    expect(badges).toHaveLength(2);
+    expect(root.innerHTML).toContain('>1d6<');
+    expect(root.innerHTML).toContain('>5d6<');
+    expect(root.innerHTML).toContain('text-cyber-red');
+  });
+
+  it('armadura mostra SP e a penalidade que ela cobra', async () => {
+    const controller = await shelf();
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    expect(root.innerHTML).toContain('>SP 15<');
+    expect(root.innerHTML).toContain('>-4 REF · DEX · MOVE<');
+    // Kevlar costs nothing to wear: say so instead of leaving a blank.
+    expect(root.innerHTML).toContain('>SP 7<');
+    expect(root.innerHTML).toContain('>SEM PENALIDADE<');
+  });
+
+  it('a etiqueta de categoria nao repete o nome da arma', async () => {
+    const controller = await shelf();
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    // "Light Melee Weapon" is both the name and the weapon class: the chip
+    // falls back to WEAPONS instead of printing the headline a second time.
+    expect(root.innerHTML).toContain('>WEAPONS<');
+    expect(root.innerHTML.match(/>Light Melee Weapon</g) || []).toHaveLength(1);
+    // A gun whose class differs from its name still shows the class.
+    expect(root.innerHTML).toContain('>Assault Rifle<');
+  });
+
+  it('municao mostra o calibre e o tamanho do pacote no preco', async () => {
+    const controller = await shelf();
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    expect(root.innerHTML).toContain('>Rifle<');
+    expect(root.innerHTML).toContain('10eb · x10');
+  });
+
+  it('a mochila e o resumo repetem o dano de cada arma comprada', async () => {
+    const controller = await shelf();
+    controller.handlers.buyGear('ASSAULT-RIFLE');
+    controller.handlers.buyGear('AGENT');
+    const root = { innerHTML: '' };
+
+    render(root, controller.state);
+    expect(root.innerHTML).toContain('Assault Rifle <em class="not-italic font-mono font-bold text-cyber-red">5d6</em>');
+
+    controller.state.step = 'review';
+    render(root, controller.state);
+    expect(root.innerHTML).toContain('Assault Rifle <em class="not-italic font-mono font-bold text-cyber-red">5d6</em>');
+    expect(root.innerHTML).toContain('Agent');
+  });
+});
+
 describe('passo de vida', () => {
   it('grava moradia, custo mensal e carencia na ficha', () => {
     const payload = buildCharacterPayload(completeDraft('sem teto'));
@@ -373,5 +543,39 @@ describe('passo de vida', () => {
     controller.handlers.setLifestyleDetail('monthlyCost', '3000');
     controller.handlers.setRole('Exec');
     expect(controller.state.draft.lifestyle).toMatchObject({ id: 'custom', housing: 'Cobertura no Corpo Plaza', monthlyCost: 3000 });
+  });
+});
+
+describe('scroll do corpo entre repaints', () => {
+  function fakeRoot({ scrollTop, shelfTop }) {
+    const body = {
+      scrollTop,
+      offsetTop: 100,
+      querySelector: (sel) => (sel === '[data-wiz-shelf]' && shelfTop !== null ? { offsetTop: 100 + shelfTop } : null),
+    };
+    return { body, querySelector: (sel) => (sel === '[data-wiz-body]' ? body : null) };
+  }
+
+  it('segue a prateleira quando a secao instalada cresce acima dela', () => {
+    const before = fakeRoot({ scrollTop: 400, shelfTop: 300 });
+    const offset = scrollAnchor(before);
+    // After the buy, "Instalado" pushed the shelf 120px further down.
+    const after = fakeRoot({ scrollTop: 0, shelfTop: 420 });
+    restoreScroll(after, offset);
+    expect(after.body.scrollTop).toBe(520);
+  });
+
+  it('sem prateleira, devolve o mesmo deslocamento', () => {
+    const offset = scrollAnchor(fakeRoot({ scrollTop: 250, shelfTop: null }));
+    const after = fakeRoot({ scrollTop: 0, shelfTop: null });
+    restoreScroll(after, offset);
+    expect(after.body.scrollTop).toBe(250);
+  });
+
+  it('no topo nao mexe em nada', () => {
+    const after = fakeRoot({ scrollTop: 0, shelfTop: 300 });
+    restoreScroll(after, scrollAnchor(fakeRoot({ scrollTop: 0, shelfTop: 300 })));
+    expect(after.body.scrollTop).toBe(0);
+    expect(scrollAnchor({ innerHTML: '' })).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { desktopHandlers, desktopRenderVals } from '../../../src/ui/views/desktop.js';
 
-const tx = { desktop: 'DESKTOP', market: 'MARKET', dice: 'DICE', inventory: 'INVENTORY', map: 'MAP', comms: 'COMMS', combat: 'COMBAT', miniGame: 'MINI-GAME', system: 'SYSTEM', depleted: 'DEPLETED', equipped: 'EQUIPPED', roll: 'ROLL', dmg: 'DMG', skill: 'SKILL', rof: 'ROF', mag: 'MAG', concealable: 'CONCEALABLE', halfSp: 'HALF SP', hands: 'HANDS', req: 'REQ', alreadyInstalled: 'INSTALLED', activeUnit: 'ACTIVE', insufficient: 'SHORT', shortBy: 'SHORT BY', addToGear: 'ADD', install: 'INSTALL', balanceAfterInstall: 'BALANCE', physicsOnline: 'PHYSICS ONLINE', rngFallback: 'RNG FALLBACK' };
+const tx = { desktop: 'DESKTOP', market: 'MARKET', dice: 'DICE', inventory: 'INVENTORY', map: 'MAP', comms: 'COMMS', combat: 'COMBAT', miniGame: 'MINI-GAME', system: 'SYSTEM', depleted: 'DEPLETED', equipped: 'EQUIPPED', roll: 'ROLL', dmg: 'DMG', skill: 'SKILL', rof: 'ROF', mag: 'MAG', concealable: 'CONCEALABLE', halfSp: 'HALF SP', hands: 'HANDS', req: 'REQ', alreadyInstalled: 'INSTALLED', activeUnit: 'ACTIVE', insufficient: 'SHORT', shortBy: 'SHORT BY', addToGear: 'ADD', install: 'INSTALL', balanceAfterInstall: 'BALANCE', blockedRequirement: 'REQUIREMENT NOT MET', requirementPending: 'REQUIREMENT PENDING', outOfStock: 'OUT OF STOCK', physicsOnline: 'PHYSICS ONLINE', rngFallback: 'RNG FALLBACK' };
 
 const mira = { id: 'mira', name: 'Mira', role: 'Solo', level: 2, roleAbilityRank: 4, ip: 30, initials: 'MI', notes: '', gear: [], credits: 500 };
 
@@ -27,6 +27,7 @@ function renderDeps(overrides = {}) {
     products: [],
     gearList: [],
     clockText: () => '12:00:00',
+    playerRoleTone: () => ({ label: 'SOL', color: '#ff5f6d', rgb: '255,95,109' }),
     scanlinesDefault: true,
     auraDefault: true,
     setState: vi.fn(),
@@ -36,6 +37,7 @@ function renderDeps(overrides = {}) {
     hasDamageProfile: (item) => !!(item && item.sides && item.count),
     gearDamageText: (item) => (item.dmg || ''),
     ignoresHalfSpBadge: () => false,
+    isMeleeWeapon: (item) => ['Melee Weapon', 'Martial Arts', 'Brawling'].includes(item && item.skill),
     effectMap: (map) => map || {},
     weaponProfile: (p) => ({ dmg: '', skill: '', rof: null, mag: null, hands: null, concealable: false, modes: [], special: '' }),
     normalizeEquipped: (equipped) => equipped || [],
@@ -116,11 +118,73 @@ describe('ui/views/desktop desktopRenderVals', () => {
     expect(go).not.toHaveBeenCalled();
   });
 
+  // A grip on the rim that says nothing about the sheet it opens is just a
+  // tab: it wears the operative's face, class colour and HP.
+  it('viste a alca lateral com o operativo ativo', () => {
+    const vals = desktopRenderVals(baseState({ authAuthenticated: true }), renderDeps());
+
+    expect(vals.sheetHandleVisible).toBe(true);
+    expect(vals.sheetHandleVars).toContain('--handle-accent:#ff5f6d');
+    expect(vals.sheetHandleVars).toContain('--handle-hp:86%');
+    expect(vals.sheetHandleVars).toContain('--handle-hp-color:#3fe0d0');
+    expect(vals.sheetHandleNoPortrait).toBe(true);
+    expect(vals.activeInitials).toBe('MI');
+  });
+
+  it('a alca mostra a foto real, nunca a arte gerada do assistente', () => {
+    const photo = desktopRenderVals(baseState(), renderDeps({ activeCharacter: { ...mira, portraitUrl: '/uploads/mira.png' } }));
+    expect(photo.sheetHandlePortrait).toBe('/uploads/mira.png');
+    expect(photo.sheetHandleHasPortrait).toBe(true);
+
+    const generated = desktopRenderVals(baseState(), renderDeps({ activeCharacter: { ...mira, portraitUrl: 'data:image/svg+xml,x' } }));
+    expect(generated.sheetHandlePortrait).toBe('');
+    expect(generated.sheetHandleNoPortrait).toBe(true);
+  });
+
+  // HP baixo repinta o fio da alca: da para ver o estado sem abrir a ficha.
+  it('o fio de HP da alca vira alerta quando o operativo esta caindo', () => {
+    const hurt = desktopRenderVals(baseState(), renderDeps({ healthCur: 6, healthMax: 35 }));
+    expect(hurt.sheetHandleVars).toContain('--handle-hp:17%');
+    expect(hurt.sheetHandleVars).toContain('--handle-hp-color:#c0635b');
+  });
+
+  it('a alca some com a gaveta aberta e no mapa da campanha', () => {
+    expect(desktopRenderVals(baseState({ authAuthenticated: true, sheetOpen: true }), renderDeps()).sheetHandleVisible).toBe(false);
+    expect(desktopRenderVals(baseState({ authAuthenticated: true, view: 'map' }), renderDeps()).sheetHandleVisible).toBe(false);
+  });
+
   it('builds character vitals and flags from the forwarded sheet data', () => {
     const vals = desktopRenderVals(baseState(), renderDeps());
     expect(vals.health).toEqual({ cur: 30, max: 35, pct: 86 });
     expect(vals.characterDetailVitals.find(v => v.label === 'IP').value).toBe('30');
     expect(vals.characterDetailFlags.find(v => v.label === 'CONDICOES').value).toBe('0');
+  });
+
+  it('tags each weapon by reach so the card is not one grey block of text', () => {
+    const gear = [
+      { id: 'g1', name: 'Katana', type: 'WEAPON - MELEE', skill: 'Melee Weapon', qty: 1, sides: 6, count: 3, rarity: '#fff' },
+      { id: 'g2', name: 'Assault Rifle', type: 'WEAPON - RANGED', skill: 'Shoulder Arms', qty: 1, sides: 6, count: 5, rarity: '#fff' },
+      { id: 'g3', name: 'Medtech Bag', type: 'GEAR', qty: 1, rarity: '#fff' },
+    ];
+    const vals = desktopRenderVals(baseState(), renderDeps({ normalizeGearList: () => gear }));
+
+    expect(vals.gear[0]).toMatchObject({ isMeleeWeapon: true, isRangedWeapon: false, dmgColor: '#c0635b' });
+    expect(vals.gear[1]).toMatchObject({ isMeleeWeapon: false, isRangedWeapon: true, dmgColor: '#c0635b' });
+    // Anything without a damage profile gets neither chip and stays dimmed.
+    expect(vals.gear[2]).toMatchObject({ isMeleeWeapon: false, isRangedWeapon: false, dmg: '—', dmgColor: '#3a3f33' });
+  });
+
+  it('uma arma sem pericia nem flag nao recebe etiqueta de alcance nenhuma', () => {
+    const gear = [{ id: 'g1', name: 'Arma Custom', type: 'WEAPON', qty: 1, sides: 6, count: 2, rarity: '#fff' }];
+    const vals = desktopRenderVals(baseState(), renderDeps({ normalizeGearList: () => gear }));
+    // Guessing "ranged" here is how a katana ends up labelled a rifle.
+    expect(vals.gear[0]).toMatchObject({ isMeleeWeapon: false, isRangedWeapon: false });
+  });
+
+  it('a flag melee sozinha ja classifica a arma', () => {
+    const gear = [{ id: 'g1', name: 'Mantis Blades', type: 'CYBERWEAPON', melee: true, qty: 1, sides: 6, count: 2, rarity: '#fff' }];
+    const vals = desktopRenderVals(baseState(), renderDeps({ normalizeGearList: () => gear, isMeleeWeapon: (item) => !!item.melee }));
+    expect(vals.gear[0]).toMatchObject({ isMeleeWeapon: true, isRangedWeapon: false });
   });
 
   it('filters inventory gear and gates management by canEditSheet', () => {
@@ -138,6 +202,41 @@ describe('ui/views/desktop desktopRenderVals', () => {
     const product = { code: 'AIR-SUPP', name: 'Air Supply', cat: 'INTERNAL', kind: 'cyberware', stock: 'IN STOCK', price: 100, statMod: { BODY: 1 }, skillBonus: {}, armor: 0, ram: 0, hcost: 2 };
     const vals = desktopRenderVals(baseState({ selected: product }), renderDeps({ products: [product] }));
     expect(vals.selected.cmp.some(row => row.label === 'BODY')).toBe(true);
+  });
+
+  it('says on the product page why an implant is locked, instead of only greying the button', () => {
+    const product = { code: 'GORILLA-ARMS', name: 'Gorilla Arms', cat: 'LIMBS', kind: 'cyberware', stock: 'IN STOCK', price: 100 };
+    const previewInstall = vi.fn(() => ({
+      ok: false, reason: 'requirements', label: 'REQUISITO NAO CUMPRIDO',
+      message: 'Gorilla Arms precisa de 2x Cyberarm instalado (voce tem 0).', issues: [{ type: 'required_cyberware_count_missing' }],
+    }));
+    const vals = desktopRenderVals(baseState({ selected: product }), renderDeps({ products: [product], previewInstall }));
+
+    expect(previewInstall).toHaveBeenCalledWith(product);
+    expect(vals.selected.hasBlock).toBe(true);
+    expect(vals.selected.blockLabel).toBe('REQUIREMENT NOT MET');
+    expect(vals.selected.blockMessage).toContain('2x Cyberarm');
+    expect(vals.selected.buyLabel).toBe('REQUIREMENT PENDING');
+    expect(vals.selected.buyStyle).toContain('lm-market-buy-btn--off');
+  });
+
+  it('leaves the buy button alone when nothing blocks the install', () => {
+    const product = { code: 'AIR-SUPP', name: 'Air Supply', cat: 'INTERNAL', kind: 'cyberware', stock: 'IN STOCK', price: 100 };
+    const previewInstall = vi.fn(() => ({ ok: true, reason: null, label: '', message: '', issues: [] }));
+    const vals = desktopRenderVals(baseState({ selected: product }), renderDeps({ products: [product], previewInstall }));
+
+    expect(vals.selected.hasBlock).toBe(false);
+    expect(vals.selected.buyStyle).toContain('lm-market-buy-btn--on');
+  });
+
+  it('explains a price the operative cannot pay, and never asks the engine about it', () => {
+    const product = { code: 'BORG', name: 'Full Borg', cat: 'BORG', kind: 'cyberware', stock: 'IN STOCK', price: 99999 };
+    const previewInstall = vi.fn();
+    const vals = desktopRenderVals(baseState({ selected: product }), renderDeps({ products: [product], previewInstall }));
+
+    expect(previewInstall).not.toHaveBeenCalled();
+    expect(vals.selected.blockLabel).toBe('SHORT');
+    expect(vals.selected.blockMessage).toContain('SHORT BY');
   });
 
   it('keeps system-profile rows off the market shelf and out of its counts', () => {
@@ -243,6 +342,7 @@ function fakeComponent(overrides = {}) {
     roll: vi.fn(),
     combatHandlers: () => ({ combatDamageContributions: vi.fn(() => []), useCombatUtility: vi.fn() }),
     nexusHandlers: () => ({ teardownNexus: vi.fn(), mountNexus: vi.fn() }),
+    tarotHandlers: () => ({ ensureTarotFx: vi.fn() }),
     gearList: [],
     ...overrides,
   };
@@ -313,10 +413,13 @@ describe('ui/views/desktop desktopHandlers', () => {
   });
 
   it('selectGameTab tears down Nexus when leaving it and mounts it when entering', () => {
-    const component = fakeComponent();
+    const ensureTarotFx = vi.fn();
+    const component = fakeComponent({ tarotHandlers: () => ({ ensureTarotFx }) });
     desktopHandlers(component).selectGameTab('tarot');
     expect(component.nexusHandlers().teardownNexus).not.toBeUndefined();
     expect(component.state.gameTab).toBe('tarot');
+    // Coming back to the tarot tab remounts the canvas, so the FX has to restart.
+    expect(ensureTarotFx).toHaveBeenCalled();
 
     const mountNexus = vi.fn();
     const teardownNexus = vi.fn();

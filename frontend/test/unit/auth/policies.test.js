@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { canManageOwnSheet, isAdmin, isPlayerUser } from '../../../src/domain/auth/policies.ts';
+import { canManageOwnSheet, canUploadImage, isAdmin, isPlayerUser } from '../../../src/domain/auth/policies.ts';
 
 describe('domain/auth/policies', () => {
   describe('isAdmin', () => {
@@ -46,6 +46,30 @@ describe('domain/auth/policies', () => {
     it('a GM/admin session (not isPlayerUser) can never manage via this policy', () => {
       const gmSession = { authAuthenticated: true, authUser: { role: 'gm' }, activeCharacterId: 'char-1' };
       expect(canManageOwnSheet(gmSession, 'char-1')).toBe(false);
+    });
+  });
+
+  describe('canUploadImage', () => {
+    const player = { authAuthenticated: true, authUser: { role: 'player' }, activeCharacterId: 'char-1' };
+
+    it('lets staff upload anything', () => {
+      expect(canUploadImage(null, { staff: true, scope: 'map-image', ownerId: 'current-map' })).toBe(true);
+    });
+    it('lets a player set the portrait of the sheet they are playing', () => {
+      expect(canUploadImage(player, { scope: 'character-portrait', ownerId: 'char-1' })).toBe(true);
+    });
+    it('refuses a player the portrait of someone else', () => {
+      expect(canUploadImage(player, { scope: 'character-portrait', ownerId: 'char-2' })).toBe(false);
+    });
+    it('refuses a portrait upload with no owner, so an empty id is never a wildcard', () => {
+      expect(canUploadImage(player, { scope: 'character-portrait', ownerId: '' })).toBe(false);
+    });
+    it('refuses every other scope to a player', () => {
+      expect(canUploadImage(player, { scope: 'map-image', ownerId: 'char-1' })).toBe(false);
+      expect(canUploadImage(player, { scope: 'item-image', ownerId: 'char-1' })).toBe(false);
+    });
+    it('refuses an anonymous session', () => {
+      expect(canUploadImage(null, { scope: 'character-portrait', ownerId: 'char-1' })).toBe(false);
     });
   });
 });

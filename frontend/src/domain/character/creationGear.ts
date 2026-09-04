@@ -7,7 +7,7 @@
 // because installing it has rules of its own; this module is a plain shop.
 
 import { isPurchasableProduct } from '../items/itemNormalizers.ts';
-import { weaponProfile } from '../items/weaponProfileEngine.ts';
+import { isMeleeWeapon, weaponProfile } from '../items/weaponProfileEngine.ts';
 import type { LegacyCatalogItem } from '../items/legacyCatalogTypes.ts';
 
 /**
@@ -29,6 +29,40 @@ export interface GearItem {
   dmg: string;
   /** Units in one purchase: ammunition is sold in boxes of ten (p.94/344). */
   packSize: number;
+  /** Weapon facets, empty/null for anything that is not a weapon. */
+  skill: string;
+  rof: number | null;
+  /** `1`, `2` or `varies` (melee weapons pick by BODY); empty when unknown. */
+  hands: string;
+  mag: number | null;
+  concealable: boolean;
+  /** True for anything swung or punched: Melee Weapon, Brawling, Martial Arts. */
+  melee: boolean;
+  /** Armor facets: Stopping Power and the REF/DEX/MOVE penalty (0 when none). */
+  sp: number | null;
+  armorPenalty: number;
+  /** Ammunition facet: the caliber this box feeds. */
+  ammoType: string;
+}
+
+interface ArmorFacet {
+  sp: number | null;
+  armorPenalty: number;
+}
+
+/**
+ * Stopping Power and penalty from the catalog's armor block. Head and body
+ * share one SP on every RAW piece, so the body value is the headline; the
+ * penalty is the same number on REF, DEX and MOVE, so one integer is enough.
+ */
+function armorFacet(row: Record<string, unknown>): ArmorFacet {
+  const armor = row.armor && typeof row.armor === 'object' ? row.armor as Record<string, unknown> : null;
+  if (!armor) return { sp: null, armorPenalty: 0 };
+  const sp = armor.bodySP ?? armor.headSP ?? armor.sp;
+  const penalty = armor.armorPenalty && typeof armor.armorPenalty === 'object'
+    ? Math.min(0, ...Object.values(armor.armorPenalty as Record<string, unknown>).map((v) => toInt(v, 0)))
+    : toInt(armor.armorPenalty, 0);
+  return { sp: sp == null ? null : toInt(sp, 0), armorPenalty: Math.min(0, penalty) };
 }
 
 export interface GearPick extends GearItem {
@@ -51,6 +85,10 @@ export function normalizeGearItem(raw: unknown): GearItem | null {
   if (!code) return null;
   const profile = weaponProfile(row as LegacyCatalogItem);
   const cat = toText(row.cat || row.category).toUpperCase();
+  const isWeapon = cat === 'WEAPONS' || row.kind === 'weapon';
+  const skill = isWeapon ? toText(profile.skill) : '';
+  const rof = isWeapon && profile.rof != null && profile.rof !== '' ? toInt(profile.rof, 0) || null : null;
+  const armor = cat === 'ARMOR' ? armorFacet(row) : { sp: null, armorPenalty: 0 };
   return {
     code,
     name: toText(row.name) || code,
@@ -61,6 +99,15 @@ export function normalizeGearItem(raw: unknown): GearItem | null {
     stock: toText(row.stock) || 'IN STOCK',
     dmg: toText(profile.dmg),
     packSize: Math.max(1, toInt(row.packSize, 1)),
+    skill,
+    rof,
+    hands: isWeapon && profile.hands != null ? toText(profile.hands) : '',
+    mag: isWeapon && profile.mag != null ? toInt(profile.mag, 0) || null : null,
+    concealable: isWeapon && profile.concealable,
+    melee: isWeapon && isMeleeWeapon(profile),
+    sp: armor.sp,
+    armorPenalty: armor.armorPenalty,
+    ammoType: cat === 'AMMUNITION' ? toText(row.ammoType) : '',
   };
 }
 
@@ -149,6 +196,32 @@ export function gearBlock(
   return null;
 }
 
+/** Short tag for the blocked card — the headline above the explanation. */
+export function gearBlockLabel(reason: GearBlockReason): string {
+  if (!reason) return '';
+  if (reason === 'soldout') return 'ESGOTADO';
+  if (reason === 'funds') return 'SEM SALDO';
+  return 'SEM PREÇO';
+}
+
+/**
+ * The same reason written for the tag on the card, where the item's name is
+ * already on screen: what to do about it, not who it is about.
+ */
+export function gearBlockDetail(
+  reason: GearBlockReason,
+  item: GearItem | null | undefined,
+  { cashLeft = 0 }: GearContext = {},
+): string {
+  if (!reason) return '';
+  if (reason === 'soldout') return 'Esgotado no catálogo.';
+  if (reason === 'funds') {
+    const short = Math.max(0, Math.trunc(((item && item.price) || 0) - (Number(cashLeft) || 0)));
+    return short ? `Faltam ${short}eb. Venda outra compra ou fique sem ele.` : 'Sem eurodólares para esta compra.';
+  }
+  return 'Sem preço no catálogo: não dá para comprar aqui.';
+}
+
 export function gearBlockMessage(reason: GearBlockReason, item: GearItem | null | undefined): string {
   const name = (item && item.name) || 'Este item';
   if (!reason) return '';
@@ -196,6 +269,13 @@ export interface GearRow {
   packSize: number;
   notes: string;
   equipped: boolean;
+  /** Weapon facets carried through so the sheet does not print "—" for them. */
+  skill: string;
+  rof: number | null;
+  mag: number | null;
+  hands: string;
+  concealable: boolean;
+  melee: boolean;
 }
 
 /**
@@ -215,5 +295,11 @@ export function gearInventory(picks: GearPick[] | null | undefined): GearRow[] {
     packSize: pick.packSize,
     notes: pick.packSize > 1 ? `pacote com ${pick.packSize} · ${pick.desc}`.trim() : pick.desc,
     equipped: false,
+    skill: pick.skill,
+    rof: pick.rof,
+    mag: pick.mag,
+    hands: pick.hands,
+    concealable: pick.concealable,
+    melee: pick.melee,
   }));
 }

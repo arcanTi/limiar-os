@@ -1,6 +1,6 @@
 """Character commands and queries."""
 
-from ..domain.access import is_staff, owns_character
+from ..domain.access import controls_character, is_staff
 from ..domain.validation import validate_character, validate_character_creation
 from .errors import ApplicationError
 from .ports import CampaignAccessRepository, Record, RecordRepository, Session
@@ -22,6 +22,17 @@ class CharacterService:
         self.records = records
         self.campaigns = campaigns
 
+    def _delegated_ids(self, session: Session) -> list[str]:
+        """Characters a GM handed this session control of, across all tables."""
+        lookup = getattr(self.campaigns, "delegated_character_ids", None)
+        if not callable(lookup):
+            return []
+        return list(lookup(session["username"]))
+
+    def _controls(self, record: Record | None, session: Session) -> bool:
+        """Owner, or the stand-in covering for an absent player."""
+        return controls_character(record, session, self._delegated_ids(session))
+
     def list(self, session: Session, campaign_id: str = "") -> list[Record]:
         # Deliberately never raises for an unknown or unjoined campaign: a
         # player lands here mid-onboarding, before the join, and an empty list
@@ -30,7 +41,8 @@ class CharacterService:
         records = self.records.list("characters", campaign_id)
         if is_staff(session) and (not campaign_id or self._is_member(campaign_id, session)):
             return records
-        return [r for r in records if owns_character(r, session)]
+        delegated = self._delegated_ids(session)
+        return [r for r in records if controls_character(r, session, delegated)]
 
     def get(self, record_id: str, session: Session) -> Record:
         record = self._require(record_id)
@@ -59,15 +71,23 @@ class CharacterService:
         if campaign_id:
             self._joinable(campaign_id, session)
         current = self.records.get("characters", str(payload.get("id") or ""))
-        if current and not owns_character(current, session):
+        if current and not self._controls(current, session):
             raise ApplicationError(403, "Character access denied")
         if current is None:
             # Creation is the only moment the CPR starting budget applies.
             validate_character_creation(payload)
+        # A stand-in plays the sheet, it does not inherit it: an existing
+        # document keeps the owner it already had, and only a brand new one is
+        # stamped with the author.
+        owner = (
+            str(current.get("ownerUsername") or current.get("createdBy") or "")
+            if current
+            else ""
+        )
         stamped = {
             **payload,
             "schemaVersion": int(payload.get("schemaVersion") or 1),
-            "ownerUsername": session["username"],
+            "ownerUsername": owner or session["username"],
             "createdBy": current.get("createdBy") if current else session["username"],
             "campaignId": self._scope_of(current, campaign_id),
         }
@@ -104,7 +124,7 @@ class CharacterService:
         return record
 
     def _require_read(self, record: Record, session: Session) -> None:
-        if owns_character(record, session):
+        if self._controls(record, session):
             return
         scope = str(record.get("campaignId") or "")
         if is_staff(session) and (not scope or self._is_member(scope, session)):

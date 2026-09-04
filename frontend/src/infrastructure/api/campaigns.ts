@@ -19,6 +19,12 @@ export function createCampaignsApi(request: HttpRequest, waitForCampaignEvent?: 
       request(campaignPath(campaignId, '/invites/' + encodeURIComponent(username)), { method: 'DELETE' }),
     removeMember: async (campaignId: string, username: string): Promise<unknown> =>
       request(campaignPath(campaignId, '/members/' + encodeURIComponent(username)), { method: 'DELETE' }),
+    // Stand-in control of an absent player's sheet, granted and taken back by
+    // the GM of this table.
+    grantControl: async (campaignId: string, characterId: string, username: string): Promise<unknown> =>
+      request(campaignPath(campaignId, '/delegations'), { method: 'POST', body: JSON.stringify({ characterId, username }) }),
+    revokeControl: async (campaignId: string, characterId: string): Promise<unknown> =>
+      request(campaignPath(campaignId, '/delegations/' + encodeURIComponent(characterId)), { method: 'DELETE' }),
     join: async (campaignId: string, characterIdOrPayload: string | Record<string, unknown>): Promise<unknown> => {
       const payload = typeof characterIdOrPayload === 'string' ? { characterId: characterIdOrPayload } : characterIdOrPayload;
       return request(campaignPath(campaignId, '/join'), { method: 'POST', body: JSON.stringify(payload || {}) });

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   addGear,
   gearBlock,
+  gearBlockDetail,
+  gearBlockLabel,
   gearBlockMessage,
   gearCatalog,
   gearCount,
@@ -57,8 +59,59 @@ describe('prateleira da criacao', () => {
     expect(byCode('ASSAULT-RIFLE').packSize).toBe(1);
   });
 
+  it('a ficha recebe pericia, ROF e alcance junto com o item comprado', () => {
+    const catalog = gearCatalog([
+      { code: 'KATANA', name: 'Katana', cat: 'WEAPONS', kind: 'weapon', skill: 'Melee Weapon', price: 100, dmg: '3d6', rof: 2, hands: 'varies', concealable: false },
+    ]);
+    const picks = addGear([], catalog[0], rich);
+    const [row] = gearInventory(picks);
+    // Without these the sheet printed "—" for skill and ROF, and could not
+    // tell a katana from a rifle.
+    expect(row).toMatchObject({ skill: 'Melee Weapon', rof: 2, hands: 'varies', melee: true, concealable: false, mag: null });
+  });
+
   it('carrega o perfil de dano do catalogo', () => {
     expect(byCode('ASSAULT-RIFLE')).toMatchObject({ dmg: '5d6', type: 'Assault Rifle' });
+  });
+
+  it('marca arma branca como melee e arma de fogo como distancia', () => {
+    const catalog = gearCatalog([
+      { code: 'LIGHT-MELEE', name: 'Light Melee Weapon', cat: 'WEAPONS', kind: 'weapon', skill: 'Melee Weapon', price: 50, dmg: '1d6', rof: 2, hands: 'varies', concealable: true },
+      { code: 'SNIPER', name: 'Sniper Rifle', cat: 'WEAPONS', kind: 'weapon', skill: 'Shoulder Arms', price: 500, dmg: '5d6', rof: 1, hands: 2, mag: 4 },
+      { code: 'FISTS', name: 'Brawling', cat: 'WEAPONS', kind: 'weapon', skill: 'Brawling', price: 10, dmg: '2d6', rof: 2, hands: 0 },
+    ]);
+    const at = (code) => catalog.find((item) => item.code === code);
+    expect(at('LIGHT-MELEE')).toMatchObject({ melee: true, skill: 'Melee Weapon', rof: 2, hands: 'varies', concealable: true, mag: null });
+    expect(at('SNIPER')).toMatchObject({ melee: false, skill: 'Shoulder Arms', rof: 1, hands: '2', mag: 4, concealable: false });
+    // Brawling is melee by its skill even without an explicit flag on the row.
+    expect(at('FISTS').melee).toBe(true);
+  });
+
+  it('le SP e penalidade da armadura, e nada disso vaza para outras categorias', () => {
+    const catalog = gearCatalog([
+      { code: 'FLAK', name: 'Flak', cat: 'ARMOR', price: 500, armor: { headSP: 15, bodySP: 15, armorPenalty: { REF: -4, DEX: -4, MOVE: -4 } } },
+      { code: 'KEVLAR', name: 'Kevlar', cat: 'ARMOR', price: 50, armor: { headSP: 7, bodySP: 7, armorPenalty: { REF: 0, DEX: 0, MOVE: 0 } } },
+      { code: 'AMMO-RIFLE', name: 'Rifle Ammunition', cat: 'AMMUNITION', ammoType: 'Rifle', packSize: 10, price: 10 },
+      { code: 'AGENT', name: 'Agent', cat: 'GEAR', price: 100 },
+    ]);
+    const at = (code) => catalog.find((item) => item.code === code);
+    expect(at('FLAK')).toMatchObject({ sp: 15, armorPenalty: -4 });
+    expect(at('KEVLAR')).toMatchObject({ sp: 7, armorPenalty: 0 });
+    expect(at('AMMO-RIFLE')).toMatchObject({ sp: null, armorPenalty: 0, ammoType: 'Rifle', melee: false });
+    expect(at('AGENT')).toMatchObject({ sp: null, skill: '', rof: null, ammoType: '' });
+  });
+
+  it('o catalogo real classifica cada arma vendida como melee ou de distancia', () => {
+    const weapons = gearCatalog(seed.items).filter((item) => item.cat === 'WEAPONS');
+    expect(weapons.length).toBeGreaterThan(0);
+    for (const weapon of weapons) {
+      expect(weapon.dmg).toMatch(/^\d+d\d+/);
+      expect(weapon.skill).not.toBe('');
+    }
+    const melee = weapons.filter((item) => item.melee).map((item) => item.code);
+    expect(melee).toContain('LIGHT-MELEE');
+    expect(melee).toContain('VERY-HEAVY-MELEE');
+    expect(melee).not.toContain('ASSAULT-RIFLE');
   });
 });
 
@@ -89,6 +142,15 @@ describe('compra e venda', () => {
 
   it('respeita o estoque', () => {
     expect(gearBlock([], byCode('SOLD-OUT-GUN'), rich)).toBe('soldout');
+  });
+
+  it('o aviso da carta conta quanto falta, sem repetir o nome do item', () => {
+    expect(gearBlockLabel('funds')).toBe('SEM SALDO');
+    expect(gearBlockDetail('funds', byCode('ASSAULT-RIFLE'), { cashLeft: 400 }))
+      .toBe('Faltam 100eb. Venda outra compra ou fique sem ele.');
+    expect(gearBlockDetail('soldout', byCode('SOLD-OUT-GUN'))).toBe('Esgotado no catálogo.');
+    expect(gearBlockDetail(null, byCode('AGENT'))).toBe('');
+    expect(gearBlockLabel(null)).toBe('');
   });
 });
 

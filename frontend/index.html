@@ -97,38 +97,126 @@
       </div>
 
 	      <sc-if value="{{ notGm }}">
+	        <!-- MESA: the party read as characters - face, name, class, class
+	             colour - with the player who drives each one underneath. Only
+	             your own seat is a button, and it just opens your own sheet: no
+	             seat ever switches who you control. -->
+	        <sc-if value="{{ hasTableSeats }}">
+	          <div class="lm-player-select-panel">
+	            <div class="lm-player-select-head">
+	              <div class="lm-player-select-title">MESA // {{ tableName }}</div>
+	              <div class="lm-player-select-mode">{{ tableSeatCount }} NA MESA</div>
+	            </div>
+	            <div class="lm-table-seat-row">
+	              <sc-for list="{{ tableSeatCards }}" as="seat" hint-placeholder-count="3">
+	                <sc-if value="{{ seat.isNotSelf }}">
+	                  <div class="{{ seat.style }}" style="{{ seat.vars }}">
+	                    <span class="lm-table-seat-avatar">
+	                      <sc-if value="{{ seat.hasPortrait }}"><img data-src="{{ seat.portraitUrl }}" alt="" class="lm-table-seat-img" /></sc-if>
+	                      <sc-if value="{{ seat.noPortrait }}"><span class="lm-table-seat-initials">{{ seat.initials }}</span></sc-if>
+	                      <span class="lm-table-seat-tag">{{ seat.roleTag }}</span>
+	                    </span>
+	                    <span class="lm-table-seat-body">
+	                      <span class="lm-table-seat-name">{{ seat.title }}</span>
+	                      <span class="lm-table-seat-class">{{ seat.classLabel }}</span>
+	                      <sc-if value="{{ seat.showPlayerLine }}"><span class="lm-table-seat-player">{{ seat.playerLine }}</span></sc-if>
+	                      <sc-if value="{{ seat.isCovered }}"><span class="lm-table-seat-cover">{{ seat.coverLabel }}</span></sc-if>
+	                    </span>
+	                  </div>
+	                </sc-if>
+	                <sc-if value="{{ seat.isSelf }}">
+	                  <button onClick="{{ seat.onClick }}" class="{{ seat.style }} lm-table-seat--btn" style="{{ seat.vars }}" style-hover="--seat-bg:rgba(var(--seat-rgb),.14);--seat-border:var(--seat-accent);">
+	                    <span class="lm-table-seat-avatar">
+	                      <sc-if value="{{ seat.hasPortrait }}"><img data-src="{{ seat.portraitUrl }}" alt="" class="lm-table-seat-img" /></sc-if>
+	                      <sc-if value="{{ seat.noPortrait }}"><span class="lm-table-seat-initials">{{ seat.initials }}</span></sc-if>
+	                      <span class="lm-table-seat-tag">{{ seat.roleTag }}</span>
+	                    </span>
+	                    <span class="lm-table-seat-body">
+	                      <span class="lm-table-seat-name">{{ seat.title }}</span>
+	                      <span class="lm-table-seat-class">{{ seat.classLabel }}</span>
+	                      <sc-if value="{{ seat.showPlayerLine }}"><span class="lm-table-seat-player">{{ seat.playerLine }}</span></sc-if>
+	                      <sc-if value="{{ seat.isCovered }}"><span class="lm-table-seat-cover">{{ seat.coverLabel }}</span></sc-if>
+	                    </span>
+	                    <span class="lm-table-seat-open">{{ seat.openLabel }}</span>
+	                  </button>
+	                </sc-if>
+	              </sc-for>
+	            </div>
+	          </div>
+	        </sc-if>
+
+	        <!-- SUA FICHA: only when the seat above cannot already stand for it -
+	             a sheet lent to you, no sheet yet, or no table at all. -->
+	        <sc-if value="{{ showOwnSheetPanel }}">
 	        <div class="lm-player-select-panel">
 	          <div class="lm-player-select-head">
-	            <div class="lm-player-select-title">ESCOLHA SEU OPERATIVO</div>
+	            <div class="lm-player-select-title">SUA FICHA</div>
 	            <div class="lm-player-select-mode">PLAYER ACCESS // OWN FILES</div>
 	          </div>
 	          <div class="lm-player-select-grid">
-	            <sc-for list="{{ playerCharacterCards }}" as="pc" hint-placeholder-count="3">
-	              <button onClick="{{ pc.onClick }}" class="{{ pc.style }}" style="{{ pc.vars }}" style-hover="--pc-border:var(--pc-accent);--pc-bg:rgba(var(--pc-rgb),.13);">
+	            <sc-if value="{{ hasMyOperative }}">
+	              <button onClick="{{ myOperativeCard.onClick }}" class="{{ myOperativeCard.style }}" style="{{ myOperativeCard.vars }}" style-hover="--pc-border:var(--pc-accent);--pc-bg:rgba(var(--pc-rgb),.13);">
 	                <span class="lm-player-card-glow"></span>
+	                <sc-if value="{{ myOperativeCard.hasPortrait }}"><span class="lm-player-card-bleed" style="background-image:url({{ myOperativeCard.portrait }});"></span></sc-if>
 	                <span class="lm-player-card-top">
-	                  <span class="lm-player-card-initials">{{ pc.initials }}</span>
-	                  <span class="lm-player-card-role">{{ pc.roleTag }}</span>
+	                  <sc-if value="{{ myOperativeCard.hasPortrait }}"><img class="lm-player-card-portrait" alt="" data-src="{{ myOperativeCard.portrait }}" /></sc-if>
+	                  <sc-if value="{{ myOperativeCard.noPortrait }}"><span class="lm-player-card-initials">{{ myOperativeCard.initials }}</span></sc-if>
+	                  <span class="lm-player-card-role">{{ myOperativeCard.roleTag }}</span>
 	                </span>
 	                <span class="lm-player-card-body">
-	                  <span class="lm-player-card-name">{{ pc.name }}</span>
-	                  <span class="lm-player-card-meta"><span>{{ pc.role }}</span><span>LVL {{ pc.level }}</span></span>
+	                  <span class="lm-player-card-name">{{ myOperativeCard.name }}</span>
+	                  <span class="lm-player-card-meta"><span>{{ myOperativeCard.role }}</span><span>LVL {{ myOperativeCard.level }}</span></span>
 	                </span>
 	                <span class="lm-player-card-foot">
 	                  <span class="lm-player-card-signal"></span>
-	                  <span>{{ pc.status }}</span>
+	                  <span>{{ myOperativeCard.status }}</span>
 	                </span>
 	              </button>
-	            </sc-for>
-	            <button onClick="{{ createPlayerCharacter }}" class="lm-player-create-card" style-hover="--create-bg:rgba(63,224,208,.12);--create-border:#3fe0d0;">
-	              <span class="lm-player-create-plus">+</span>
-	              <span class="lm-player-create-body">
-	                <span class="lm-player-create-title">CRIAR OPERATIVO</span>
-	                <span class="lm-player-create-sub">CYBERPUNK RED // ASSISTENTE GUIADO</span>
-	              </span>
-	            </button>
+	            </sc-if>
+	            <sc-if value="{{ missingMyOperative }}">
+	              <button onClick="{{ createPlayerCharacter }}" class="lm-player-create-card" style-hover="--create-bg:rgba(63,224,208,.12);--create-border:#3fe0d0;">
+	                <span class="lm-player-create-plus">+</span>
+	                <span class="lm-player-create-body">
+	                  <span class="lm-player-create-title">CRIAR OPERATIVO</span>
+	                  <span class="lm-player-create-sub">CYBERPUNK RED // ASSISTENTE GUIADO</span>
+	                </span>
+	              </button>
+	            </sc-if>
 	          </div>
         </div>
+	        </sc-if>
+
+	        <!-- COBRINDO: sheets of absent players this GM handed over. Clicking
+	             one takes control of it; the own-sheet card above takes it back. -->
+	        <sc-if value="{{ hasDelegatedCards }}">
+	          <div class="lm-player-select-panel lm-player-select-panel--delegated">
+	            <div class="lm-player-select-head">
+	              <div class="lm-player-select-title">VOCE ESTA COBRINDO</div>
+	              <div class="lm-player-select-mode">{{ delegatedCount }} FICHA(S) // CEDIDA(S) PELO MESTRE</div>
+	            </div>
+	            <div class="lm-player-select-grid">
+	              <sc-for list="{{ delegatedCards }}" as="pc" hint-placeholder-count="1">
+	                <button onClick="{{ pc.onClick }}" class="{{ pc.style }}" style="{{ pc.vars }}" style-hover="--pc-border:var(--pc-accent);--pc-bg:rgba(var(--pc-rgb),.13);">
+  	                <span class="lm-player-card-glow"></span>
+  	                <sc-if value="{{ pc.hasPortrait }}"><span class="lm-player-card-bleed" style="background-image:url({{ pc.portrait }});"></span></sc-if>
+  	                <span class="lm-player-card-top">
+  	                  <sc-if value="{{ pc.hasPortrait }}"><img class="lm-player-card-portrait" alt="" data-src="{{ pc.portrait }}" /></sc-if>
+  	                  <sc-if value="{{ pc.noPortrait }}"><span class="lm-player-card-initials">{{ pc.initials }}</span></sc-if>
+  	                  <span class="lm-player-card-role">{{ pc.roleTag }}</span>
+  	                </span>
+	                  <span class="lm-player-card-body">
+	                    <span class="lm-player-card-name">{{ pc.name }}</span>
+	                    <span class="lm-player-card-meta"><span>{{ pc.coverLabel }}</span><span>LVL {{ pc.level }}</span></span>
+	                  </span>
+	                  <span class="lm-player-card-foot">
+	                    <span class="lm-player-card-signal"></span>
+	                    <span>{{ pc.status }}</span>
+	                  </span>
+	                </button>
+	              </sc-for>
+	            </div>
+	          </div>
+	        </sc-if>
       </sc-if>
 
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:34px;">
@@ -453,6 +541,8 @@
               <div style="background:#080a07;border:1px solid rgba(214,170,78,0.1);padding:7px;"><div style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;letter-spacing:1px;">QTD</div><div style="font:700 13px 'Share Tech Mono',monospace;color:#f0ead8;">{{ g.qtyLabel }}</div></div>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;">
+              <sc-if value="{{ g.isMeleeWeapon }}"><span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#d6aa4e;border:1px solid rgba(214,170,78,.55);background:rgba(214,170,78,.12);padding:3px 6px;">{{ tx.meleeReach }}</span></sc-if>
+              <sc-if value="{{ g.isRangedWeapon }}"><span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#3fe0d0;border:1px solid rgba(63,224,208,.55);background:rgba(63,224,208,.12);padding:3px 6px;">{{ tx.rangedReach }}</span></sc-if>
               <sc-if value="{{ g.isConcealable }}"><span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#3fe0d0;border:1px solid rgba(63,224,208,.35);padding:3px 6px;">{{ tx.concealable }}</span></sc-if>
               <sc-if value="{{ g.halfSp }}"><span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#d6aa4e;border:1px solid rgba(214,170,78,.4);padding:3px 6px;">{{ tx.halfSp }}</span></sc-if>
               <sc-if value="{{ g.hasReqWarning }}"><span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#c0635b;border:1px solid rgba(192,99,91,.45);padding:3px 6px;">{{ tx.req }} {{ g.reqWarning }}</span></sc-if>
@@ -2150,11 +2240,13 @@
         <sc-if value="{{ canEditSheet }}">
           <div class="px-4 pb-4 space-y-1.5 mt-auto">
             <div class="flex gap-1.5 flex-wrap">
-              <sc-for list="{{ sheetCharacterBtns }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.onClick }}" class="{{ c.style }}">{{ c.label }}</button></sc-for>
+              <sc-if value="{{ showCharacterSwitcher }}">
+                <sc-for list="{{ sheetCharacterBtns }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.onClick }}" class="{{ c.style }}">{{ c.label }}</button></sc-for>
+              </sc-if>
             </div>
             <sc-if value="{{ notSheetEditing }}">
               <div class="flex gap-1.5">
-                <button onClick="{{ createSheetCharacter }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact lm-ui-btn--full">{{ tx.newCharacter }}</button>
+                <sc-if value="{{ showNewSheetButton }}"><button onClick="{{ createSheetCharacter }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact lm-ui-btn--full">{{ tx.newCharacter }}</button></sc-if>
                 <button onClick="{{ editSheet }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact lm-ui-btn--full">{{ tx.editSheet }}</button>
               </div>
               <sc-if value="{{ canExportSheetPdf }}">
@@ -2197,9 +2289,10 @@
             <div class="lm-roster-grid">
               <sc-for list="{{ rosterCards }}" as="rc" hint-placeholder-count="4">
                 <div class="{{ rc.style }}" style="{{ rc.vars }}">
-                  <button onClick="{{ rc.onSelect }}" class="lm-roster-card-main">
+                  <button onClick="{{ rc.onSelect }}" class="lm-roster-card-main" title="Tornar ativo">
                     <span class="lm-roster-card-id">
-                      <span class="lm-roster-initials">{{ rc.initials }}</span>
+                      <sc-if value="{{ rc.hasPortrait }}"><img data-src="{{ rc.portrait }}" alt="" class="lm-roster-portrait" /></sc-if>
+                      <sc-if value="{{ rc.noPortrait }}"><span class="lm-roster-initials">{{ rc.initials }}</span></sc-if>
                       <span class="lm-roster-kind">{{ rc.kindLabel }}</span>
                     </span>
                     <span class="lm-roster-card-body">
@@ -2210,6 +2303,12 @@
                       <sc-if value="{{ rc.hasConditions }}"><span class="lm-roster-cond">{{ rc.conditionLabel }}</span></sc-if>
                     </span>
                   </button>
+                  <!-- Quick actions: make this sheet active AND jump the console to the matching tab. -->
+                  <div class="lm-roster-card-actions">
+                    <button onClick="{{ rc.onCondition }}" title="Atribuir lesao ou efeito" class="lm-roster-action lm-roster-action--cond"><i class="fa-solid fa-heart-crack"></i> CONDICAO</button>
+                    <button onClick="{{ rc.onItem }}" title="Entregar item" class="lm-roster-action lm-roster-action--item"><i class="fa-solid fa-box-open"></i> ITEM</button>
+                    <button onClick="{{ rc.onNet }}" title="Pedir teste de netrunning" class="lm-roster-action lm-roster-action--net"><i class="fa-solid fa-network-wired"></i> NET</button>
+                  </div>
                   <div class="lm-roster-card-foot">
                     <span class="lm-roster-state">{{ rc.statusLabel }}</span>
                     <button onClick="{{ rc.onDelete }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">DEL</button>
@@ -2222,81 +2321,143 @@
                 <div class="lm-roster-console-head">
                   <span class="lm-roster-console-title">CONSOLE RAPIDO // {{ rosterActiveName }}</span>
                   <span class="lm-roster-console-meta">{{ rosterActiveMeta }}</span>
-                </div>
-                <div class="lm-roster-console-row">
-                  <input type="number" min="1" value="{{ rosterAmount }}" onInput="{{ onRosterAmount }}" title="Quantidade usada pelos botoes" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono" style="width:74px;" />
-                  <button onClick="{{ rosterDamage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">-HP</button>
-                  <button onClick="{{ rosterHeal }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">+HP</button>
-                  <button onClick="{{ rosterHealFull }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">HP CHEIO</button>
-                  <button onClick="{{ rosterIpGain }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">+IP</button>
-                  <button onClick="{{ rosterIpSpend }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">-IP</button>
-                  <button onClick="{{ rosterCreditsGain }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">+EB</button>
-                  <button onClick="{{ rosterCreditsSpend }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">-EB</button>
-                </div>
-                <div class="lm-roster-console-row">
-                  <select onChange="{{ onRosterInjury }}" class="lm-ui-select lm-ui-select--full">
-                    <sc-for list="{{ rosterInjuryOptions }}" as="ri" hint-placeholder-count="6">
-                      <sc-if value="{{ ri.selected }}"><option value="{{ ri.value }}" selected>{{ ri.label }}</option></sc-if>
-                      <sc-if value="{{ ri.notSelected }}"><option value="{{ ri.value }}">{{ ri.label }}</option></sc-if>
+                  <div class="lm-roster-tabs">
+                    <sc-for list="{{ rosterTabs }}" as="rt" hint-placeholder-count="4">
+                      <button onClick="{{ rt.onClick }}" class="{{ rt.style }}">{{ rt.label }}</button>
                     </sc-for>
-                  </select>
-                  <button onClick="{{ addRosterInjury }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">+ LESAO</button>
+                  </div>
                 </div>
-                <div class="lm-roster-console-row">
-                  <select onChange="{{ onRosterStatus }}" class="lm-ui-select lm-ui-select--full">
-                    <sc-for list="{{ rosterStatusOptions }}" as="rs" hint-placeholder-count="6">
-                      <sc-if value="{{ rs.selected }}"><option value="{{ rs.value }}" selected>{{ rs.label }}</option></sc-if>
-                      <sc-if value="{{ rs.notSelected }}"><option value="{{ rs.value }}">{{ rs.label }}</option></sc-if>
-                    </sc-for>
-                  </select>
-                  <button onClick="{{ addRosterStatus }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">+ EFEITO</button>
-                </div>
-                <sc-if value="{{ hasRosterGrantOptions }}">
+
+                <sc-if value="{{ rosterTabVitals }}">
                   <div class="lm-roster-console-row">
-                    <select onChange="{{ onRosterGrant }}" class="lm-ui-select lm-ui-select--full">
-                      <sc-for list="{{ rosterGrantOptions }}" as="rg" hint-placeholder-count="6">
-                        <sc-if value="{{ rg.selected }}"><option value="{{ rg.value }}" selected>{{ rg.label }}</option></sc-if>
-                        <sc-if value="{{ rg.notSelected }}"><option value="{{ rg.value }}">{{ rg.label }}</option></sc-if>
-                      </sc-for>
-                    </select>
-                    <button onClick="{{ grantRosterItem }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">DAR ITEM</button>
+                    <input type="number" min="1" value="{{ rosterAmount }}" onInput="{{ onRosterAmount }}" title="Quantidade usada pelos botoes" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono" style="width:74px;" />
+                    <button onClick="{{ rosterDamage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">-HP</button>
+                    <button onClick="{{ rosterHeal }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">+HP</button>
+                    <button onClick="{{ rosterHealFull }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">HP CHEIO</button>
+                    <button onClick="{{ rosterIpGain }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">+IP</button>
+                    <button onClick="{{ rosterIpSpend }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">-IP</button>
+                    <button onClick="{{ rosterCreditsGain }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">+EB</button>
+                    <button onClick="{{ rosterCreditsSpend }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">-EB</button>
                   </div>
                 </sc-if>
-                <div class="lm-roster-remove-grid">
-                  <div>
-                    <div class="lm-roster-remove-title">LESOES</div>
-                    <sc-if value="{{ noRosterInjuries }}"><div class="lm-roster-empty">nenhuma</div></sc-if>
-                    <sc-for list="{{ rosterInjuryRows }}" as="ri" hint-placeholder-count="2">
-                      <div class="lm-roster-remove-row">
-                        <span class="lm-roster-remove-label">{{ ri.label }}</span>
-                        <span class="lm-roster-remove-state" style="color:{{ ri.stateColor }};">{{ ri.stateLabel }}</span>
-                        <button onClick="{{ ri.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
-                      </div>
-                    </sc-for>
+
+                <sc-if value="{{ rosterTabCond }}">
+                  <div class="lm-roster-console-row">
+                    <select onChange="{{ onRosterInjury }}" class="lm-ui-select lm-ui-select--full">
+                      <sc-for list="{{ rosterInjuryOptions }}" as="ri" hint-placeholder-count="6">
+                        <sc-if value="{{ ri.selected }}"><option value="{{ ri.value }}" selected>{{ ri.label }}</option></sc-if>
+                        <sc-if value="{{ ri.notSelected }}"><option value="{{ ri.value }}">{{ ri.label }}</option></sc-if>
+                      </sc-for>
+                    </select>
+                    <button onClick="{{ addRosterInjury }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">+ LESAO</button>
                   </div>
-                  <div>
-                    <div class="lm-roster-remove-title">EFEITOS</div>
-                    <sc-if value="{{ noRosterStatuses }}"><div class="lm-roster-empty">nenhum</div></sc-if>
-                    <sc-for list="{{ rosterStatusRows }}" as="rs" hint-placeholder-count="2">
-                      <div class="lm-roster-remove-row">
-                        <span class="lm-roster-remove-label">{{ rs.label }}</span>
-                        <span class="lm-roster-remove-state">{{ rs.stateLabel }}</span>
-                        <button onClick="{{ rs.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
-                      </div>
-                    </sc-for>
+                  <div class="lm-roster-console-row">
+                    <select onChange="{{ onRosterStatus }}" class="lm-ui-select lm-ui-select--full">
+                      <sc-for list="{{ rosterStatusOptions }}" as="rs" hint-placeholder-count="6">
+                        <sc-if value="{{ rs.selected }}"><option value="{{ rs.value }}" selected>{{ rs.label }}</option></sc-if>
+                        <sc-if value="{{ rs.notSelected }}"><option value="{{ rs.value }}">{{ rs.label }}</option></sc-if>
+                      </sc-for>
+                    </select>
+                    <button onClick="{{ addRosterStatus }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">+ EFEITO</button>
                   </div>
-                  <div>
-                    <div class="lm-roster-remove-title">ITENS</div>
-                    <sc-if value="{{ noRosterGear }}"><div class="lm-roster-empty">nenhum</div></sc-if>
-                    <sc-for list="{{ rosterGearRows }}" as="rg" hint-placeholder-count="3">
-                      <div class="lm-roster-remove-row">
-                        <span class="lm-roster-remove-label">{{ rg.label }}</span>
-                        <span class="lm-roster-remove-state">{{ rg.typeLabel }}</span>
-                        <button onClick="{{ rg.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
-                      </div>
-                    </sc-for>
+                  <div class="lm-roster-remove-grid">
+                    <div>
+                      <div class="lm-roster-remove-title">LESOES</div>
+                      <sc-if value="{{ noRosterInjuries }}"><div class="lm-roster-empty">nenhuma</div></sc-if>
+                      <sc-for list="{{ rosterInjuryRows }}" as="ri" hint-placeholder-count="2">
+                        <div class="lm-roster-remove-row">
+                          <span class="lm-roster-remove-label">{{ ri.label }}</span>
+                          <span class="lm-roster-remove-state" style="color:{{ ri.stateColor }};">{{ ri.stateLabel }}</span>
+                          <button onClick="{{ ri.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
+                        </div>
+                      </sc-for>
+                    </div>
+                    <div>
+                      <div class="lm-roster-remove-title">EFEITOS</div>
+                      <sc-if value="{{ noRosterStatuses }}"><div class="lm-roster-empty">nenhum</div></sc-if>
+                      <sc-for list="{{ rosterStatusRows }}" as="rs" hint-placeholder-count="2">
+                        <div class="lm-roster-remove-row">
+                          <span class="lm-roster-remove-label">{{ rs.label }}</span>
+                          <span class="lm-roster-remove-state">{{ rs.stateLabel }}</span>
+                          <button onClick="{{ rs.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
+                        </div>
+                      </sc-for>
+                    </div>
                   </div>
-                </div>
+                </sc-if>
+
+                <sc-if value="{{ rosterTabItems }}">
+                  <sc-if value="{{ hasRosterGrantOptions }}">
+                    <div class="lm-roster-console-row">
+                      <select onChange="{{ onRosterGrant }}" class="lm-ui-select lm-ui-select--full">
+                        <sc-for list="{{ rosterGrantOptions }}" as="rg" hint-placeholder-count="6">
+                          <sc-if value="{{ rg.selected }}"><option value="{{ rg.value }}" selected>{{ rg.label }}</option></sc-if>
+                          <sc-if value="{{ rg.notSelected }}"><option value="{{ rg.value }}">{{ rg.label }}</option></sc-if>
+                        </sc-for>
+                      </select>
+                      <button onClick="{{ grantRosterItem }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">DAR DO CATALOGO</button>
+                    </div>
+                  </sc-if>
+                  <div class="lm-roster-remove-title">ITEM PERSONALIZADO</div>
+                  <div class="lm-roster-console-row">
+                    <input value="{{ rosterCustomName }}" onInput="{{ onRosterCustomName }}" placeholder="nome do item" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono" style="flex:2;min-width:160px;" />
+                    <select onChange="{{ onRosterCustomType }}" class="lm-ui-select" style="min-width:120px;">
+                      <sc-for list="{{ rosterCustomTypeOptions }}" as="ct" hint-placeholder-count="7">
+                        <sc-if value="{{ ct.selected }}"><option value="{{ ct.value }}" selected>{{ ct.label }}</option></sc-if>
+                        <sc-if value="{{ ct.notSelected }}"><option value="{{ ct.value }}">{{ ct.label }}</option></sc-if>
+                      </sc-for>
+                    </select>
+                    <input type="number" min="1" value="{{ rosterCustomQty }}" onInput="{{ onRosterCustomQty }}" title="Quantidade" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono" style="width:64px;" />
+                  </div>
+                  <div class="lm-roster-console-row">
+                    <input value="{{ rosterCustomNotes }}" onInput="{{ onRosterCustomNotes }}" placeholder="descricao / efeito (opcional)" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" style="flex:1;" />
+                    <sc-if value="{{ canGrantCustomItem }}"><button onClick="{{ grantRosterCustomItem }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">ENTREGAR</button></sc-if>
+                  </div>
+                  <div class="lm-roster-remove-grid">
+                    <div>
+                      <div class="lm-roster-remove-title">ITENS</div>
+                      <sc-if value="{{ noRosterGear }}"><div class="lm-roster-empty">nenhum</div></sc-if>
+                      <sc-for list="{{ rosterGearRows }}" as="rg" hint-placeholder-count="3">
+                        <div class="lm-roster-remove-row">
+                          <span class="lm-roster-remove-label">{{ rg.label }}</span>
+                          <span class="lm-roster-remove-state">{{ rg.typeLabel }}</span>
+                          <button onClick="{{ rg.onRemove }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">X</button>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ rosterTabNet }}">
+                  <div class="lm-roster-console-row">
+                    <select onChange="{{ onRosterNetAbility }}" class="lm-ui-select lm-ui-select--full">
+                      <sc-for list="{{ rosterNetAbilityOptions }}" as="na" hint-placeholder-count="8">
+                        <sc-if value="{{ na.selected }}"><option value="{{ na.value }}" selected>{{ na.label }}</option></sc-if>
+                        <sc-if value="{{ na.notSelected }}"><option value="{{ na.value }}">{{ na.label }}</option></sc-if>
+                      </sc-for>
+                    </select>
+                    <sc-if value="{{ rosterNetCustom }}">
+                      <input value="{{ rosterNetLabel }}" onInput="{{ onRosterNetLabel }}" placeholder="rotulo do teste" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono" style="flex:1;min-width:140px;" />
+                    </sc-if>
+                  </div>
+                  <div class="lm-roster-net-desc">{{ rosterNetAbilityDesc }}</div>
+                  <div class="lm-roster-console-row">
+                    <sc-for list="{{ rosterNetDvChips }}" as="dc" hint-placeholder-count="6">
+                      <button onClick="{{ dc.onClick }}" class="{{ dc.style }}">{{ dc.label }}</button>
+                    </sc-for>
+                    <input type="number" min="0" value="{{ rosterNetDv }}" onInput="{{ onRosterNetDv }}" placeholder="DV" title="DV livre (vazio = mestre decide)" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono" style="width:70px;" />
+                    <button onClick="{{ toggleRosterNetAll }}" class="{{ rosterNetAllStyle }}" title="Enviar para todos os jogadores da mesa">TODOS OS PJS</button>
+                  </div>
+                  <div class="lm-roster-net-target">
+                    <span class="lm-roster-net-target-label">ALVO</span>
+                    <span class="lm-roster-net-target-name">{{ rosterNetTargetLabel }}</span>
+                    <sc-if value="{{ rosterNetNoInterface }}"><span class="lm-roster-net-warn">SEM INTERFACE (nao e Netrunner) // rola 1d10 puro</span></sc-if>
+                  </div>
+                  <div class="lm-roster-console-row">
+                    <span class="lm-roster-net-preview">{{ rosterNetPreview }}</span>
+                    <sc-if value="{{ canSendNetTest }}"><button onClick="{{ sendRosterNetTest }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact"><i class="fa-solid fa-paper-plane"></i> ENVIAR TESTE</button></sc-if>
+                  </div>
+                </sc-if>
               </div>
             </sc-if>
           </sc-if>
@@ -2367,6 +2528,21 @@
   </div>
   </sc-if>
 
+  <!-- ============ OPERATIVE FILE HANDLE (right rim) ============ -->
+  <sc-if value="{{ sheetHandleVisible }}">
+    <button onClick="{{ openSheet }}" aria-label="Abrir ficha do operativo" class="lm-sheet-handle" style="{{ sheetHandleVars }}">
+      <span class="lm-sheet-handle-spine"><span class="lm-sheet-handle-hp"></span></span>
+      <span class="lm-sheet-handle-face">
+        <sc-if value="{{ sheetHandleHasPortrait }}"><img class="lm-sheet-handle-img" alt="" data-src="{{ sheetHandlePortrait }}" /></sc-if>
+        <sc-if value="{{ sheetHandleNoPortrait }}"><span class="lm-sheet-handle-initials">{{ activeInitials }}</span></sc-if>
+      </span>
+      <span class="lm-sheet-handle-label">FICHA</span>
+      <span class="lm-sheet-handle-arrow" aria-hidden="true">
+        <svg viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"><polyline points="9,3 3,10 9,17" /></svg>
+      </span>
+    </button>
+  </sc-if>
+
   <!-- ============ CHARACTER SHEET (lateral quick-access drawer) ============ -->
   <sc-if value="{{ sheetOpen }}">
   <div onClick="{{ closeSheet }}" class="fixed inset-0 z-[70] bg-black/70" style="backdrop-filter:blur(3px);"></div>
@@ -2382,14 +2558,16 @@
       <sc-if value="{{ canEditSheet }}">
         <div class="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-cyber-border/50 flex-wrap">
           <div class="flex gap-1.5 flex-wrap min-w-0">
-            <sc-for list="{{ sheetCharacterBtns }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.onClick }}" class="{{ c.style }}">{{ c.label }}</button></sc-for>
+            <sc-if value="{{ showCharacterSwitcher }}">
+              <sc-for list="{{ sheetCharacterBtns }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.onClick }}" class="{{ c.style }}">{{ c.label }}</button></sc-for>
+            </sc-if>
           </div>
           <sc-if value="{{ notSheetEditing }}">
             <div class="flex gap-1.5 flex-shrink-0">
               <sc-if value="{{ canExportSheetPdf }}">
                 <button onClick="{{ exportSheetPdf }}" title="Baixar a ficha em PDF editavel" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ tx.exportSheetPdf }}</button>
               </sc-if>
-              <button onClick="{{ createSheetCharacter }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">{{ tx.newCharacter }}</button>
+              <sc-if value="{{ showNewSheetButton }}"><button onClick="{{ createSheetCharacter }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">{{ tx.newCharacter }}</button></sc-if>
               <button onClick="{{ editSheet }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.editSheet }}</button>
             </div>
           </sc-if>
@@ -2579,6 +2757,15 @@
             </sc-for>
           </div>
 
+          <sc-if value="{{ selected.hasBlock }}">
+            <div role="note" class="lm-block-notice">
+              <span aria-hidden="true" class="lm-block-notice-icon">&#9888;</span>
+              <span class="lm-block-notice-body">
+                <span class="lm-block-notice-title">{{ selected.blockLabel }}</span>
+                <span class="lm-block-notice-text">{{ selected.blockMessage }}</span>
+              </span>
+            </div>
+          </sc-if>
           <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:20px;border-top:1px solid rgba(214,170,78,0.2);padding-top:16px;flex-wrap:wrap;gap:14px;">
             <div>
               <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;">{{ tx.unitPrice }}</div>

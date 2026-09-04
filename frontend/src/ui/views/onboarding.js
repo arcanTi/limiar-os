@@ -51,18 +51,23 @@ import {
 import {
   chromeAttachments,
   chromeBlock,
+  chromeBlockDetail,
+  chromeBlockLabel,
   chromeBlockMessage,
   chromeCatalog,
   chromeEquipped,
   isChromeEnhancement,
 } from '../../domain/character/creationChrome.ts';
 import {
+  gearBlockDetail,
+  gearBlockLabel,
   gearBlockMessage,
   gearCatalog,
   gearCount,
   gearInventory,
 } from '../../domain/character/creationGear.ts';
 import { CPRED_LIFESTYLES, lifestyleSummary } from '../../domain/character/lifestyle.ts';
+import { catalogLabel } from '../../domain/items/installBlockText.ts';
 import { RPG_SYSTEMS, implementationLabel, isSystemPlayable } from '../../domain/campaigns/systems.ts';
 import {
   CPRED_CREATION_CASH,
@@ -373,25 +378,84 @@ function cashBar(draft, guide) {
 const CHROME_GUIDE = `Chrome e equipamento saem do mesmo bolso, e o que sobrar vira o dinheiro vivo inicial. A cirurgia é grátis na criação, mas a HUMANITY é cobrada na hora. Os ${money(CPRED_CREATION_FASHION_CASH)}eb de roupas e Fashionware são gastos com o mestre e não viram dinheiro.`;
 const ARSENAL_GUIDE = 'Armas, armadura, munição e equipamento saem do mesmo orçamento do chrome. Nada começa equipado: quem está com o quê na mão é decisão de mesa.';
 
-function chromeCard(item, { bought, blockedMessage }) {
-  const enhancement = isChromeEnhancement(item);
+/**
+ * Category chips, one hue per body region, so the shelf reads at a glance
+ * without parsing the meta line. Unknown categories fall back to gold.
+ */
+const CHROME_CAT_TONE = {
+  NEURAL: 'text-cyber-purple border-cyber-purple/45 bg-cyber-purple/10',
+  OPTICS: 'text-cyber-cyan border-cyber-cyan/45 bg-cyber-cyan/10',
+  AUDIO: 'text-cyber-cyan border-cyber-cyan/45 bg-cyber-cyan/10',
+  INTERNAL: 'text-cyber-gold border-cyber-gold/45 bg-cyber-gold/10',
+  EXTERNAL: 'text-cyber-gold border-cyber-gold/45 bg-cyber-gold/10',
+  LIMBS: 'text-cyber-bright border-cyber-text/40 bg-cyber-text/10',
+  BORG: 'text-cyber-bright border-cyber-text/40 bg-cyber-text/10',
+  DEFENSE: 'text-cyber-red border-cyber-red/45 bg-cyber-red/10',
+};
+const CHIP = 'inline-flex items-center font-mono text-[9px] font-bold tracking-[1.2px] leading-none px-1.5 py-1 border whitespace-nowrap';
+const CHIP_MUTED = `${CHIP} text-cyber-text/70 border-cyber-text/25 bg-cyber-text/5`;
+
+/**
+ * Price and Humanity as tags instead of a meta sentence. The Humanity chip is
+ * red on purpose: it is the one cost that does not come back when the item is
+ * removed from the sheet later, so it has to stand out from the eurodollars.
+ */
+function chromeTags(item, { catalog } = {}) {
+  const tags = [
+    `<span class="${CHIP} ${CHROME_CAT_TONE[item.cat] || CHROME_CAT_TONE.INTERNAL}">${esc(item.cat)}</span>`,
+    `<span class="${CHIP} text-cyber-gold border-cyber-gold/45 bg-cyber-gold/10">${money(item.price)}eb</span>`,
+    item.hcost
+      ? `<span class="${CHIP} text-cyber-red border-cyber-red/55 bg-cyber-red/15">−${esc(item.hcost)} HUMANITY</span>`
+      : `<span class="${CHIP_MUTED}">0 HUMANITY</span>`,
+  ];
+  if (isChromeEnhancement(item)) {
+    const parents = item.attachesTo.map((code) => catalogLabel(catalog, code) || code).join(' ou ');
+    tags.push(`<span class="${CHIP} text-cyber-purple border-cyber-purple/45 bg-cyber-purple/10" title="Aprimoramento de ${esc(parents)}">APRIMORAMENTO · ${esc(parents)}</span>`);
+  }
+  return `<span class="flex flex-wrap gap-1 mt-1.5">${tags.join('')}</span>`;
+}
+
+/**
+ * Why a card is greyed out, said out loud, across the whole card. A disabled
+ * button with the reason hidden in a `title` reads as a broken shop: the
+ * player cannot hover on a phone and has no idea that installing the base
+ * piece first would unlock it. The overlay crosses the card out so the eye
+ * reads "blocked" before reading why; the item name is lifted above it so the
+ * player still knows which card is crossed out.
+ */
+function blockOverlay(label, message) {
+  if (!message) return '';
+  return `<div role="note" data-block-tag class="absolute inset-0 z-10 grid place-items-center overflow-hidden bg-cyber-bg/60 border border-cyber-red/45 cursor-not-allowed">
+        <svg aria-hidden="true" class="absolute inset-0 w-full h-full text-cyber-red/45" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <line x1="0" y1="0" x2="100" y2="100" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"></line>
+          <line x1="100" y1="0" x2="0" y2="100" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"></line>
+        </svg>
+        <span class="relative max-w-[90%] flex flex-col items-center gap-1 text-center bg-cyber-bg/95 border border-cyber-red/45 px-3 py-2">
+          ${label ? `<strong class="font-mono text-[10px] font-bold tracking-[1.5px] text-cyber-red">✕ ${esc(label)}</strong>` : ''}
+          <span class="font-sans text-[11px] leading-snug text-cyber-bright/90">${esc(message)}</span>
+        </span>
+      </div>`;
+}
+
+function chromeCard(item, { bought, blockedMessage, blockedLabel, blockedTitle, catalog }) {
   const tone = bought
     ? 'border-cyber-cyan/40 bg-cyber-cyan/5'
-    : (blockedMessage ? 'border-cyber-gold/15 bg-cyber-bg/40 opacity-60' : 'border-cyber-gold/20 bg-cyber-bg/55');
+    : (blockedMessage ? 'border-cyber-red/25 bg-cyber-bg/40' : 'border-cyber-gold/20 bg-cyber-bg/55');
   const action = bought
     ? `<button type="button" data-wiz-chrome-remove="${esc(item.code)}" class="${STEPPER_BTN} w-auto px-2 text-[10px] tracking-wider">REMOVER</button>`
-    : `<button type="button" data-wiz-chrome-buy="${esc(item.code)}" ${blockedMessage ? 'disabled aria-disabled="true"' : ''}
-              title="${esc(blockedMessage || '')}" class="${STEPPER_BTN} w-auto px-2 text-[10px] tracking-wider ${blockedMessage ? '' : 'border-cyber-cyan text-cyber-cyan'}">INSTALAR</button>`;
+    : `<button type="button" data-wiz-chrome-buy="${esc(item.code)}" ${blockedMessage ? 'disabled aria-disabled="true" tabindex="-1"' : ''}
+              title="${esc(blockedTitle || blockedMessage || '')}" class="${STEPPER_BTN} w-auto px-2 text-[10px] tracking-wider ${blockedMessage ? '' : 'border-cyber-cyan text-cyber-cyan'}">INSTALAR</button>`;
   return `
-    <div class="flex items-start gap-2 border px-3 py-2.5 ${tone}">
+    <div class="relative flex items-start gap-2 border px-3 py-2.5 ${tone}">
       <span class="flex-1 min-w-0 flex flex-col leading-tight">
-        <span class="font-sans text-[13px] text-cyber-bright truncate">${esc(item.name)}</span>
-        <em class="not-italic font-mono text-[9px] tracking-wider text-cyber-text/45">
-          ${esc(item.cat)} · ${money(item.price)}eb${item.hcost ? ` · −${item.hcost} HUM` : ''}${enhancement ? ` · aprimoramento de ${esc(item.attachesTo.join(', '))}` : ''}
-        </em>
-        ${item.desc ? `<em class="not-italic font-sans text-[11px] text-cyber-text/50 mt-1 line-clamp-2">${esc(item.desc)}</em>` : ''}
+        <span class="font-sans text-[13px] text-cyber-bright truncate ${blockedMessage ? 'relative z-20' : ''}">${esc(item.name)}</span>
+        <span class="flex flex-col ${blockedMessage ? 'opacity-35 select-none' : ''}">
+          ${chromeTags(item, { catalog })}
+          ${item.desc ? `<em class="not-italic font-sans text-[11px] text-cyber-text/50 mt-1.5 line-clamp-2">${esc(item.desc)}</em>` : ''}
+        </span>
       </span>
-      ${action}
+      <span class="${blockedMessage ? 'opacity-40' : ''}">${action}</span>
+      ${blockOverlay(blockedLabel, blockedMessage)}
     </div>`;
 }
 
@@ -412,9 +476,15 @@ function chromeStep(draft, state) {
   } else if (state.catalogStatus === 'error') {
     list = '<div class="font-sans text-xs text-cyber-red py-2.5">Não foi possível carregar o catálogo. Você pode criar a ficha sem chrome e instalar depois.</div>';
   } else {
-    list = `<div class="grid grid-cols-fit-lg gap-3">${visible.map((item) => {
+    list = `<div data-wiz-shelf class="grid grid-cols-fit-lg gap-3">${visible.map((item) => {
       const block = chromeBlock(draft.chrome, item, context);
-      return chromeCard(item, { bought: false, blockedMessage: block.reason ? chromeBlockMessage(block, item) : '' });
+      return chromeCard(item, {
+        bought: false,
+        blockedLabel: chromeBlockLabel(block),
+        blockedMessage: chromeBlockDetail(block, item, { catalog: context.catalog }),
+        blockedTitle: block.reason ? chromeBlockMessage(block, item, { catalog: context.catalog }) : '',
+        catalog: context.catalog,
+      });
     }).join('') || '<div class="font-sans text-xs text-cyber-text/45 py-2.5">Nenhum implante encontrado.</div>'}</div>`;
   }
 
@@ -422,8 +492,8 @@ function chromeStep(draft, state) {
     ? `<section class="flex flex-col gap-2">
         <span class="${FIELD_LABEL} mb-0">Instalado · ${money(chromeSpendTotal(draft))}eb</span>
         <div class="flex flex-col gap-2">${installed.map((row) => `
-          ${chromeCard(row.parent, { bought: true, blockedMessage: '' })}
-          ${row.enhancements.map((enhancement) => `<div class="pl-6">${chromeCard(enhancement, { bought: true, blockedMessage: '' })}</div>`).join('')}
+          ${chromeCard(row.parent, { bought: true, blockedMessage: '', blockedLabel: '', catalog: context.catalog })}
+          ${row.enhancements.map((enhancement) => `<div class="pl-6">${chromeCard(enhancement, { bought: true, blockedMessage: '', blockedLabel: '', catalog: context.catalog })}</div>`).join('')}
         `).join('')}</div>
       </section>`
     : '';
@@ -444,27 +514,94 @@ function chromeStep(draft, state) {
     </div>`;
 }
 
-function gearCard(item, { qty, blockedMessage }) {
+/**
+ * Shelf categories, one hue each. Weapons are red because damage is red
+ * everywhere else on the sheet; armor is cyan because it is the thing that
+ * keeps damage out. Unknown categories fall back to plain text.
+ */
+const GEAR_CAT_TONE = {
+  WEAPONS: 'text-cyber-red border-cyber-red/45 bg-cyber-red/10',
+  ARMOR: 'text-cyber-cyan border-cyber-cyan/45 bg-cyber-cyan/10',
+  AMMUNITION: 'text-cyber-gold border-cyber-gold/45 bg-cyber-gold/10',
+  'WEAPON ATTACHMENTS': 'text-cyber-purple border-cyber-purple/45 bg-cyber-purple/10',
+  GEAR: 'text-cyber-bright border-cyber-text/40 bg-cyber-text/10',
+  DECK: 'text-cyber-purple border-cyber-purple/45 bg-cyber-purple/10',
+};
+
+/**
+ * Everything a card used to say in one grey sentence, split into chips so the
+ * eye can sort the shelf without reading. The first chip after the category
+ * answers the question a player asks first about a weapon: is it swung or
+ * fired? Gold for melee, cyan for ranged, so the two never blur together.
+ * Damage is not here on purpose: it gets its own badge in the header.
+ */
+function gearTags(item) {
+  const cat = String(item.cat || '').toUpperCase();
+  // Most RAW weapons are named after their own class ("Light Melee Weapon"),
+  // so echoing the type there would print the headline twice. Fall back to
+  // the category, which is the one thing the name never already says.
+  const type = String(item.type || '').trim();
+  const headline = type && type !== cat && type !== String(item.name || '').trim() ? type : cat;
+  const tags = [
+    `<span class="${CHIP} ${GEAR_CAT_TONE[cat] || GEAR_CAT_TONE.GEAR}">${esc(headline)}</span>`,
+  ];
+  if (cat === 'WEAPONS') {
+    tags.push(item.melee
+      ? `<span class="${CHIP} text-cyber-gold border-cyber-gold/55 bg-cyber-gold/15">MELEE</span>`
+      : `<span class="${CHIP} text-cyber-cyan border-cyber-cyan/55 bg-cyber-cyan/15">DISTÂNCIA</span>`);
+    if (item.skill) tags.push(`<span class="${CHIP_MUTED}">${esc(item.skill)}</span>`);
+    if (item.rof) tags.push(`<span class="${CHIP_MUTED}">ROF ${esc(item.rof)}</span>`);
+    if (item.mag) tags.push(`<span class="${CHIP_MUTED}">MAG ${esc(item.mag)}</span>`);
+    if (item.hands) tags.push(`<span class="${CHIP_MUTED}">${item.hands === 'varies' ? 'MÃOS VARIAM' : `${esc(item.hands)} ${item.hands === '1' ? 'MÃO' : 'MÃOS'}`}</span>`);
+    if (item.concealable) tags.push(`<span class="${CHIP} text-cyber-purple border-cyber-purple/45 bg-cyber-purple/10">OCULTÁVEL</span>`);
+  } else if (cat === 'ARMOR') {
+    if (item.sp != null) tags.push(`<span class="${CHIP} text-cyber-cyan border-cyber-cyan/55 bg-cyber-cyan/15">SP ${esc(item.sp)}</span>`);
+    tags.push(item.armorPenalty
+      ? `<span class="${CHIP} text-cyber-red border-cyber-red/55 bg-cyber-red/15">${esc(item.armorPenalty)} REF · DEX · MOVE</span>`
+      : `<span class="${CHIP_MUTED}">SEM PENALIDADE</span>`);
+  } else if (cat === 'AMMUNITION') {
+    if (item.ammoType) tags.push(`<span class="${CHIP} text-cyber-cyan border-cyber-cyan/45 bg-cyber-cyan/10">${esc(item.ammoType)}</span>`);
+  }
+  tags.push(`<span class="${CHIP} text-cyber-gold border-cyber-gold/45 bg-cyber-gold/10">${money(item.price)}eb${item.packSize > 1 ? ` · x${esc(item.packSize)}` : ''}</span>`);
+  return `<span class="flex flex-wrap gap-1 mt-1.5">${tags.join('')}</span>`;
+}
+
+/**
+ * The damage badge sits in the header, not in the tag row: it is the number a
+ * player compares across cards, so it gets the sheet's damage red and a size
+ * that reads from across the table.
+ */
+function damageBadge(item) {
+  if (!item.dmg) return '';
+  return `<span data-wiz-dmg class="flex-none inline-flex items-baseline gap-1 border border-cyber-red/45 bg-cyber-red/10 px-2 py-0.5 leading-none">
+        <em class="not-italic font-mono text-[9px] font-bold tracking-[1.2px] text-cyber-red/70">DANO</em>
+        <strong class="font-mono text-[15px] font-bold text-cyber-red">${esc(item.dmg)}</strong>
+      </span>`;
+}
+
+function gearCard(item, { qty, blockedMessage, blockedLabel, blockedTitle }) {
   const tone = qty
     ? 'border-cyber-cyan/40 bg-cyber-cyan/5'
-    : (blockedMessage ? 'border-cyber-gold/15 bg-cyber-bg/40 opacity-60' : 'border-cyber-gold/20 bg-cyber-bg/55');
-  const buy = `<button type="button" data-wiz-gear-buy="${esc(item.code)}" ${blockedMessage ? 'disabled aria-disabled="true"' : ''}
-          aria-label="Comprar ${esc(item.name)}" title="${esc(blockedMessage || '')}"
+    : (blockedMessage ? 'border-cyber-red/25 bg-cyber-bg/40' : 'border-cyber-gold/20 bg-cyber-bg/55');
+  const buy = `<button type="button" data-wiz-gear-buy="${esc(item.code)}" ${blockedMessage ? 'disabled aria-disabled="true" tabindex="-1"' : ''}
+          aria-label="Comprar ${esc(item.name)}" title="${esc(blockedTitle || blockedMessage || '')}"
           class="${STEPPER_BTN} ${blockedMessage ? '' : 'border-cyber-cyan text-cyber-cyan'}">+</button>`;
   const sell = qty
     ? `<button type="button" data-wiz-gear-remove="${esc(item.code)}" aria-label="Vender ${esc(item.name)}" class="${STEPPER_BTN}">−</button>
        <output class="w-7 text-center font-mono text-[13px] font-bold text-cyber-bright">${qty}</output>`
     : '';
   return `
-    <div class="flex items-start gap-2 border px-3 py-2.5 ${tone}">
-      <span class="flex-1 min-w-0 flex flex-col leading-tight">
-        <span class="font-sans text-[13px] text-cyber-bright truncate">${esc(item.name)}</span>
-        <em class="not-italic font-mono text-[9px] tracking-wider text-cyber-text/45">
-          ${esc(item.type || item.cat)} · ${money(item.price)}eb${item.packSize > 1 ? ` (pacote com ${item.packSize})` : ''}${item.dmg ? ` · ${esc(item.dmg)}` : ''}
-        </em>
-        ${item.desc ? `<em class="not-italic font-sans text-[11px] text-cyber-text/50 mt-1 line-clamp-2">${esc(item.desc)}</em>` : ''}
+    <div class="relative flex items-start gap-2 border px-3 py-2.5 ${tone}">
+      <span class="flex-1 min-w-0 flex flex-col leading-tight ${blockedMessage ? 'opacity-40 select-none' : ''}">
+        <span class="flex items-center justify-between gap-2">
+          <span class="font-sans text-[13px] text-cyber-bright truncate">${esc(item.name)}</span>
+          ${damageBadge(item)}
+        </span>
+        ${gearTags(item)}
+        ${item.desc ? `<em class="not-italic font-sans text-[11px] text-cyber-text/50 mt-1.5 line-clamp-2">${esc(item.desc)}</em>` : ''}
       </span>
-      ${sell}${buy}
+      <span class="flex items-center gap-1 ${blockedMessage ? 'opacity-40' : ''}">${sell}${buy}</span>
+      ${blockOverlay(blockedLabel, blockedMessage)}
     </div>`;
 }
 
@@ -472,6 +609,7 @@ function arsenalStep(draft, state) {
   const catalog = state.gearCatalog || [];
   const filter = String(state.gearFilter || '').trim().toLowerCase();
   const qtyOf = (code) => (draft.gear.find((pick) => pick.code === code) || {}).qty || 0;
+  const cashLeft = startingCash(draft);
   const visible = catalog.filter((item) => (
     !filter || item.name.toLowerCase().includes(filter) || item.cat.toLowerCase().includes(filter) || String(item.type || '').toLowerCase().includes(filter)
   ));
@@ -482,10 +620,15 @@ function arsenalStep(draft, state) {
   } else if (state.catalogStatus === 'error') {
     list = '<div class="font-sans text-xs text-cyber-red py-2.5">Não foi possível carregar o catálogo. Você pode criar a ficha sem equipamento e comprar depois.</div>';
   } else {
-    list = `<div class="grid grid-cols-fit-lg gap-3">${visible.map((item) => gearCard(item, {
-      qty: qtyOf(item.code),
-      blockedMessage: gearBlockMessage(gearPurchaseBlock(draft, item), item),
-    })).join('') || '<div class="font-sans text-xs text-cyber-text/45 py-2.5">Nenhum item encontrado.</div>'}</div>`;
+    list = `<div data-wiz-shelf class="grid grid-cols-fit-lg gap-3">${visible.map((item) => {
+      const reason = gearPurchaseBlock(draft, item);
+      return gearCard(item, {
+        qty: qtyOf(item.code),
+        blockedLabel: gearBlockLabel(reason),
+        blockedMessage: gearBlockDetail(reason, item, { cashLeft }),
+        blockedTitle: gearBlockMessage(reason, item),
+      });
+    }).join('') || '<div class="font-sans text-xs text-cyber-text/45 py-2.5">Nenhum item encontrado.</div>'}</div>`;
   }
 
   const bought = draft.gear.length
@@ -493,7 +636,7 @@ function arsenalStep(draft, state) {
         <span class="${FIELD_LABEL} mb-0">Na mochila · ${gearCount(draft.gear)} ${gearCount(draft.gear) === 1 ? 'item' : 'itens'} · ${money(gearSpendTotal(draft))}eb</span>
         <div class="flex flex-wrap gap-2">${draft.gear.map((pick) => `
           <span class="font-sans text-xs text-cyber-bright bg-cyber-cyan/10 border border-cyber-cyan/25 px-2.5 py-1">
-            ${esc(pick.name)}${pick.qty > 1 ? ` <em class="not-italic font-bold text-cyber-cyan">x${pick.qty}</em>` : ''}
+            ${esc(pick.name)}${pick.dmg ? ` <em class="not-italic font-mono font-bold text-cyber-red">${esc(pick.dmg)}</em>` : ''}${pick.qty > 1 ? ` <em class="not-italic font-bold text-cyber-cyan">x${pick.qty}</em>` : ''}
           </span>`).join('')}</div>
       </section>`
     : '';
@@ -587,7 +730,7 @@ function reviewStep(draft, campaignName, mode = 'first') {
         <span class="${FIELD_LABEL} mb-0">Arsenal · ${gearCount(draft.gear)} ${gearCount(draft.gear) === 1 ? 'item' : 'itens'} · ${money(gearSpendTotal(draft))}eb</span>
         <div class="flex flex-wrap gap-2">
           ${draft.gear.length
-    ? draft.gear.map((pick) => `<span class="font-sans text-xs text-cyber-bright bg-cyber-cyan/10 border border-cyber-cyan/25 px-2.5 py-1">${esc(pick.name)}${pick.qty > 1 ? ` <em class="not-italic font-bold text-cyber-cyan">x${pick.qty}</em>` : ''}</span>`).join('')
+    ? draft.gear.map((pick) => `<span class="font-sans text-xs text-cyber-bright bg-cyber-cyan/10 border border-cyber-cyan/25 px-2.5 py-1">${esc(pick.name)}${pick.dmg ? ` <em class="not-italic font-mono font-bold text-cyber-red">${esc(pick.dmg)}</em>` : ''}${pick.qty > 1 ? ` <em class="not-italic font-bold text-cyber-cyan">x${pick.qty}</em>` : ''}</span>`).join('')
     : '<span class="font-sans text-xs text-cyber-text/45">Saiu de mãos vazias.</span>'}
         </div>
         <span class="${GUIDE}">Começa com <strong class="font-mono text-cyber-gold">${money(startingCash(draft))}eb</strong> em dinheiro vivo.</span>
@@ -600,7 +743,8 @@ function reviewStep(draft, campaignName, mode = 'first') {
     </div>`;
 }
 
-function render(root, state) {
+/** Exported so the markup — not just the state — can be asserted in tests. */
+export function render(root, state) {
   const progress = wizardProgress(state.step, state.draft);
   const copy = wizardCopy(state.mode);
   const body = {
@@ -629,7 +773,7 @@ function render(root, state) {
         </div>
         ${stepper(progress)}
       </header>
-      <div class="flex-1 min-h-0 overflow-y-auto px-6 py-5">${body}</div>
+      <div data-wiz-body class="flex-1 min-h-0 overflow-y-auto px-6 py-5">${body}</div>
       ${pendingBlock(progress)}
       <footer class="flex items-center justify-between gap-3 px-6 py-4 border-t border-cyber-gold/20">
         <button type="button" data-wiz-skip class="${footBtn} border-cyber-text/20 text-cyber-text/55">${copy.skipLabel}</button>
@@ -709,7 +853,7 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
       const item = (state.catalog || []).find((row) => row.code === code);
       const context = { catalog: state.rawCatalog, canonicalRules };
       const block = chromeBlock(state.draft.chrome, item, context);
-      if (block.reason) { state.chromeHint = chromeBlockMessage(block, item); return; }
+      if (block.reason) { state.chromeHint = chromeBlockMessage(block, item, { catalog: state.rawCatalog }); return; }
       state.draft = buyChrome(state.draft, item, context);
       state.chromeHint = '';
     },
@@ -832,18 +976,117 @@ export function buildCharacterPayload(draft, { svgCard } = {}) {
 }
 
 /** Stable selector used to restore the focused field after a repaint. */
+/**
+ * Where the body scroller is, measured against the shelf when there is one.
+ *
+ * Rebuilding the step from scratch resets the scroller to the top, so every
+ * buy on a long shelf (chrome, arsenal) would throw the player back up. A
+ * bare scrollTop is not enough either: the "Instalado" section above the
+ * shelf grows with each purchase and would push the card just bought out of
+ * view. Anchoring on the shelf keeps the same cards in front of the player.
+ */
+export function scrollAnchor(root) {
+  const body = root && typeof root.querySelector === 'function' ? root.querySelector('[data-wiz-body]') : null;
+  if (!body) return null;
+  const shelf = body.querySelector('[data-wiz-shelf]');
+  return {
+    top: body.scrollTop || 0,
+    shelf: shelf ? shelf.offsetTop - body.offsetTop : null,
+  };
+}
+
+export function restoreScroll(root, offset) {
+  if (!offset || !offset.top) return;
+  const body = root.querySelector('[data-wiz-body]');
+  if (!body) return;
+  const shelf = body.querySelector('[data-wiz-shelf]');
+  const shelfTop = shelf ? shelf.offsetTop - body.offsetTop : null;
+  body.scrollTop = (offset.shelf !== null && shelfTop !== null)
+    ? offset.top + (shelfTop - offset.shelf)
+    : offset.top;
+}
+
+/**
+ * Every field typed into, in one table so the listener and the focus
+ * restoration cannot drift apart.
+ *
+ * `repaint: 'step'` redraws the whole step because the state change alters what
+ * is on screen (a clamped budget, a narrowed shelf); `'validation'` only
+ * refreshes the pending block, which is enough for free text.
+ *
+ * `select` marks the numeric steppers: their value is a single number, so
+ * selecting it on restore lets the next keystroke replace it. Text and search
+ * fields keep the caret instead - selecting there would make every second
+ * keystroke wipe the word typed so far.
+ */
+const INPUT_FIELDS = [
+  { attr: 'data-wiz-name', repaint: 'validation', select: false, apply: (h, t) => h.setName(t.value) },
+  { attr: 'data-wiz-skill-filter', repaint: 'step', select: false, apply: (h, t) => h.setSkillFilter(t.value) },
+  { attr: 'data-wiz-chrome-filter', repaint: 'step', select: false, apply: (h, t) => h.setChromeFilter(t.value) },
+  { attr: 'data-wiz-gear-filter', repaint: 'step', select: false, apply: (h, t) => h.setGearFilter(t.value) },
+  { attr: 'data-wiz-lifestyle-housing', repaint: 'validation', select: false, apply: (h, t) => h.setLifestyleDetail('housing', t.value) },
+  { attr: 'data-wiz-lifestyle-food', repaint: 'validation', select: false, apply: (h, t) => h.setLifestyleDetail('food', t.value) },
+  { attr: 'data-wiz-lifestyle-cost', repaint: 'validation', select: false, apply: (h, t) => h.setLifestyleDetail('monthlyCost', t.value) },
+  { attr: 'data-wiz-stat', repaint: 'step', select: true, apply: (h, t) => h.setStat(t.getAttribute('data-wiz-stat'), t.value) },
+  { attr: 'data-wiz-skill', repaint: 'step', select: true, apply: (h, t) => h.setSkill(t.getAttribute('data-wiz-skill'), t.value) },
+];
+
+/** The entry describing `target`, or null when the element is not a wizard field. */
+export function inputField(target) {
+  if (!target || typeof target.hasAttribute !== 'function') return null;
+  return INPUT_FIELDS.find((field) => target.hasAttribute(field.attr)) || null;
+}
+
+/** Stable selector used to restore the focused field after a repaint. */
 export function activeFieldSelector(documentRef) {
   const active = documentRef && documentRef.activeElement;
   if (!active || !active.getAttribute) return '';
-  for (const attr of [
-    'data-wiz-stat', 'data-wiz-skill', 'data-wiz-name', 'data-wiz-skill-filter',
-    'data-wiz-chrome-filter', 'data-wiz-gear-filter',
-    'data-wiz-lifestyle-housing', 'data-wiz-lifestyle-food', 'data-wiz-lifestyle-cost',
-  ]) {
+  for (const { attr } of INPUT_FIELDS) {
     const value = active.getAttribute(attr);
     if (value !== null) return value ? `[${attr}="${value}"]` : `[${attr}]`;
   }
   return '';
+}
+
+/**
+ * Snapshot the focused field, with its caret, before the step is redrawn.
+ *
+ * The caret is what lets a search field repaint on every keystroke: without it
+ * the restored input would come back fully selected and the next character
+ * would replace the query.
+ */
+export function captureFocus(documentRef) {
+  const selector = activeFieldSelector(documentRef);
+  if (!selector) return null;
+  const active = documentRef.activeElement;
+  const field = inputField(active);
+  const select = !!(field && field.select);
+  let start = null;
+  let end = null;
+  if (!select) {
+    // Number inputs expose no selection; reading it throws in some browsers.
+    try {
+      start = active.selectionStart;
+      end = active.selectionEnd;
+    } catch { start = null; end = null; }
+  }
+  return { selector, select, start, end };
+}
+
+/** Put focus back on the field captured before the repaint. */
+export function restoreFocus(root, focus) {
+  if (!root || !focus || !focus.selector) return null;
+  const restored = root.querySelector(focus.selector);
+  if (!restored || typeof restored.focus !== 'function') return null;
+  restored.focus();
+  if (focus.select) {
+    if (typeof restored.select === 'function') restored.select();
+    return restored;
+  }
+  if (typeof restored.setSelectionRange === 'function' && focus.start != null) {
+    try { restored.setSelectionRange(focus.start, focus.end == null ? focus.start : focus.end); } catch { /* input type without a selection */ }
+  }
+  return restored;
 }
 
 export function mountOnboardingWizard({
@@ -873,20 +1116,18 @@ export function mountOnboardingWizard({
   const controller = createWizardController({ api, campaignId, campaignName, onDone, svgCard, mode });
 
   /**
-   * Repaint the step and restore focus to the field that was in use.
+   * Repaint the step, keep the body where it was scrolled and restore focus
+   * to the field that was in use.
    *
    * Attributes and skills need a full repaint because the budget may clamp the
    * entered value. Focus restoration keeps consecutive edits usable.
    */
-  function paint(focusSelector) {
-    const active = focusSelector || activeFieldSelector(documentRef);
+  function paint() {
+    const focus = captureFocus(documentRef);
+    const offset = scrollAnchor(root);
     render(root, controller.state);
-    if (!active) return;
-    const restored = root.querySelector(active);
-    if (restored && typeof restored.focus === 'function') {
-      restored.focus();
-      if (typeof restored.select === 'function') restored.select();
-    }
+    restoreScroll(root, offset);
+    restoreFocus(root, focus);
   }
 
   function dismiss() {
@@ -954,40 +1195,13 @@ export function mountOnboardingWizard({
   root.addEventListener('input', (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    // Text fields refresh only validation to preserve the active input.
-    if (target.hasAttribute('data-wiz-name')) {
-      controller.handlers.setName(target.value);
-      refreshValidation(root, controller.state);
-      return;
-    }
-    if (target.hasAttribute('data-wiz-skill-filter')) { controller.handlers.setSkillFilter(target.value); return; }
-    if (target.hasAttribute('data-wiz-chrome-filter')) { controller.handlers.setChromeFilter(target.value); return; }
-    if (target.hasAttribute('data-wiz-gear-filter')) { controller.handlers.setGearFilter(target.value); return; }
-    // Lifestyle text/number fields refresh only validation so the caret stays.
-    if (target.hasAttribute('data-wiz-lifestyle-housing')) {
-      controller.handlers.setLifestyleDetail('housing', target.value);
-      refreshValidation(root, controller.state);
-      return;
-    }
-    if (target.hasAttribute('data-wiz-lifestyle-food')) {
-      controller.handlers.setLifestyleDetail('food', target.value);
-      refreshValidation(root, controller.state);
-      return;
-    }
-    if (target.hasAttribute('data-wiz-lifestyle-cost')) {
-      controller.handlers.setLifestyleDetail('monthlyCost', target.value);
-      refreshValidation(root, controller.state);
-      return;
-    }
-    if (target.hasAttribute('data-wiz-stat')) {
-      controller.handlers.setStat(target.getAttribute('data-wiz-stat'), target.value);
-      paint();
-      return;
-    }
-    if (target.hasAttribute('data-wiz-skill')) {
-      controller.handlers.setSkill(target.getAttribute('data-wiz-skill'), target.value);
-      paint();
-    }
+    const field = inputField(target);
+    if (!field) return;
+    field.apply(controller.handlers, target);
+    // Free text only gates the next button, so it skips the repaint entirely;
+    // everything else redraws the step and the caret comes back with it.
+    if (field.repaint === 'validation') refreshValidation(root, controller.state);
+    else paint();
   });
 
   root.addEventListener('change', (event) => {
@@ -995,10 +1209,6 @@ export function mountOnboardingWizard({
     if (!(target instanceof Element)) return;
     if (target.hasAttribute('data-wiz-role')) { controller.handlers.setRole(target.value); paint(); }
     if (target.hasAttribute('data-wiz-origin')) { controller.handlers.setOriginLanguage(target.value); paint(); }
-    if (target.hasAttribute('data-wiz-skill-filter')) paint();
-    if (target.hasAttribute('data-wiz-chrome-filter')) paint();
-    if (target.hasAttribute('data-wiz-gear-filter')) paint();
-    if (target.hasAttribute('data-wiz-lifestyle-cost')) paint();
   });
 
   paint();

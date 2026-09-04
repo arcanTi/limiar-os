@@ -31,6 +31,8 @@ import { mountOnboardingWizard } from './onboarding.js';
 import { BODY_TYPES as TOXIN_BODY_TYPES } from '../../domain/toxins/index.ts';
 import { characterEffectDigest } from '../../domain/effects/index.ts';
 import { effectPresetCatalog } from '../../domain/effects/customEffects.ts';
+import { uploadedPortrait } from '../../domain/character/portrait.ts';
+import { tableSeats } from '../../domain/campaigns/tableSeats.ts';
 
 // SYS.01 // CHARACTER: the sheet drawer — core stats, skills, conditions,
 // IP purchases, installed chrome, trauma team coverage, and the
@@ -47,6 +49,8 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const eff = deps.eff;
 
   const isPlayer = !!(S.authUser && S.authUser.role === 'player');
+  const sessionUsername = (S.authUser && S.authUser.username) || '';
+  const cleanTableName = (name) => String(name || '').trim().toUpperCase() || 'MESA SEM NOME';
   const canEditSheet = (S.gmAuthenticated && S.gm) || isPlayer;
   const canSaveSheet = canEditSheet || (S.sheetEditing && S.sheetCreating && !S.gmAuthenticated);
 
@@ -312,26 +316,136 @@ export function sheetRenderVals(state = {}, deps = {}) {
       style: 'lm-char-btn' + (active ? ' lm-char-btn--active' : ''),
     };
   });
-  const playerCharacterCards = (S.characters || []).map(c => {
+  // One player, one sheet. Switching is a GM tool: a player who could pick
+  // another document would be driving a character the table did not seat them
+  // in. The drawer's initials row is therefore staff-only.
+  const isStaffSheet = !!(S.gmAuthenticated && S.gm);
+  const showCharacterSwitcher = isStaffSheet && sheetCharacterBtns.length > 1;
+  // Creating a second operative is a GM tool for the same reason. A player with
+  // no sheet still gets the CRIAR OPERATIVO card on the desktop, so this hides
+  // only the path that would leave an orphan document behind.
+  const showNewSheetButton = isStaffSheet;
+  // The table roster reads `campaign.roster` (username/role/class/portrait),
+  // the one cross-player view the backend publishes - character documents stay
+  // owner-scoped. The seat leads with the character (name, class, face, class
+  // colour) and names the player under it, because at the table you look for
+  // "the Nomad", not for an account. Only your own seat is a button, and all it
+  // does is open your own sheet: no seat ever switches who you control.
+  const seats = tableSeats(S.activeCampaign, { username: sessionUsername });
+  const GM_TONE = { label: 'GM', color: '#3fe0d0', rgb: '63,224,208' };
+  const tableSeatCards = seats.map(seat => {
+    // Same rule as the operative cards: the wizard's generated card art is not
+    // a face, so a seat showing it falls back to initials.
+    const photo = uploadedPortrait({ portraitUrl: seat.portraitUrl });
+    const hasCharacter = !!seat.characterName;
+    const tone = seat.isGm ? GM_TONE : deps.playerRoleTone(seat.characterRole || 'EDGERUNNER');
+    const initialsFrom = hasCharacter ? seat.characterName : seat.username;
+    return {
+      ...seat,
+      portraitUrl: photo,
+      hasPortrait: !!photo,
+      noPortrait: !photo,
+      initials: String(initialsFrom || 'OP').replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'OP',
+      hasCharacter,
+      // The character is the headline; the account holding it is the footnote.
+      title: hasCharacter ? seat.characterName : seat.username,
+      classLabel: hasCharacter
+        ? (seat.characterRole || 'EDGERUNNER').toUpperCase() + ' // LVL ' + seat.characterLevel
+        : (seat.isGm ? 'MESTRE DA MESA' : 'SEM FICHA'),
+      playerLabel: seat.username.toUpperCase(),
+      // The account line only earns its place under a character name - on a
+      // seat with no sheet the username is already the headline.
+      playerLine: hasCharacter
+        ? seat.username.toUpperCase() + (seat.isSelf ? ' // VOCE' : '')
+        : (seat.isSelf ? 'VOCE' : ''),
+      showPlayerLine: hasCharacter || seat.isSelf,
+      roleTag: tone.label,
+      vars: '--seat-accent:' + tone.color + ';--seat-rgb:' + tone.rgb + ';',
+      selfTag: seat.isSelf ? 'VOCE' : '',
+      isNotSelf: !seat.isSelf,
+      // An absent player's seat says who is holding their sheet, so nobody has
+      // to ask at the table who is rolling for whom.
+      isCovered: !!seat.controlledBy,
+      isNotCovered: !seat.controlledBy,
+      coverLabel: seat.controlledBy ? (seat.controlledByMe ? 'VOCE COBRE' : 'COBERTO POR ' + seat.controlledBy.toUpperCase()) : '',
+      openLabel: 'ABRIR FICHA',
+      onClick: seat.isSelf ? () => deps.setState({ sheetOpen: true }) : null,
+      style: 'lm-table-seat'
+        + (seat.isGm ? ' lm-table-seat--gm' : '')
+        + (seat.isSelf ? ' lm-table-seat--self' : '')
+        + (hasCharacter ? ' lm-table-seat--pc' : '')
+        + (seat.controlledBy ? ' lm-table-seat--covered' : ''),
+    };
+  });
+  // The desktop only ever offers sheets the table sanctioned: this player's own
+  // seat, plus any absent player's sheet a GM handed them. Owning a document is
+  // not enough - an older character nobody seated stays out of reach here.
+  const mySeat = seats.find(seat => seat.isSelf) || null;
+  const delegatedSeatIds = seats.filter(seat => seat.controlledByMe && !seat.isSelf).map(seat => seat.characterId);
+  const characterById = (id) => (S.characters || []).find(c => c.id === id) || null;
+  /**
+   * @param {object} c        character document
+   * @param {string} kind     'own' when this is the player's own operative
+   * @param {string} coverFor username being stood in for, '' when it is theirs
+   */
+  const operativeCard = (c, kind, coverFor) => {
     const active = c.id === S.activeCharacterId;
     const role = c.role || 'EDGERUNNER';
     const tone = deps.playerRoleTone(role);
     const initials = String(c.initials || (c.name || 'OP').slice(0, 2)).slice(0, 2).toUpperCase();
+    const own = kind === 'own';
+    // A face on the card is the point here, so the wizard's generated card art
+    // does not count as one - those cards keep their initials.
+    const portrait = uploadedPortrait(c);
     return {
       id: c.id,
       initials,
+      portrait,
+      hasPortrait: portrait.length > 0,
+      noPortrait: portrait.length === 0,
       name: c.name || 'OPERATIVE',
       role,
       roleTag: tone.label,
       level: c.level || 1,
-      status: active ? 'ACTIVE' : 'SELECT',
+      isDelegated: !own,
+      coverFor,
+      coverLabel: own ? '' : 'NO LUGAR DE ' + String(coverFor || '').toUpperCase(),
+      active,
+      status: active ? 'ABRIR FICHA' : (own ? 'VOLTAR AO SEU' : 'ASSUMIR CONTROLE'),
       statusColor: active ? '#3fe0d0' : '#6f7a64',
       badgeBg: tone.color,
       vars: '--pc-accent:' + tone.color + ';--pc-rgb:' + tone.rgb + ';',
-      onClick: () => deps.selectCharacter(c.id),
-      style: 'limiar-player-card lm-player-card-btn' + (active ? ' lm-player-card-btn--active' : ''),
+      // Opening the sheet is the only thing this card does for the operative
+      // already in play. Taking over a delegated sheet (or dropping back to
+      // their own) is a switch the table authorised, so it selects first.
+      onClick: () => {
+        if (!active) deps.selectCharacter(c.id);
+        deps.setState({ sheetOpen: true });
+      },
+      style: 'limiar-player-card lm-player-card-btn'
+        + (active ? ' lm-player-card-btn--active' : '')
+        + (own ? '' : ' lm-player-card-btn--delegated'),
     };
-  });
+  };
+  const myCharacter = characterById(mySeat && mySeat.characterId)
+    || (S.characters || []).find(c => c.id === S.activeCharacterId && !delegatedSeatIds.includes(c.id))
+    || (S.characters || [])[0]
+    || null;
+  const myOperativeCard = myCharacter ? operativeCard(myCharacter, 'own', '') : null;
+  const hasMyOperative = !!myOperativeCard;
+  // One player driving one sheet does not need a whole panel repeating what
+  // their own seat already shows - the seat opens it. The panel comes back the
+  // moment there is a choice to make (a sheet lent to them), when the table
+  // seated them in nothing yet (CRIAR OPERATIVO), or off-table, where there
+  // are no seats to read.
+  const seatShowsMyCharacter = !!(myCharacter && mySeat && mySeat.characterId === myCharacter.id);
+  const delegatedCards = seats
+    .filter(seat => seat.controlledByMe && !seat.isSelf)
+    .map(seat => {
+      const character = characterById(seat.characterId);
+      return character ? operativeCard(character, 'delegated', seat.username) : null;
+    })
+    .filter(Boolean);
   const conditionLocation = ['head', 'body'].includes(S.conditionLocation) ? S.conditionLocation : 'body';
   const conditionLocationOptions = ['head', 'body'].map(loc => ({ value: loc, label: loc === 'head' ? 'CABECA' : 'CORPO', selected: loc === conditionLocation, notSelected: loc !== conditionLocation }));
   const filteredInjuries = Object.values(CPRED_CRITICAL_INJURIES).filter(injury => injury.location === conditionLocation);
@@ -660,7 +774,14 @@ export function sheetRenderVals(state = {}, deps = {}) {
     traumaLogoUrl: './assets/trauma-team-logo.png',
     traumaPlan, traumaPlanName, traumaPlanCode, traumaMemberName, traumaCardStyle, traumaPlanOptions,
     showRemoveTraumaPlan, showUseExecutiveBackup, onRemoveTraumaPlan, onUseExecutiveBackup,
-    sheetCharacterBtns, playerCharacterCards,
+    sheetCharacterBtns, showCharacterSwitcher, showNewSheetButton,
+    tableSeatCards, hasTableSeats: tableSeatCards.length > 0,
+    tableSeatCount: String(tableSeatCards.length),
+    tableName: cleanTableName(S.activeCampaignName),
+    myOperativeCard, hasMyOperative, missingMyOperative: !hasMyOperative,
+    showOwnSheetPanel: !(hasMyOperative && seatShowsMyCharacter && delegatedCards.length === 0),
+    delegatedCards, hasDelegatedCards: delegatedCards.length > 0,
+    delegatedCount: String(delegatedCards.length),
     sheetEditing: S.sheetEditing, notSheetEditing: !S.sheetEditing, sheetCreating: S.sheetCreating,
     editSheet: () => deps.editSheet(), createSheetCharacter: () => deps.createSheetCharacter(), createPlayerCharacter: () => deps.createPlayerCharacter(), cancelSheetEdit: () => deps.cancelSheetEdit(), saveSheetDraft: () => deps.saveSheetDraft(),
     exportSheetPdf: () => deps.exportCharacterPdf(S.activeCharacterId), canExportSheetPdf: !!S.activeCharacterId,
@@ -994,7 +1115,11 @@ export function sheetHandlers(component) {
     const active = component.activeCharacter();
     const asset = await component.uploadImage(file, 'character-portrait', active.id);
     if (asset && asset.url) {
-      component.updateActiveCharacter({ portraitUrl: asset.url });
+      // `applyCharacterPatch`, not `updateActiveCharacter`: the latter is the
+      // GM-gated writer, and a player setting their own portrait would be
+      // bounced to the login screen by it. The patch helper already picks the
+      // player endpoint when the session is not staff.
+      component.applyCharacterPatch(active.id, { portraitUrl: asset.url });
       component.setState({ gmStatus: 'Player portrait uploaded' });
     }
     e.target.value = '';

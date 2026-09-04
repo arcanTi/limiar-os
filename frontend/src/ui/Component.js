@@ -79,9 +79,10 @@ import {
   weaponRuntimeAttackMod as itemsWeaponRuntimeAttackMod,
   weaponRuntimeQuality as itemsWeaponRuntimeQuality,
   ignoresHalfSpBadge as itemsIgnoresHalfSpBadge,
+  isMeleeWeapon as itemsIsMeleeWeapon,
 } from '../domain/items/weaponProfileEngine.ts';
 import { LIMIAR_TRAUMA_PLANS, setTraumaPlans, traumaPlanKey as charTraumaPlanKey, traumaPlanByKey as charTraumaPlanByKey } from '../domain/character/traumaPlans.ts';
-import { isAdmin as authIsAdmin, isPlayerUser as authIsPlayerUser, canManageOwnSheet as authCanManageOwnSheet } from '../domain/auth/policies.ts';
+import { isAdmin as authIsAdmin, isPlayerUser as authIsPlayerUser, canManageOwnSheet as authCanManageOwnSheet, canUploadImage as authCanUploadImage } from '../domain/auth/policies.ts';
 import {
   chatText as chatRollText,
   chatRollTitle as chatRollTitleText,
@@ -118,6 +119,7 @@ import { clearMapAoeIntent, loadMapAoeIntent } from '../domain/map/mapAoeIntent.
 import { computeSituationalChips } from '../domain/map/situationalMods.ts';
 import { propsToWalls } from '../domain/map/visionEngine.ts';
 import { desktopHandlers, desktopRenderVals } from './views/desktop.js';
+import { activeCharacterIdFor, controlledCharacterIds, seatCharacterId } from '../domain/campaigns/tableSeats.ts';
 import {
   chipStyle as viewChipStyle,
   dieStyle as viewDieStyle,
@@ -160,7 +162,7 @@ const LimiarSeed = {
 
 class Component extends DCLogic {
   state = {
-    view: 'desktop', sheetOpen: false, sheetExpanded: false, railOpen: (typeof window !== 'undefined' && window.innerWidth >= 1100), gm: false, gmAuthenticated: false, authAuthenticated: false, authUser: null, activeCampaignId: this.props.activeCampaignId || '', activeCampaignName: '', playerReady: false, lang: 'en',
+    view: 'desktop', sheetOpen: false, sheetExpanded: false, railOpen: (typeof window !== 'undefined' && window.innerWidth >= 1100), gm: false, gmAuthenticated: false, authAuthenticated: false, authUser: null, activeCampaignId: this.props.activeCampaignId || '', activeCampaignName: '', activeCampaign: null, playerReady: false, lang: 'en',
     now: new Date(),
     characters: [],
     activeCharacterId: LimiarSeed.activeCharacterId,
@@ -202,6 +204,10 @@ class Component extends DCLogic {
     tarotState: null,
     tarotCurrent: null,
     tarotPhase: 'idle',
+    // Client-local: the drawnThisSession entry this client took off the table.
+    // The session lock stays server-side, so without this the next sync would
+    // deal the discarded card straight back.
+    tarotDismissed: null,
     tarotHistory: [],
     tarotTargetId: null,
     tarotAttackerId: null,
@@ -241,6 +247,8 @@ class Component extends DCLogic {
     // quick console's shared amount and pickers. Transient view state.
     rosterOpen: true, rosterQuery: '', rosterFilter: 'all', rosterAmount: '1',
     rosterInjuryId: '', rosterStatusId: '', rosterGrantId: '',
+    rosterTab: 'vitals', rosterCustomName: '', rosterCustomType: 'GEAR', rosterCustomQty: '1', rosterCustomNotes: '',
+    rosterNetAbility: 'backdoor', rosterNetDv: '', rosterNetLabel: '', rosterNetAll: false,
     achievementDraft: null,
     sheetEditing: false,
     sheetCreating: false,
@@ -307,7 +315,7 @@ class Component extends DCLogic {
   // Long-poll `/campaigns/:id/updates` while there is an active campaign,
   // refetching only the topics (chat/combat/roster) the server reports dirty.
   // No active campaign yet -> idle-wait and recheck, so switching into one
-  // later (e.g. after loadActiveCampaignName resolves) picks the loop up.
+  // later (e.g. after loadActiveCampaign resolves) picks the loop up.
   async startCampaignSync() {
     if (this._syncRunning) return;
     this._syncRunning = true;
@@ -360,6 +368,10 @@ class Component extends DCLogic {
   async applyCampaignSyncTopics(topics) {
     if (topics.includes('chat')) await this.refreshChat();
     if (topics.includes('roster') || topics.includes('combat')) await this.refreshRoster();
+    // A seat change (someone joined, the GM re-seated a player, or control of a
+    // sheet was handed over) only shows up in the campaign row, which
+    // refreshRoster does not fetch.
+    if (topics.includes('roster')) await this.loadActiveCampaign();
     if (topics.some(topic => ['tarot', 'hq', 'nexus'].includes(topic))) await this.reloadRemoteData();
   }
 
@@ -395,20 +407,46 @@ class Component extends DCLogic {
       if (user && ['admin', 'gm'].includes(user.role)) {
         await this.loadUsers();
       }
-      if (this.state.activeCampaignId) await this.loadActiveCampaignName();
+      if (this.state.activeCampaignId) await this.loadActiveCampaign();
       if (this.state.activeCampaignId) await this.loadToxins();
       if (this.state.activeCampaignId) await this.loadCustomEffects();
     }
   }
 
-  async loadActiveCampaignName() {
+  // The whole campaign row, not just its name: `roster` is what the desktop
+  // uses to show who else is at the table, and the seat it holds for this
+  // account decides which sheet the player drives.
+  async loadActiveCampaign() {
     const api = this.api();
     if (!api?.campaigns?.list) return;
     try {
       const campaigns = await api.campaigns.list();
       const campaign = (Array.isArray(campaigns) ? campaigns : []).find((entry) => entry && entry.id === this.state.activeCampaignId);
-      if (campaign) this.setState({ activeCampaignName: campaign.name || '' });
-    } catch (_) { /* keep whatever name we had, non-critical */ }
+      if (!campaign) return;
+      this.setState({ activeCampaign: campaign, activeCampaignName: campaign.name || '' });
+      this.applyCampaignSeat(campaign);
+    } catch (_) { /* keep whatever campaign we had, non-critical */ }
+  }
+
+  // Seat the player in the character the table registered for them. Selecting
+  // through the sheet handler keeps the derived state (credits, gear, health)
+  // in step with the document, exactly as the old picker did.
+  //
+  // A sheet delegated to this player counts as sanctioned, so covering for an
+  // absent player survives the next roster refresh instead of snapping back.
+  applyCampaignSeat(campaign) {
+    const username = (this.state.authUser && this.state.authUser.username) || '';
+    if (!username) return;
+    const row = campaign || this.state.activeCampaign;
+    const seatId = seatCharacterId(row, username);
+    const nextId = activeCharacterIdFor(
+      seatId,
+      this.state.characters,
+      this.state.activeCharacterId || '',
+      controlledCharacterIds(row, username),
+    );
+    if (!nextId || nextId === this.state.activeCharacterId) return;
+    this.sheetHandlers().selectCharacter(nextId);
   }
 
   redirectToLogin() {
@@ -478,7 +516,7 @@ class Component extends DCLogic {
       ]);
       this._catalogProducts = products || [];
       const tarotState = await this.tarotHandlers().ensureTarotState(tarotStateRaw);
-      const tarotCurrent = this.tarotHandlers().tarotCardFromEntry(tarotState.drawnThisSession);
+      const tarotSync = this.tarotHandlers().tarotSyncPatch(tarotState);
       const normalizedCharacters = this.normalizeCharacterList(characters || []);
       const combatState = await this.combatHandlers().ensureCombatState(combatStateRaw, normalizedCharacters);
       const activeStillExists = normalizedCharacters.some(c => c.id === this.state.activeCharacterId);
@@ -496,8 +534,7 @@ class Component extends DCLogic {
         tarotDeck: tarotState.order,
         tarotHistory: this.tarotHandlers().tarotHistoryRows(tarotState.history),
         combatState,
-        tarotCurrent: tarotCurrent || this.state.tarotCurrent,
-        tarotPhase: tarotCurrent ? 'shown' : this.state.tarotPhase,
+        ...tarotSync,
         activeCharacterId: activeId || this.state.activeCharacterId,
         notesDraft: this.sheetHandlers().notesFieldsFrom(active),
         credits: active.credits ?? this.state.credits,
@@ -509,6 +546,9 @@ class Component extends DCLogic {
         gearItems: active.gear || this.state.gearItems,
         gmStatus: this.state.gmAuthenticated ? this.state.gmStatus : 'Backend conectado',
       });
+      // A card can land here from anyone's draw; this client only sees the FX
+      // if it (re)starts it itself.
+      this.tarotHandlers().ensureTarotFx();
       await this.consumeMapAttackIntent();
       await this.consumeMapFocusIntent();
       await this.consumeMapAoeIntent();
@@ -574,6 +614,9 @@ class Component extends DCLogic {
   }
   ignoresHalfSpBadge(item) {
     return itemsIgnoresHalfSpBadge(item);
+  }
+  isMeleeWeapon(item) {
+    return itemsIsMeleeWeapon(item);
   }
   normalizeGearItem(item, idx = 0) {
     const src = item || {};
@@ -1008,6 +1051,7 @@ class Component extends DCLogic {
       patch.gameTab = 'tarot';
     }
     this.setState(patch);
+    if (v === 'games') this.tarotHandlers().ensureTarotFx();
   }
 
   async openCampaignMap() {
@@ -1404,9 +1448,16 @@ class Component extends DCLogic {
     const current = this.normalizeSpDamage(target.spDamage);
     this.updateCharacterById(target.id, { spDamage: { ...current, [slot]: Math.max(0, (current[slot] || 0) + (Number(amount) || 0)) } });
   }
+  /**
+   * Uploads are a GM tool everywhere except a player's own portrait. The GM
+   * gate used to cover that case too, and since it redirects to the login
+   * screen it threw the player out to campaign selection the first time they
+   * picked a photo for the sheet they had just created.
+   */
   async uploadImage(file, scope, ownerId) {
     if (!file) return null;
-    if (!this.ensureGm('Login do mestre necessario para upload')) return null;
+    const allowed = authCanUploadImage(this.authSession(), { staff: this.state.gmAuthenticated, scope, ownerId });
+    if (!allowed && !this.ensureGm('Login do mestre necessario para upload')) return null;
     if (this.api()) return this.api().uploads.image(file, { scope, ownerId });
     return { url: URL.createObjectURL(file) };
   }
@@ -1960,6 +2011,7 @@ class Component extends DCLogic {
       products: this.products,
       gearList: this.gearList,
       clockText: (now) => this.clockText(now),
+      playerRoleTone: (role) => this.playerRoleTone(role),
       scanlinesDefault: this.props.scanlines,
       auraDefault: this.props.aura,
       setState: (fn) => this.setState(fn),
@@ -1970,6 +2022,7 @@ class Component extends DCLogic {
       hasDamageProfile: (item) => this.hasDamageProfile(item),
       gearDamageText: (item) => this.gearDamageText(item),
       ignoresHalfSpBadge: (item) => this.ignoresHalfSpBadge(item),
+      isMeleeWeapon: (item) => this.isMeleeWeapon(item),
       effectMap: (map) => this.effectMap(map),
       weaponProfile: (item) => this.weaponProfile(item),
       normalizeEquipped: (equipped) => this.normalizeEquipped(equipped),
@@ -1998,6 +2051,13 @@ class Component extends DCLogic {
       deleteInventoryGear: (id) => this.desktopHandlers().deleteInventoryGear(id),
       useInventoryGear: (id) => this.desktopHandlers().useInventoryGear(id),
       buy: (p) => this.desktopHandlers().buy(p),
+      previewInstall: (product) => this.app().installCyberware.preview({
+        character: this.activeCharacter(),
+        catalog: this.state.products,
+        product,
+        credits: this.state.credits,
+        resolveInstallPayload: (item) => this.installPayload(item),
+      }),
       createGmCharacter: () => this.desktopHandlers().createGmCharacter(),
       upsertGmItem: () => this.desktopHandlers().upsertGmItem(),
       deleteGmItem: () => this.desktopHandlers().deleteGmItem(),

@@ -64,6 +64,9 @@ export function campaignsRenderVals(state = {}, deps = {}) {
     query,
     selected: current,
     status: String(state.status || ''),
+    // Who the GM picked in each seat's "ceder para..." select, before pressing
+    // CEDER. Keyed by character so two rows cannot share one choice.
+    substituteByCharacter: state.substituteByCharacter || {},
     draft,
     editing: Boolean(draft.id),
     bannerFileName: bannerFile ? bannerFile.name : '',
@@ -197,6 +200,39 @@ export function campaignsHandlers(component, api) {
         patch({ status: 'Falha ao remover player' });
       }
     },
+    chooseSubstitute: (characterId, username) => {
+      // The overlay controller merges plain objects (no updater form), so the
+      // current map is read here and replaced whole.
+      patch({
+        substituteByCharacter: {
+          ...(component.state.substituteByCharacter || {}),
+          [characterId]: username,
+        },
+      });
+    },
+    grantControl: async (campaignId, characterId) => {
+      const username = (component.state.substituteByCharacter || {})[characterId] || '';
+      if (!username) {
+        patch({ status: 'Escolha quem vai cobrir esta ficha' });
+        return;
+      }
+      try {
+        await api.campaigns.grantControl(campaignId, characterId, username);
+        patch({ status: `Controle de ${characterId} cedido para ${username}` });
+        await refresh();
+      } catch (_) {
+        patch({ status: 'Nao foi possivel ceder o controle' });
+      }
+    },
+    revokeControl: async (campaignId, characterId) => {
+      try {
+        await api.campaigns.revokeControl(campaignId, characterId);
+        patch({ status: 'Controle devolvido ao dono' });
+        await refresh();
+      } catch (_) {
+        patch({ status: 'Nao foi possivel devolver o controle' });
+      }
+    },
     join: async (campaignId) => {
       const characterId = selectedCharacterForCampaign(campaignId, component.state.characterByCampaign, component.state.characters);
       if (!characterId) {
@@ -259,13 +295,31 @@ function campaignDetail(vals) {
         <div class="lm-campaign-master-grid">
           <div class="lm-campaign-roster">
             <div class="lm-campaign-staff-title">FICHAS NA CAMPANHA</div>
-            ${campaign.members.map(member => `
+            ${campaign.members.map(member => {
+    // Substitute control: when a player misses the session, the GM hands their
+    // sheet to another member of this same table until it is taken back.
+    const held = (campaign.delegations || []).find(entry => entry.characterId === member.characterId);
+    const substitutes = campaign.members.filter(other => other.username !== member.username);
+    return `
               <div class="lm-campaign-roster-row">
                 <span>${esc(member.username)}</span>
                 <strong>${esc(member.characterId)}</strong>
                 <button data-campaign-remove-member="${esc(campaign.id)}" data-campaign-user="${esc(member.username)}">REMOVER</button>
               </div>
-            `).join('') || '<div class="lm-campaign-empty">Nenhum player vinculado.</div>'}
+              <div class="lm-campaign-delegation-row">
+                ${held ? `
+                  <span class="lm-campaign-delegation-held">CONTROLE: ${esc(held.username)}</span>
+                  <button data-campaign-revoke-control="${esc(campaign.id)}" data-campaign-sheet="${esc(member.characterId)}">DEVOLVER</button>
+                ` : substitutes.length ? `
+                  <select data-campaign-substitute="${esc(member.characterId)}">
+                    <option value="">ausente? ceder para...</option>
+                    ${substitutes.map(other => `<option value="${esc(other.username)}" ${vals.substituteByCharacter[member.characterId] === other.username ? 'selected' : ''}>${esc(other.username)}</option>`).join('')}
+                  </select>
+                  <button data-campaign-grant-control="${esc(campaign.id)}" data-campaign-sheet="${esc(member.characterId)}">CEDER</button>
+                ` : '<span class="lm-campaign-delegation-held">sem outro player na mesa</span>'}
+              </div>
+            `;
+  }).join('') || '<div class="lm-campaign-empty">Nenhum player vinculado.</div>'}
             <div class="lm-campaign-staff-title lm-campaign-subtitle">CONVITES</div>
             ${campaign.invites.map(invite => `
               <div class="lm-campaign-roster-row">
@@ -442,6 +496,20 @@ export function mountCampaignsOverlay({ api, documentRef = globalThis.document, 
     }
     const cancelInviteNode = target.closest('[data-campaign-cancel-invite]');
     if (cancelInviteNode) handlers.cancelInvite(cancelInviteNode.getAttribute('data-campaign-cancel-invite'), cancelInviteNode.getAttribute('data-campaign-user'));
+    const grantNode = target.closest('[data-campaign-grant-control]');
+    if (grantNode) {
+      handlers.grantControl(
+        grantNode.getAttribute('data-campaign-grant-control'),
+        grantNode.getAttribute('data-campaign-sheet'),
+      );
+    }
+    const revokeNode = target.closest('[data-campaign-revoke-control]');
+    if (revokeNode) {
+      handlers.revokeControl(
+        revokeNode.getAttribute('data-campaign-revoke-control'),
+        revokeNode.getAttribute('data-campaign-sheet'),
+      );
+    }
     const removeMemberNode = target.closest('[data-campaign-remove-member]');
     if (removeMemberNode) {
       const username = removeMemberNode.getAttribute('data-campaign-user');
@@ -455,6 +523,8 @@ export function mountCampaignsOverlay({ api, documentRef = globalThis.document, 
     if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return;
     const draftKey = target.getAttribute('data-campaign-draft');
     if (draftKey) handlers.updateDraft(draftKey, target.value);
+    const substituteFor = target.getAttribute('data-campaign-substitute');
+    if (substituteFor) handlers.chooseSubstitute(substituteFor, target.value);
     if (target.matches('[data-campaign-search]')) {
       handlers.updateInviteQuery(target.value);
       filterCandidateButtons(root, target.value);

@@ -1,4 +1,5 @@
 import { resolveInstalledCyberware } from '../domain/items/cyberwareInstallEngine.ts';
+import { installBlockText } from '../domain/items/installBlockText.ts';
 import { cyberwareHumanityLoss } from '../domain/cyberware/index.ts';
 import type { InstalledCyberwareItem } from '../domain/cyberware/index.ts';
 import type { ValidationIssue } from '../domain/items/itemTypes.ts';
@@ -40,6 +41,17 @@ export interface InstallCyberwareInput {
   resolveInstallPayload?: (product: ProductLike) => LegacyCatalogItem;
 }
 
+export interface InstallCyberwarePreview {
+  /** True when the install would go through right now. */
+  ok: boolean;
+  reason: 'equipped' | 'soldout' | 'funds' | 'requirements' | null;
+  /** Short tag for the shop card, e.g. REQUISITO NAO CUMPRIDO. */
+  label: string;
+  /** Player-facing explanation of what to do about it. */
+  message: string;
+  issues: ValidationIssue[];
+}
+
 export interface InstallCyberwareResult {
   ok: boolean;
   error?: string | null;
@@ -61,6 +73,45 @@ export default class InstallCyberware {
     this.api = api;
   }
 
+  /**
+   * Same rules as `execute`, without buying anything — so the shop can say
+   * why a piece is unavailable BEFORE the player spends a click on it. A
+   * disabled button with no reason is the bug this exists to fix.
+   */
+  preview({ character, catalog, product, credits, resolveInstallPayload }: InstallCyberwareInput): InstallCyberwarePreview {
+    const free: InstallCyberwarePreview = { ok: true, reason: null, label: '', message: '', issues: [] };
+    if (!product || !product.code) return free;
+    const active = character || {};
+    const currentEquipped = Array.isArray(active.equipped) ? active.equipped : [];
+    const name = String(product.name || product.code);
+
+    if (currentEquipped.some(it => it && it.code === product.code)) {
+      return { ok: false, reason: 'equipped', label: 'JA INSTALADO', message: `${name} ja esta instalado nesta ficha.`, issues: [] };
+    }
+    if (product.stock === 'SOLD OUT') {
+      return { ok: false, reason: 'soldout', label: 'ESGOTADO', message: `${name} esta esgotado no catalogo.`, issues: [] };
+    }
+    const price = Number(product.price) || 0;
+    const after = (Number(credits) || 0) - price;
+    if (after < 0) {
+      return { ok: false, reason: 'funds', label: 'SEM SALDO', message: `Faltam ${Math.abs(after)}eb para ${name}.`, issues: [] };
+    }
+
+    const installedItem = resolveInstallPayload ? resolveInstallPayload(product) : product;
+    const before = resolveInstalledCyberware({ ...active, equipped: currentEquipped }, catalog, canonicalRules as CanonicalRules);
+    const afterResolved = resolveInstalledCyberware({ ...active, equipped: [...currentEquipped, installedItem] }, catalog, canonicalRules as CanonicalRules);
+    const blockingIssues = newErrorIssues(before.issues, afterResolved.issues);
+    if (!blockingIssues.length) return free;
+    const detail = installBlockText(blockingIssues, catalog);
+    return {
+      ok: false,
+      reason: 'requirements',
+      label: 'REQUISITO NAO CUMPRIDO',
+      message: `${name} ${detail || 'nao pode ser instalado agora'}.`,
+      issues: blockingIssues,
+    };
+  }
+
   execute({ character, catalog, product, credits, resolveInstallPayload }: InstallCyberwareInput): InstallCyberwareResult {
     const active = character || {};
     if (!product || !product.code) return { ok: false, error: null };
@@ -80,7 +131,7 @@ export default class InstallCyberware {
     if (blockingIssues.length) {
       return {
         ok: false,
-        error: product.code + ' nao pode ser instalado: ' + blockingIssues.map(issue => issue.message).join('; '),
+        error: product.code + ' nao pode ser instalado: ' + (installBlockText(blockingIssues, catalog) || blockingIssues.map(issue => issue.message).join('; ')),
         issues: blockingIssues,
       };
     }

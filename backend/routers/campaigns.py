@@ -57,6 +57,31 @@ def join(campaign_id: str, session: Authenticated, payload: Payload, service: Ca
     )
 
 
+@router.post("/campaigns/{campaign_id}/delegations", status_code=201)
+def grant_delegation(
+    campaign_id: str, session: Staff, payload: Payload, service: Campaigns
+) -> JSONResponse:
+    """GM hands an absent player's sheet to another player at the table."""
+    return JSONResponse(
+        jsonable_encoder(
+            service.grant_control(
+                campaign_id,
+                str(payload.get("characterId") or "").strip(),
+                str(payload.get("username") or ""),
+                session,
+            )
+        ),
+        status_code=201,
+    )
+
+
+@router.delete("/campaigns/{campaign_id}/delegations/{character_id}")
+def revoke_delegation(
+    campaign_id: str, character_id: str, session: Staff, service: Campaigns
+) -> dict[str, bool]:
+    return {"revoked": service.revoke_control(campaign_id, character_id, session)}
+
+
 @router.get("/campaigns/{campaign_id}/updates")
 def campaign_updates(campaign_id: str, session: Authenticated, service: Campaigns, since: int = 0) -> dict[str, object]:
     return service.updates(campaign_id, since, session)

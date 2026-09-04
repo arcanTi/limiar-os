@@ -3,6 +3,7 @@ import { CPRED_STAT_ORDER } from '../../domain/character/constants.ts';
 import { buildBodyMap } from '../../domain/items/bodyMapEngine.ts';
 import { isPurchasableProduct } from '../../domain/items/itemNormalizers.ts';
 import { gameTabStyle } from '../view/styles.js';
+import { uploadedPortrait } from '../../domain/character/portrait.ts';
 
 const BODY_REGION_LABELS = {
   skull: 'CABECA',
@@ -187,10 +188,18 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const status = depleted ? tx.depleted : g.equipped ? tx.equipped : 'READY';
     const statusColor = hasReqWarning ? '#c0635b' : depleted ? '#c0635b' : g.equipped ? '#3fe0d0' : '#d6aa4e';
     const useEnabled = isWeapon || !depleted;
+    const isMelee = isWeapon && !!(deps.isMeleeWeapon && deps.isMeleeWeapon(g));
+    const knowsReach = !!(g.melee || String(g.skill || '').trim());
     return {
       ...g,
       dmg: isWeapon ? deps.gearDamageText(g) : '—',
       dmgColor: isWeapon ? '#c0635b' : '#3a3f33',
+      // Reach is the first thing a player checks before declaring an attack,
+      // so a weapon says it as a chip instead of hiding it inside the skill.
+      // A row with neither a melee flag nor a skill cannot be classified, and
+      // an unknown weapon gets no chip rather than a confident wrong one.
+      isMeleeWeapon: isMelee,
+      isRangedWeapon: isWeapon && knowsReach && !isMelee,
       rofLabel: g.rof != null && g.rof !== '' ? String(g.rof) : '—',
       magLabel: g.mag != null && g.mag !== '' ? String(g.mag) : '—',
       skillLabel: g.skill || '—',
@@ -351,17 +360,39 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const isTraumaPlanProduct = p.kind === 'trauma-plan';
     const isCurrentTraumaPlan = isTraumaPlanProduct && deps.traumaPlanKey(activeCharacter) === p.planKey;
     const isEquipped = p.kind === 'weapon' ? false : isTraumaPlanProduct ? isCurrentTraumaPlan : eqp && eqp.code === p.code;
+    // Prerequisites are checked BEFORE the click, not after: a shop that only
+    // says "nao pode ser instalado" once the money is gone teaches nothing.
+    // Only real cyberware goes through the install engine — carried gear and
+    // Trauma Team plans have no slots or requirements to fail.
+    const goesThroughInstallEngine = !isTraumaPlanProduct && p.kind !== 'weapon';
+    const requirementBlock = (goesThroughInstallEngine && !isEquipped && canAfford && deps.previewInstall)
+      ? deps.previewInstall(p)
+      : null;
+    const requirementBlocked = !!(requirementBlock && !requirementBlock.ok && requirementBlock.reason === 'requirements');
+
     let buyLabel, buyBg, balLabel, balColor;
-    if (isEquipped) { buyLabel = tx.alreadyInstalled; buyBg = '#3a3f33'; balLabel = tx.activeUnit; balColor = '#3fe0d0'; }
-    else if (p.stock === 'SOLD OUT') { buyLabel = tx.depleted; buyBg = '#3a3f33'; balLabel = tx.outOfStock; balColor = '#c0635b'; }
-    else if (!canAfford) { buyLabel = tx.insufficient + ' ₢'; buyBg = '#3a3f33'; balLabel = tx.shortBy + ' ' + deps.fmt(Math.abs(after)); balColor = '#c0635b'; }
-    else { buyLabel = (isTraumaPlanProduct ? (S.lang === 'pt' ? 'ATIVAR PLANO' : 'ACTIVATE PLAN') : p.kind === 'weapon' ? tx.addToGear : tx.install) + ' →'; buyBg = '#d6aa4e'; balLabel = tx.balanceAfterInstall + ' ' + deps.fmt(after); balColor = '#6f7a64'; }
-    const canInstall = !isEquipped && p.stock !== 'SOLD OUT' && canAfford;
+    let blockLabel = '', blockMessage = '';
+    if (isEquipped) {
+      buyLabel = tx.alreadyInstalled; buyBg = '#3a3f33'; balLabel = tx.activeUnit; balColor = '#3fe0d0';
+      blockLabel = tx.alreadyInstalled; blockMessage = tx.activeUnit;
+    } else if (p.stock === 'SOLD OUT') {
+      buyLabel = tx.depleted; buyBg = '#3a3f33'; balLabel = tx.outOfStock; balColor = '#c0635b';
+      blockLabel = tx.depleted; blockMessage = tx.outOfStock;
+    } else if (!canAfford) {
+      buyLabel = tx.insufficient + ' ₢'; buyBg = '#3a3f33'; balLabel = tx.shortBy + ' ' + deps.fmt(Math.abs(after)); balColor = '#c0635b';
+      blockLabel = tx.insufficient; blockMessage = tx.shortBy + ' ' + deps.fmt(Math.abs(after)) + '.';
+    } else if (requirementBlocked) {
+      buyLabel = tx.requirementPending; buyBg = '#3a3f33'; balLabel = tx.balanceAfterInstall + ' ' + deps.fmt(after); balColor = '#6f7a64';
+      blockLabel = tx.blockedRequirement; blockMessage = requirementBlock.message;
+    } else {
+      buyLabel = (isTraumaPlanProduct ? (S.lang === 'pt' ? 'ATIVAR PLANO' : 'ACTIVATE PLAN') : p.kind === 'weapon' ? tx.addToGear : tx.install) + ' →'; buyBg = '#d6aa4e'; balLabel = tx.balanceAfterInstall + ' ' + deps.fmt(after); balColor = '#6f7a64';
+    }
+    const canInstall = !isEquipped && p.stock !== 'SOLD OUT' && canAfford && !requirementBlocked;
     const buyStyle = 'lm-market-buy-btn' + (canInstall ? ' lm-market-buy-btn--on' : ' lm-market-buy-btn--off');
 
     const selectedFx = marketFx(Math.max(0, idx));
     const traumaPlanStatusLabel = isCurrentTraumaPlan ? '— ACTIVE PLAN —' : '— NOT ACTIVE —';
-    selected = { ...p, ...selectedFx, num: String(idx + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), equippedName: p.kind === 'weapon' ? 'CARRIED GEAR' : isTraumaPlanProduct ? traumaPlanStatusLabel : eqp ? eqp.code + ' INSTALLED' : '— NOT INSTALLED —', cmp, buyLabel, buyStyle, balLabel, balColor, hasImage: !!p.imageUrl, noImage: !p.imageUrl, buy: () => deps.buy(p) };
+    selected = { ...p, ...selectedFx, num: String(idx + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), equippedName: p.kind === 'weapon' ? 'CARRIED GEAR' : isTraumaPlanProduct ? traumaPlanStatusLabel : eqp ? eqp.code + ' INSTALLED' : '— NOT INSTALLED —', cmp, buyLabel, buyStyle, balLabel, balColor, hasImage: !!p.imageUrl, noImage: !p.imageUrl, hasBlock: !!blockMessage, blockLabel, blockMessage, buy: () => deps.buy(p) };
   }
 
   // dice app (SYS.04)
@@ -389,6 +420,13 @@ export function desktopRenderVals(state = {}, deps = {}) {
 
   // mini-games tab shell (SYS.05: Tarot / Nexus Breach switcher)
   const gameTab = S.gameTab;
+
+  // Right-rim grip: same rule as the seats - the wizard's generated card art is
+  // not a face, so it falls back to initials.
+  const handleTone = deps.playerRoleTone(activeCharacter.role || 'EDGERUNNER');
+  const handlePortrait = uploadedPortrait(activeCharacter);
+  const handleHpPct = deps.clampPct(healthMax ? healthCur / healthMax * 100 : 0);
+  const handleHpColor = handleHpPct <= 25 ? '#c0635b' : handleHpPct <= 60 ? '#d6aa4e' : '#3fe0d0';
 
   return {
     scanlines: scanOn,
@@ -425,6 +463,19 @@ export function desktopRenderVals(state = {}, deps = {}) {
     openSheet: () => deps.setState({ sheetOpen: true }),
     closeSheet: () => deps.setState({ sheetOpen: false }),
     sheetOpen: S.sheetOpen,
+    // Edge handle: a permanent grip on the right rim that pulls the operative
+    // file open. It hides itself while the drawer is out so it cannot sit on
+    // top of it, and stays out of the way of the campaign map view.
+    sheetHandleVisible: !S.sheetOpen && S.authAuthenticated && S.view !== 'map',
+    // The grip wears the operative it opens: face (or initials), class colour,
+    // and a hairline of HP down its spine, so the rim says whose file this is
+    // without the drawer being out.
+    sheetHandleVars: '--handle-accent:' + handleTone.color + ';--handle-rgb:' + handleTone.rgb + ';'
+      + '--handle-hp:' + handleHpPct + '%;--handle-hp-color:' + handleHpColor + ';',
+    sheetHandlePortrait: handlePortrait,
+    sheetHandleHasPortrait: handlePortrait.length > 0,
+    sheetHandleNoPortrait: handlePortrait.length === 0,
+    sheetHandleTag: handleTone.label,
     health: { cur: healthCur, max: healthMax, pct: deps.clampPct(healthMax ? healthCur / healthMax * 100 : 0) },
     humanity: { cur: hum, max: derived.humanityMax, pct: deps.clampPct(derived.humanityMax ? hum / derived.humanityMax * 100 : 0) },
     reputation: deps.asNumber(deps.activeCharacter.reputation, 0, 0, 10),
@@ -815,6 +866,9 @@ export function desktopHandlers(component) {
     // the DOM by the time mountNexus runs (no requestAnimationFrame needed).
     component.setState({ gameTab: tab });
     if (tab === 'nexus') component.nexusHandlers().mountNexus();
+    // Same idea for the tarot canvas: it only exists while this tab is mounted,
+    // so a card already on the table needs its FX restarted on the way back in.
+    if (tab === 'tarot') component.tarotHandlers().ensureTarotFx();
   }
 
   return {

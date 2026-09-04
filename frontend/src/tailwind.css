@@ -312,6 +312,7 @@
   .lm-roster-card-main { display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;align-items:start;text-align:left;background:transparent;border:none;padding:10px;cursor:pointer; }
   .lm-roster-card-id { display:flex;flex-direction:column;align-items:center;gap:5px; }
   .lm-roster-initials { width:34px;height:34px;display:grid;place-items:center;background:linear-gradient(180deg,var(--pc-accent),rgba(var(--pc-rgb),.7));color:#080a07;font:800 12px 'Share Tech Mono',monospace; }
+  .lm-roster-portrait { width:44px;height:44px;object-fit:cover;border:1px solid rgba(var(--pc-rgb),.55);box-shadow:0 0 10px rgba(var(--pc-rgb),.25);background:#080a07; }
   .lm-roster-kind { font:800 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:var(--pc-accent); }
   .lm-roster-card-body { min-width:0;display:flex;flex-direction:column;gap:4px; }
   .lm-roster-name { font:800 14px/1.05 'Chakra Petch',sans-serif;letter-spacing:.7px;color:#f0ead8;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
@@ -321,12 +322,29 @@
   .lm-roster-line { display:flex;justify-content:space-between;gap:8px;font:9px 'Share Tech Mono',monospace;color:#6f7a64;min-width:0; }
   .lm-roster-line span { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .lm-roster-cond { font:9px 'Share Tech Mono',monospace;letter-spacing:.5px;color:#c0635b; }
+  .lm-roster-card-actions { display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:0 8px 7px; }
+  .lm-roster-action { font:800 8px 'Share Tech Mono',monospace;letter-spacing:.8px;padding:6px 4px;cursor:pointer;background:rgba(8,10,7,.7);border:1px solid rgba(var(--pc-rgb),.22);color:#cfc9b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .12s,color .12s; }
+  .lm-roster-action i { margin-right:3px;opacity:.85; }
+  .lm-roster-action--cond:hover { color:#080a07;background:#c0635b;border-color:#c0635b; }
+  .lm-roster-action--item:hover { color:#080a07;background:#d6aa4e;border-color:#d6aa4e; }
+  .lm-roster-action--net:hover { color:#080a07;background:#b56cff;border-color:#b56cff; }
   .lm-roster-card-foot { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-top:1px solid rgba(var(--pc-rgb),.16); }
   .lm-roster-state { font:800 9px 'Share Tech Mono',monospace;letter-spacing:1.4px;color:var(--pc-accent); }
   .lm-roster-console { margin-top:11px;border:1px solid rgba(63,224,208,0.18);background:rgba(8,10,7,.72);padding:10px; }
   .lm-roster-console-head { display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:8px; }
   .lm-roster-console-title { font:700 10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0; }
   .lm-roster-console-meta { font:9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64; }
+  .lm-roster-tabs { display:flex;gap:4px;flex-wrap:wrap;margin-left:auto; }
+  .lm-roster-tab { font:800 9px 'Share Tech Mono',monospace;letter-spacing:1.2px;color:#6f7a64;background:transparent;border:1px solid rgba(63,224,208,0.2);padding:6px 10px;cursor:pointer; }
+  .lm-roster-tab--on { color:#080a07;background:#3fe0d0;border-color:#3fe0d0; }
+  .lm-roster-chip { font:700 9px 'Share Tech Mono',monospace;letter-spacing:1px;color:#9a9883;background:transparent;border:1px solid rgba(181,108,255,.3);padding:6px 9px;cursor:pointer; }
+  .lm-roster-chip--on { color:#080a07;background:#b56cff;border-color:#b56cff; }
+  .lm-roster-net-desc { font:9px/1.5 'Share Tech Mono',monospace;color:#9a9883;margin:-2px 0 8px; }
+  .lm-roster-net-target { display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:7px;padding:6px 8px;background:#080a07;border:1px solid rgba(181,108,255,.18); }
+  .lm-roster-net-target-label { font:800 8px 'Share Tech Mono',monospace;letter-spacing:2px;color:#b56cff; }
+  .lm-roster-net-target-name { font:700 10px 'Share Tech Mono',monospace;letter-spacing:.8px;color:#f0ead8; }
+  .lm-roster-net-warn { font:9px 'Share Tech Mono',monospace;letter-spacing:.5px;color:#d6aa4e; }
+  .lm-roster-net-preview { flex:1;min-width:0;font:700 10px 'Share Tech Mono',monospace;letter-spacing:.8px;color:#3fe0d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .lm-roster-console-row { display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:7px; }
   .lm-roster-console-row .lm-ui-select { flex:1;min-width:160px; }
   .lm-roster-remove-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px;margin-top:4px; }

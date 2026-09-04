@@ -63,6 +63,39 @@ class CampaignService:
             raise ApplicationError(403, "Campaign access denied")
         return self.campaigns.join_campaign(campaign_id, character_id, dict(session))
 
+    def grant_control(
+        self,
+        campaign_id: str,
+        character_id: str,
+        username: str,
+        session: Session,
+    ) -> Record:
+        """Hand an absent player's sheet to another player at the table.
+
+        Only the GM of this campaign decides, and only over a sheet this table
+        actually seated: a delegation is a seat standing in for another seat,
+        never a way to reach a character from outside the campaign.
+        """
+        self._owner(campaign_id, session)
+        username = username.strip()
+        if not username:
+            raise ApplicationError(400, "Username required")
+        members = self.campaigns.list_members(campaign_id)
+        seat = next((m for m in members if str(m.get("character_id")) == character_id), None)
+        if not seat:
+            raise ApplicationError(404, "Character is not seated in this campaign")
+        if not any(m.get("username") == username for m in members):
+            raise ApplicationError(403, "Substitute must be a member of this campaign")
+        if seat.get("username") == username:
+            raise ApplicationError(400, "Character already belongs to this player")
+        return self.campaigns.grant_delegation(
+            campaign_id, character_id, username, session["username"]
+        )
+
+    def revoke_control(self, campaign_id: str, character_id: str, session: Session) -> bool:
+        self._owner(campaign_id, session)
+        return self.campaigns.revoke_delegation(campaign_id, character_id)
+
     def updates(self, campaign_id: str, since: int, session: Session) -> Record:
         self._member(campaign_id, session)
         return self.events.wait_for_campaign_update(campaign_id, max(0, since))

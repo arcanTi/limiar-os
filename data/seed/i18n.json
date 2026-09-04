@@ -45,6 +45,8 @@
     "rof": "ROF",
     "mag": "MAG",
     "concealable": "CONCEALABLE",
+    "meleeReach": "MELEE",
+    "rangedReach": "RANGED",
     "hands": "HANDS",
     "skill": "SKILL",
     "halfSp": "½ SP",
@@ -261,7 +263,10 @@
     "npcFaction": "FACTION (OPTIONAL)",
     "rollNpc": "ROLL NPC",
     "rollAndSpawnNpc": "ROLL + CREATE",
-    "npcArmor": "ARMOR"
+    "npcArmor": "ARMOR",
+    "blockedNotice": "WHY THIS IS LOCKED",
+    "blockedRequirement": "REQUIREMENT NOT MET",
+    "requirementPending": "REQUIREMENT PENDING"
   },
   "pt": {
     "desktop": "DESKTOP",
@@ -309,6 +314,8 @@
     "rof": "ROF",
     "mag": "MAG",
     "concealable": "OCULTAVEL",
+    "meleeReach": "MELEE",
+    "rangedReach": "DISTANCIA",
     "hands": "MAOS",
     "skill": "PERICIA",
     "halfSp": "½ SP",
@@ -525,6 +532,9 @@
     "npcFaction": "FACCAO (OPCIONAL)",
     "rollNpc": "ROLAR NPC",
     "rollAndSpawnNpc": "ROLAR + CRIAR",
-    "npcArmor": "ARMADURA"
+    "npcArmor": "ARMADURA",
+    "blockedNotice": "POR QUE NAO DA PARA INSTALAR",
+    "blockedRequirement": "REQUISITO NAO CUMPRIDO",
+    "requirementPending": "REQUISITO PENDENTE"
   }
 }

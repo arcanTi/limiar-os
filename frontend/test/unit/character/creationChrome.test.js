@@ -3,6 +3,8 @@ import {
   addChrome,
   chromeAttachments,
   chromeBlock,
+  chromeBlockDetail,
+  chromeBlockLabel,
   chromeBlockMessage,
   chromeCatalog,
   chromeEquipped,
@@ -163,6 +165,53 @@ describe('outras recusas', () => {
     expect(block.reason).toBe('install');
     expect(chromeBlockMessage(block, chip)).toContain('Chipware X');
     expect(chromeBlock(addChrome([], link), chip, { catalog: raw }).reason).toBeNull();
+  });
+});
+
+describe('o aviso que a carta bloqueada mostra', () => {
+  it('diz o que fazer, sem repetir o nome que ja esta no card', () => {
+    const block = chromeBlock([], byCode('ENH-TUNGSTEN'));
+    expect(chromeBlockLabel(block)).toBe('FALTA A PEÇA BASE');
+    expect(chromeBlockDetail(block, byCode('ENH-TUNGSTEN'), { catalog: CATALOG }))
+      .toBe('É um aprimoramento: instale Gorilla Arms primeiro.');
+    // No catalog to look the parent up in, the code is still better than nothing.
+    expect(chromeBlockDetail(block, byCode('ENH-TUNGSTEN'))).toContain('GORILLA-ARMS');
+  });
+
+  it('conta quantos eurodolares faltam em vez de so dizer que nao da', () => {
+    const picks = addChrome([], byCode('BORG-FULL'));
+    const block = chromeBlock(picks, byCode('GORILLA-ARMS'), { budget: 2550 });
+    expect(block).toMatchObject({ reason: 'funds', short: 450 });
+    expect(chromeBlockLabel(block)).toBe('SEM SALDO');
+    expect(chromeBlockDetail(block, byCode('GORILLA-ARMS'))).toBe('Faltam 450eb. Remova outra compra ou fique sem ele.');
+  });
+
+  it('nomeia o aprimoramento que ja ocupa a peca', () => {
+    let picks = addChrome([], byCode('GORILLA-ARMS'));
+    picks = addChrome(picks, byCode('ENH-TUNGSTEN'));
+    const block = chromeBlock(picks, byCode('ENH-HYDRAULIC'));
+    expect(chromeBlockLabel(block)).toBe('PEÇA OCUPADA');
+    expect(chromeBlockDetail(block, byCode('ENH-HYDRAULIC'))).toContain('Tungsten Reinforcement já ocupa essa peça');
+  });
+
+  it('traduz o requisito do motor para uma frase que comeca com maiuscula', () => {
+    const raw = [
+      { code: 'NEURAL-LINK', name: 'Neural Link', cat: 'NEURAL', price: 500, hcost: 7, cyberwareType: 'neuralware' },
+      {
+        code: 'CHIP-X', name: 'Chipware X', cat: 'NEURAL', price: 200, hcost: 2, cyberwareType: 'chipware',
+        requires: [{ type: 'requiredCyberware', code: 'NEURAL-LINK', name: 'Neural Link' }],
+      },
+    ];
+    const chip = chromeCatalog(raw).find((item) => item.code === 'CHIP-X');
+    const block = chromeBlock([], chip, { catalog: raw });
+    expect(chromeBlockLabel(block)).toBe('REQUISITO NÃO CUMPRIDO');
+    expect(chromeBlockDetail(block, chip, { catalog: raw })).toBe('Precisa de Neural Link instalado antes.');
+  });
+
+  it('sem bloqueio nao inventa aviso nenhum', () => {
+    const block = chromeBlock([], byCode('NEURAL-LINK'));
+    expect(chromeBlockLabel(block)).toBe('');
+    expect(chromeBlockDetail(block, byCode('NEURAL-LINK'))).toBe('');
   });
 });
 

@@ -2,6 +2,7 @@ import { asNumber } from '../../domain/shared/num.ts';
 import { CPRED_CRITICAL_INJURIES } from '../../domain/character/constants.ts';
 import { CPRED_STATUS_PRESETS } from '../../domain/conditions/index.ts';
 import { effectPresetCatalog } from '../../domain/effects/customEffects.ts';
+import { CPRED_NETRUNNING_ABILITIES } from '../../domain/netrunning/constants.ts';
 
 // SYS.01/MESA // GM roster: every sheet at this table on one screen, with the
 // switch that makes one of them active. Everything the GM edits — inventory,
@@ -9,6 +10,31 @@ import { effectPresetCatalog } from '../../domain/effects/customEffects.ts';
 // here is what makes those tools point at the right player; the quick console
 // below the grid covers the handful of edits that were not worth a round trip
 // through another page (HP, IP, eddies, one condition, one item).
+
+// Console tabs: each card's quick buttons jump straight to one of these with
+// that character made active, so "give Rook an item" is two clicks.
+export const ROSTER_TABS = [
+  { key: 'vitals', label: 'VITAIS' },
+  { key: 'cond', label: 'CONDICOES' },
+  { key: 'items', label: 'ITENS' },
+  { key: 'net', label: 'NET' },
+];
+
+// Free-form item types the GM can hand out without a catalog entry.
+export const ROSTER_CUSTOM_ITEM_TYPES = ['GEAR', 'WEAPON', 'ARMOR', 'CONSUMABLE', 'DATA', 'KEYCARD', 'CYBERWARE'];
+
+// CPR RAW NET Architecture DVs (floors 6/8/10/12) plus the two hard tiers.
+export const ROSTER_NET_DVS = [6, 8, 10, 12, 15, 17];
+
+export const ROSTER_NET_CUSTOM_ABILITY = 'custom';
+
+// CPR RAW: only Netrunners have an Interface rank. Anyone else rolls a flat
+// 1d10 (mod 0) and the console says so before the request goes out.
+export function interfaceRankOf(character) {
+  const c = character || {};
+  if (!String(c.role || '').toLowerCase().includes('netrunner')) return 0;
+  return asNumber(c.roleAbilityRank, 0, 0, 10);
+}
 
 const ROSTER_FILTERS = [
   { key: 'all', label: 'TODOS' },
@@ -53,9 +79,20 @@ export function rosterRenderVals(state = {}, deps = {}) {
     const injuries = (character.criticalInjuries || []).filter(row => !row.treated).length;
     const statuses = (character.statusEffects || []).length;
     const active = character.id === S.activeCharacterId;
+    const portrait = String(character.portraitUrl || '').trim();
+    const jumpTo = (tab) => {
+      deps.selectCharacter(character.id);
+      deps.setState({ rosterTab: tab, rosterOpen: true });
+    };
     return {
       id: character.id,
       active,
+      portrait,
+      hasPortrait: portrait.length > 0,
+      noPortrait: portrait.length === 0,
+      onCondition: () => jumpTo('cond'),
+      onItem: () => jumpTo('items'),
+      onNet: () => jumpTo('net'),
       initials: String(character.initials || (character.name || 'OP')).slice(0, 2).toUpperCase(),
       name: character.name || 'OPERATIVE',
       role: character.role || 'EDGERUNNER',
@@ -97,12 +134,103 @@ export function rosterRenderVals(state = {}, deps = {}) {
   const gear = deps.normalizeGearList ? deps.normalizeGearList(activeCharacter.gear) : (activeCharacter.gear || []);
 
   const open = S.rosterOpen !== false;
+  const tab = ROSTER_TABS.some(row => row.key === S.rosterTab) ? S.rosterTab : 'vitals';
+
+  // Custom item draft (ITENS tab).
+  const customType = ROSTER_CUSTOM_ITEM_TYPES.includes(S.rosterCustomType) ? S.rosterCustomType : 'GEAR';
+  const customName = String(S.rosterCustomName || '');
+  const customQty = asNumber(S.rosterCustomQty, 1, 1, 999);
+  const customNotes = String(S.rosterCustomNotes || '');
+
+  // NET test draft (NET tab).
+  const netAbilityIds = [...CPRED_NETRUNNING_ABILITIES.map(row => row.id), ROSTER_NET_CUSTOM_ABILITY];
+  const netAbilityId = netAbilityIds.includes(S.rosterNetAbility) ? S.rosterNetAbility : netAbilityIds[0];
+  const netAbility = CPRED_NETRUNNING_ABILITIES.find(row => row.id === netAbilityId) || null;
+  const netDvRaw = String(S.rosterNetDv == null ? '' : S.rosterNetDv).trim();
+  const netDv = netDvRaw === '' || Number.isNaN(Number(netDvRaw)) ? null : Number(netDvRaw);
+  const netLabelDraft = String(S.rosterNetLabel || '');
+  const netAll = !!S.rosterNetAll;
+  const pcs = characters.filter(character => character.kind !== 'npc');
+  const netTargets = netAll ? pcs : (activeCharacter.id ? [activeCharacter] : []);
+  const netLabel = netAbility ? netAbility.name.toUpperCase() : (netLabelDraft.trim().toUpperCase() || 'TESTE NET');
+  const activeInterface = interfaceRankOf(activeCharacter);
 
   return {
     rosterOpen: open,
     rosterClosed: !open,
     toggleRoster: () => deps.setState({ rosterOpen: !open }),
     rosterToggleLabel: open ? 'RECOLHER' : 'ABRIR MESA',
+    rosterTabs: ROSTER_TABS.map(row => ({
+      key: row.key,
+      label: row.label,
+      style: 'lm-roster-tab' + (row.key === tab ? ' lm-roster-tab--on' : ''),
+      onClick: () => deps.setState({ rosterTab: row.key }),
+    })),
+    rosterTabVitals: tab === 'vitals',
+    rosterTabCond: tab === 'cond',
+    rosterTabItems: tab === 'items',
+    rosterTabNet: tab === 'net',
+
+    rosterCustomName: customName,
+    onRosterCustomName: (e) => deps.setState({ rosterCustomName: e.target.value }),
+    rosterCustomTypeOptions: ROSTER_CUSTOM_ITEM_TYPES.map(type => ({
+      value: type,
+      label: type,
+      selected: type === customType,
+      notSelected: type !== customType,
+    })),
+    onRosterCustomType: (e) => deps.setState({ rosterCustomType: e.target.value }),
+    rosterCustomQty: S.rosterCustomQty === undefined ? '1' : S.rosterCustomQty,
+    onRosterCustomQty: (e) => deps.setState({ rosterCustomQty: e.target.value }),
+    rosterCustomNotes: customNotes,
+    onRosterCustomNotes: (e) => deps.setState({ rosterCustomNotes: e.target.value }),
+    canGrantCustomItem: customName.trim().length > 0,
+    grantRosterCustomItem: () => {
+      if (!customName.trim()) return;
+      const granted = deps.grantCustomGear({ name: customName.trim(), type: customType, qty: customQty, notes: customNotes.trim() });
+      if (granted !== false) deps.setState({ rosterCustomName: '', rosterCustomNotes: '', rosterCustomQty: '1' });
+    },
+
+    rosterNetAbilityOptions: [
+      ...CPRED_NETRUNNING_ABILITIES.map(row => ({
+        value: row.id,
+        label: row.name.toUpperCase() + (row.isAttack ? ' // ATAQUE' : ''),
+        selected: row.id === netAbilityId,
+        notSelected: row.id !== netAbilityId,
+      })),
+      { value: ROSTER_NET_CUSTOM_ABILITY, label: 'OUTRO (rotulo livre)', selected: netAbilityId === ROSTER_NET_CUSTOM_ABILITY, notSelected: netAbilityId !== ROSTER_NET_CUSTOM_ABILITY },
+    ],
+    onRosterNetAbility: (e) => deps.setState({ rosterNetAbility: e.target.value }),
+    rosterNetCustom: netAbilityId === ROSTER_NET_CUSTOM_ABILITY,
+    rosterNetAbilityDesc: netAbility ? netAbility.desc : 'Rotulo livre: o jogador rola Interface + 1d10 com o nome que voce escrever.',
+    rosterNetLabel: netLabelDraft,
+    onRosterNetLabel: (e) => deps.setState({ rosterNetLabel: e.target.value }),
+    rosterNetDv: netDvRaw,
+    onRosterNetDv: (e) => deps.setState({ rosterNetDv: e.target.value }),
+    rosterNetDvChips: ROSTER_NET_DVS.map(dv => ({
+      label: 'DV ' + dv,
+      style: 'lm-roster-chip' + (netDv === dv ? ' lm-roster-chip--on' : ''),
+      onClick: () => deps.setState({ rosterNetDv: String(dv) }),
+    })),
+    rosterNetAll: netAll,
+    rosterNetAllStyle: 'lm-roster-chip' + (netAll ? ' lm-roster-chip--on' : ''),
+    toggleRosterNetAll: () => deps.setState({ rosterNetAll: !netAll }),
+    rosterNetTargetLabel: netAll
+      ? 'TODOS OS PJS (' + pcs.length + ')'
+      : (activeCharacter.name || 'OPERATIVE') + ' // INTERFACE ' + activeInterface,
+    rosterNetNoInterface: !netAll && !!activeCharacter.id && activeInterface === 0,
+    rosterNetPreview: netLabel + ' :: 1d10 + INTERFACE' + (netDv != null ? ' vs DV ' + netDv : ' (DV a criterio do mestre)'),
+    canSendNetTest: netTargets.length > 0 && (netAbility != null || netLabelDraft.trim().length > 0),
+    sendRosterNetTest: () => {
+      if (netTargets.length === 0) return;
+      if (!netAbility && !netLabelDraft.trim()) return;
+      deps.requestNetTest({
+        targets: netTargets.map(character => character.id),
+        abilityId: netAbility ? netAbility.id : ROSTER_NET_CUSTOM_ABILITY,
+        label: netLabel,
+        dv: netDv,
+      });
+    },
     rosterCards,
     noRosterCards: rosterCards.length === 0,
     rosterCount: characters.length,
@@ -261,6 +389,51 @@ export function rosterHandlers(component) {
       const item = component.desktopHandlers().gearFromProduct(product);
       const character = active();
       updateGear([...component.normalizeGearList(character.gear), item], item.name + ' entregue a ' + character.name);
+    },
+
+    // Free-form item: no catalog row behind it, so it goes through the same
+    // normalizer the sheet uses and is tagged source:'gm-custom'.
+    grantCustomGear(draft) {
+      if (!component.ensureGm('Login do mestre necessario para dar itens')) return false;
+      const name = String((draft && draft.name) || '').trim();
+      if (!name) { component.flash('Item precisa de nome'); return false; }
+      const stamp = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+      const item = component.normalizeGearItem({
+        id: component.slug(name) + '-' + stamp,
+        name,
+        type: String((draft && draft.type) || 'GEAR').toUpperCase(),
+        qty: asNumber(draft && draft.qty, 1, 1, 999),
+        notes: String((draft && draft.notes) || '').trim(),
+        source: 'gm-custom',
+      }, 0);
+      const character = active();
+      updateGear([...component.normalizeGearList(character.gear), item], item.name + ' entregue a ' + character.name);
+      return true;
+    },
+
+    // NET test: one comms request per target, each carrying that target's
+    // own Interface rank as the modifier (like initiative carries REF), so
+    // the player rolls it with one tap and the result comes back tagged.
+    requestNetTest(draft) {
+      if (!component.ensureGm('Login do mestre necessario para pedir teste')) return false;
+      const targets = Array.isArray(draft && draft.targets) ? draft.targets : [];
+      if (targets.length === 0) return false;
+      const label = String((draft && draft.label) || 'TESTE NET').trim().toUpperCase() || 'TESTE NET';
+      const dv = draft && draft.dv != null && !Number.isNaN(Number(draft.dv)) ? Number(draft.dv) : null;
+      const names = [];
+      targets.forEach(id => {
+        const character = component.characterById(id);
+        if (!character || !character.id) return;
+        const mod = interfaceRankOf(character);
+        const opts = { label, sides: 10, count: 1, mod, check: true, combatantId: character.id, netrunning: draft.abilityId || ROSTER_NET_CUSTOM_ABILITY };
+        if (dv != null) opts.dv = dv;
+        const text = 'Pedido de teste NET para ' + (character.name || 'OPERATIVO') + ': ' + label
+          + ' (Interface ' + mod + ' + 1d10' + (dv != null ? ' vs DV ' + dv : '') + ')';
+        component.postChat({ kind: 'request', text, request: opts });
+        names.push(character.name || 'OPERATIVO');
+      });
+      if (names.length) component.flash('Teste NET enviado: ' + names.join(', '));
+      return names.length > 0;
     },
 
     removeGear(gearId) {
