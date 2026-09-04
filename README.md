@@ -247,12 +247,20 @@ Complete Package's starting money (CPR p.42/104/105/110), and
   buy nothing in the wizard and, per RAW, never turn into cash.
 
 The **Arsenal** step spends what is left of that same pool on weapons, armor,
-ammunition, attachments, decks and gear (`creationGear.ts`). A row is on the
-shelf only if it belongs to one of those categories and carries a price — a
-zero-price row is reference data (the Brawling damage table) or a catalog gap,
-and either way a free item would quietly break the budget; `unsellableGear`
-lists them for the GM. Buying the same item twice raises its quantity, nothing
-starts equipped, and the picks are written to the sheet's `gear` inventory.
+ammunition, attachments, decks and gear (`creationGear.ts`). Buying the same
+item twice raises its quantity, nothing starts equipped, and the picks are
+written to the sheet's `gear` inventory. Ammunition is sold the way the book
+sells it (p.94/344): a box of ten for the common calibers, one at a time for
+grenades and rockets, with `packSize` on the catalog row and on the inventory
+line so ten rounds never read as one.
+
+A row reaches either shelf only if the catalog calls it merchandise
+(`isPurchasableProduct`) and carries a price. The `BRAWLING-BODY-*` entries are
+the damage table that turns an attacker's BODY into dice — the rules engine
+looks them up, nobody buys them — and the catalog already says so with
+`purchasable: false`; both the creation shop and the desktop market honor that,
+counts included. A remaining zero-price row is a catalog gap rather than a free
+item, and `unsellableGear` reports both cases with their reason.
 
 The **Vida** step records where the operative lives (`lifestyle.ts`, CPR
 p.105). Everyone starts with a free month in a Cargo Container eating Kibble

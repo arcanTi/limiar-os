@@ -6,6 +6,7 @@
 // survives both is the character's cash. Cyberware lives in `creationChrome`
 // because installing it has rules of its own; this module is a plain shop.
 
+import { isPurchasableProduct } from '../items/itemNormalizers.ts';
 import { weaponProfile } from '../items/weaponProfileEngine.ts';
 import type { LegacyCatalogItem } from '../items/legacyCatalogTypes.ts';
 
@@ -26,6 +27,8 @@ export interface GearItem {
   desc: string;
   stock: string;
   dmg: string;
+  /** Units in one purchase: ammunition is sold in boxes of ten (p.94/344). */
+  packSize: number;
 }
 
 export interface GearPick extends GearItem {
@@ -57,20 +60,22 @@ export function normalizeGearItem(raw: unknown): GearItem | null {
     desc: toText(row.desc || row.description || row.legacyDesc),
     stock: toText(row.stock) || 'IN STOCK',
     dmg: toText(profile.dmg),
+    packSize: Math.max(1, toInt(row.packSize, 1)),
   };
 }
 
 /**
- * A catalog row is on the shelf only if it belongs to a sold category and
- * carries a price. A price of zero is not a free item: in this catalog it
- * marks rows that are reference data (the Brawling damage table) or entries
- * still waiting for their cost, and either way a shop that hands them out for
- * nothing would quietly break the budget.
+ * A catalog row is on the shelf only if it belongs to a sold category, the
+ * catalog calls it merchandise, and it carries a price. A price of zero is not
+ * a free item here: it marks an entry still waiting for its cost, and a shop
+ * that hands those out would quietly break the budget.
  */
 export function isGearItem(raw: unknown): boolean {
   const item = normalizeGearItem(raw);
   if (!item) return false;
-  return GEAR_CATEGORIES.includes(item.cat) && item.price > 0;
+  if (!GEAR_CATEGORIES.includes(item.cat)) return false;
+  if (!isPurchasableProduct(raw as Parameters<typeof isPurchasableProduct>[0])) return false;
+  return item.price > 0;
 }
 
 export function gearCatalog(items: unknown): GearItem[] {
@@ -88,11 +93,33 @@ export function gearCatalog(items: unknown): GearItem[] {
   ));
 }
 
-/** Catalog rows this shop refuses to sell, with the reason, for a GM report. */
-export function unsellableGear(items: unknown): { code: string; name: string; cat: string; reason: 'no-price' }[] {
-  return (Array.isArray(items) ? items : []).map(normalizeGearItem)
-    .filter((item): item is GearItem => item !== null && GEAR_CATEGORIES.includes(item.cat) && item.price <= 0)
-    .map((item) => ({ code: item.code, name: item.name, cat: item.cat, reason: 'no-price' as const }));
+export type UnsellableReason = 'system-profile' | 'no-price';
+
+export interface UnsellableGearRow {
+  code: string;
+  name: string;
+  cat: string;
+  reason: UnsellableReason;
+}
+
+/**
+ * Rows in a sold category that the shop still will not sell, and why.
+ * `system-profile` is deliberate (the rules engine's own lookup rows);
+ * `no-price` is a catalog gap someone has to close.
+ */
+export function unsellableGear(items: unknown): UnsellableGearRow[] {
+  return (Array.isArray(items) ? items : []).flatMap((raw) => {
+    const item = normalizeGearItem(raw);
+    if (!item || !GEAR_CATEGORIES.includes(item.cat)) return [];
+    const merchandise = isPurchasableProduct(raw as Parameters<typeof isPurchasableProduct>[0]);
+    if (merchandise && item.price > 0) return [];
+    return [{
+      code: item.code,
+      name: item.name,
+      cat: item.cat,
+      reason: (merchandise ? 'no-price' : 'system-profile') as UnsellableReason,
+    }];
+  });
 }
 
 export function gearSpend(picks: GearPick[] | null | undefined): number {
@@ -165,6 +192,8 @@ export interface GearRow {
   qty: number;
   price: number;
   dmg: string;
+  /** Units per purchased row (10 for a box of ammunition). */
+  packSize: number;
   notes: string;
   equipped: boolean;
 }
@@ -183,7 +212,8 @@ export function gearInventory(picks: GearPick[] | null | undefined): GearRow[] {
     qty: pick.qty,
     price: pick.price,
     dmg: pick.dmg,
-    notes: pick.desc,
+    packSize: pick.packSize,
+    notes: pick.packSize > 1 ? `pacote com ${pick.packSize} · ${pick.desc}`.trim() : pick.desc,
     equipped: false,
   }));
 }

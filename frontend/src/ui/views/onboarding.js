@@ -460,7 +460,7 @@ function gearCard(item, { qty, blockedMessage }) {
       <span class="flex-1 min-w-0 flex flex-col leading-tight">
         <span class="font-sans text-[13px] text-cyber-bright truncate">${esc(item.name)}</span>
         <em class="not-italic font-mono text-[9px] tracking-wider text-cyber-text/45">
-          ${esc(item.type || item.cat)} · ${money(item.price)}eb${item.dmg ? ` · ${esc(item.dmg)}` : ''}
+          ${esc(item.type || item.cat)} · ${money(item.price)}eb${item.packSize > 1 ? ` (pacote com ${item.packSize})` : ''}${item.dmg ? ` · ${esc(item.dmg)}` : ''}
         </em>
         ${item.desc ? `<em class="not-italic font-sans text-[11px] text-cyber-text/50 mt-1 line-clamp-2">${esc(item.desc)}</em>` : ''}
       </span>

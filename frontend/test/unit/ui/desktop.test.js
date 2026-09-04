@@ -140,6 +140,22 @@ describe('ui/views/desktop desktopRenderVals', () => {
     expect(vals.selected.cmp.some(row => row.label === 'BODY')).toBe(true);
   });
 
+  it('keeps system-profile rows off the market shelf and out of its counts', () => {
+    // BRAWLING-BODY-* are the unarmed damage table, priced 0eb; on the shelf
+    // they would read as free weapons.
+    const rifle = { code: 'ASSAULT-RIFLE', name: 'Assault Rifle', cat: 'WEAPONS', kind: 'weapon', stock: 'IN STOCK', price: 500 };
+    const brawling = {
+      code: 'BRAWLING-BODY-MID', name: 'Brawling, BODY 5-6', cat: 'WEAPONS', kind: 'weapon',
+      stock: 'IN STOCK', price: 0, purchasable: false, specialRules: ['system-profile', 'not purchasable'],
+    };
+    const vals = desktopRenderVals(baseState(), renderDeps({ products: [rifle, brawling] }));
+
+    expect(vals.items.map((row) => row.code)).toEqual(['ASSAULT-RIFLE']);
+    expect(vals.chips.find((chip) => chip.label === 'WEAPONS').count).toBe(1);
+    expect(vals.chips.find((chip) => chip.label === 'ALL').count).toBe(1);
+    expect(vals.totalCount).toBe(1);
+  });
+
   it('labels the manual dice roller and wires rollManual to the roll engine', () => {
     const roll = vi.fn();
     const vals = desktopRenderVals(baseState({ diceSides: 12, diceCount: 2, diceMod: 1 }), renderDeps({ roll }));

@@ -1,6 +1,7 @@
 import { LIMIAR_TIER_COLORS } from '../view/constants.js';
 import { CPRED_STAT_ORDER } from '../../domain/character/constants.ts';
 import { buildBodyMap } from '../../domain/items/bodyMapEngine.ts';
+import { isPurchasableProduct } from '../../domain/items/itemNormalizers.ts';
 import { gameTabStyle } from '../view/styles.js';
 
 const BODY_REGION_LABELS = {
@@ -249,7 +250,11 @@ export function desktopRenderVals(state = {}, deps = {}) {
   const q = S.marketQuery.trim().toLowerCase();
   const all = deps.products;
   const marketLayout = S.marketLayout || 'holo';
-  const filtered = all.filter(p => {
+  // Rows the rules engine looks up but nobody buys (the BRAWLING-BODY-* damage
+  // table) would otherwise sit on the shelf priced at 0eb. The shelf is also
+  // what the category chips count, so their numbers match what opens.
+  const shelf = all.filter(p => isPurchasableProduct(p));
+  const filtered = shelf.filter(p => {
     if (S.marketCat !== 'ALL' && p.cat !== S.marketCat) return false;
     if (S.marketAvail !== 'ALL' && p.stock !== S.marketAvail) return false;
     if (q && !(p.code + ' ' + p.name + ' ' + p.cat + ' ' + (p.weaponClass || '') + ' ' + (p.skill || '')).toLowerCase().includes(q)) return false;
@@ -279,8 +284,8 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const fx = marketFx(pageStartIndex + i);
     return { ...p, ...fx, num: String(pageStartIndex + i + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), soldout: p.stock === 'SOLD OUT', owned: p.kind === 'weapon' || p.kind === 'trauma-plan' ? false : S.owned.includes(p.code), bonusChips: chips, hasHumanityCost: p.kind !== 'weapon' && p.kind !== 'trauma-plan', hcostLabel: p.hcostNote || ('-' + (p.hcost || 0)), hasImage: !!p.imageUrl, noImage: !p.imageUrl, open: () => deps.setState({ selected: p }) };
   });
-  const cats = ['ALL', ...Array.from(new Set(all.map(p => p.cat || p.category).filter(Boolean)))];
-  const chips = cats.map(c => ({ label: c, count: c === 'ALL' ? all.length : all.filter(p => p.cat === c).length, onClick: () => deps.setState({ marketCat: c, marketPage: 1 }), style: deps.chipStyle(S.marketCat === c) }));
+  const cats = ['ALL', ...Array.from(new Set(shelf.map(p => p.cat || p.category).filter(Boolean)))];
+  const chips = cats.map(c => ({ label: c, count: c === 'ALL' ? shelf.length : shelf.filter(p => p.cat === c).length, onClick: () => deps.setState({ marketCat: c, marketPage: 1 }), style: deps.chipStyle(S.marketCat === c) }));
   const marketLayoutBtns = [{ k: 'holo', l: 'HOLO' }, { k: 'spec', l: 'SPEC' }, { k: 'terminal', l: 'TERMINAL' }].map(o => ({
     label: o.l, onClick: () => deps.setState({ marketLayout: o.k }), style: deps.viewStyle(marketLayout === o.k),
   }));
@@ -443,7 +448,7 @@ export function desktopRenderVals(state = {}, deps = {}) {
     bodyMapToggleState: inventoryBodyView ? '[ON]' : '[OFF]',
     toggleBodyView: () => deps.setState({ inventoryBodyView: !S.inventoryBodyView }),
     // market
-    chips, items, resultCount: filtered.length, totalCount: all.length,
+    chips, items, resultCount: filtered.length, totalCount: shelf.length,
     pageStart: filtered.length ? pageStartIndex + 1 : 0,
     pageEnd: Math.min(pageStartIndex + items.length, filtered.length),
     hasPagination: filtered.length > pageSize,

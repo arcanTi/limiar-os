@@ -17,7 +17,9 @@ const CATALOG = [
   { code: 'LIGHT-ARMORJACK', name: 'Light Armorjack', cat: 'ARMOR', price: 100, stock: 'IN STOCK' },
   { code: 'AGENT', name: 'Agent', cat: 'GEAR', price: 100, stock: 'IN STOCK', desc: 'celular inteligente' },
   { code: 'SOLD-OUT-GUN', name: 'Militech Arms', cat: 'WEAPONS', price: 500, stock: 'SOLD OUT' },
-  { code: 'BRAWLING-BODY-MID', name: 'Brawling, BODY 5-6', cat: 'WEAPONS', price: 0 },
+  { code: 'BRAWLING-BODY-MID', name: 'Brawling, BODY 5-6', cat: 'WEAPONS', price: 0, purchasable: false, specialRules: ['system-profile', 'not purchasable'] },
+  { code: 'AMMO-RIFLE', name: 'Rifle Ammunition', cat: 'AMMUNITION', price: 10, packSize: 10, stock: 'IN STOCK' },
+  { code: 'AMMO-SEM-PRECO', name: 'Municao sem preco', cat: 'AMMUNITION', price: 0, stock: 'IN STOCK' },
   { code: 'GORILLA-ARMS', name: 'Gorilla Arms', cat: 'LIMBS', price: 1000 },
   { code: 'BIOMON', name: 'Biomonitor', cat: 'FASHION', price: 100 },
   { code: 'TT-GOLD', name: 'Trauma Team Gold', cat: 'TRAUMA TEAM', price: 25000 },
@@ -28,9 +30,9 @@ const byCode = (code) => gearCatalog(CATALOG).find((item) => item.code === code)
 const rich = { cashLeft: 2550 };
 
 describe('prateleira da criacao', () => {
-  it('vende arma, armadura e equipamento, e nada mais', () => {
+  it('vende arma, armadura, municao e equipamento, e nada mais', () => {
     const codes = gearCatalog(CATALOG).map((item) => item.code);
-    expect(codes).toEqual(['ASSAULT-RIFLE', 'SOLD-OUT-GUN', 'LIGHT-ARMORJACK', 'AGENT']);
+    expect(codes).toEqual(['ASSAULT-RIFLE', 'SOLD-OUT-GUN', 'LIGHT-ARMORJACK', 'AMMO-RIFLE', 'AGENT']);
   });
 
   it('deixa cyberware, fashion e Trauma Team de fora', () => {
@@ -40,11 +42,19 @@ describe('prateleira da criacao', () => {
     expect(codes).not.toContain('TT-GOLD');
   });
 
-  it('nao vende linha sem preco, porque item de graca fura o orcamento', () => {
-    expect(gearCatalog(CATALOG).map((item) => item.code)).not.toContain('BRAWLING-BODY-MID');
+  it('nao vende perfil de sistema nem linha sem preco, e separa os dois motivos', () => {
+    const codes = gearCatalog(CATALOG).map((item) => item.code);
+    expect(codes).not.toContain('BRAWLING-BODY-MID');
+    expect(codes).not.toContain('AMMO-SEM-PRECO');
     expect(unsellableGear(CATALOG)).toEqual([
-      { code: 'BRAWLING-BODY-MID', name: 'Brawling, BODY 5-6', cat: 'WEAPONS', reason: 'no-price' },
+      { code: 'BRAWLING-BODY-MID', name: 'Brawling, BODY 5-6', cat: 'WEAPONS', reason: 'system-profile' },
+      { code: 'AMMO-SEM-PRECO', name: 'Municao sem preco', cat: 'AMMUNITION', reason: 'no-price' },
     ]);
+  });
+
+  it('carrega o tamanho do pacote: uma compra de municao sao dez tiros', () => {
+    expect(byCode('AMMO-RIFLE').packSize).toBe(10);
+    expect(byCode('ASSAULT-RIFLE').packSize).toBe(1);
   });
 
   it('carrega o perfil de dano do catalogo', () => {
@@ -89,6 +99,7 @@ describe('linhas gravadas no inventario', () => {
     picks = addGear(picks, byCode('AGENT'), rich);
     const rows = gearInventory(picks);
     expect(rows.map((row) => row.id)).toEqual(['assault-rifle-0', 'agent-1']);
+    expect(rows[0].packSize).toBe(1);
     expect(rows[0]).toMatchObject({ code: 'ASSAULT-RIFLE', qty: 1, type: 'Assault Rifle', dmg: '5d6', equipped: false });
     expect(rows[1]).toMatchObject({ code: 'AGENT', qty: 2, equipped: false });
   });
@@ -105,9 +116,27 @@ describe('contra o catalogo real da mesa', () => {
     expect(catalog.every((item) => item.price > 0)).toBe(true);
   });
 
-  it('lista o que o catalogo ainda deve precificar', () => {
-    const pending = unsellableGear(seed.items).map((row) => row.code);
-    expect(pending.length).toBeGreaterThan(0);
-    expect(pending).toContain('AMMO-RIFLE');
+  it('a municao basica esta precificada e sai em pacote de dez (p.94/344)', () => {
+    const ammo = catalog.filter((item) => item.cat === 'AMMUNITION');
+    expect(ammo.find((item) => item.code === 'AMMO-RIFLE')).toMatchObject({ price: 10, packSize: 10 });
+    expect(ammo.find((item) => item.code === 'AMMO-GRENADE')).toMatchObject({ price: 50, packSize: 1 });
+    expect(ammo.find((item) => item.code === 'AMMO-ROCKET')).toMatchObject({ price: 100, packSize: 1 });
+  });
+
+  it('o unico que fica fora da prateleira e a tabela de Brawling, por ser perfil de sistema', () => {
+    const pending = unsellableGear(seed.items);
+    expect(pending.every((row) => row.reason === 'system-profile')).toBe(true);
+    expect(pending.map((row) => row.code).sort()).toEqual([
+      'BRAWLING-BODY-HIGH', 'BRAWLING-BODY-LOW', 'BRAWLING-BODY-MID', 'BRAWLING-BODY-SUPERHUMAN',
+    ]);
+  });
+});
+
+describe('municao no inventario', () => {
+  it('a linha diz que a compra e um pacote, para ninguem ler dez tiros como um', () => {
+    const ammo = gearCatalog(seed.items).find((item) => item.code === 'AMMO-RIFLE');
+    const rows = gearInventory(addGear(addGear([], ammo, rich), ammo, rich));
+    expect(rows[0]).toMatchObject({ code: 'AMMO-RIFLE', qty: 2, packSize: 10 });
+    expect(rows[0].notes).toContain('pacote com 10');
   });
 });
