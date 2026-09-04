@@ -221,3 +221,77 @@ describe('modo novo operativo (jogador ja dentro do app)', () => {
     expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ campaignId: 'mesa-1', character: expect.objectContaining({ name: 'ROOK TWO' }) }));
   });
 });
+
+describe('passo de chrome', () => {
+  const CATALOG_ROWS = [
+    { code: 'GORILLA-ARMS', name: 'Gorilla Arms', cat: 'LIMBS', price: 1000, hcost: 14, stock: 'IN STOCK' },
+    { code: 'ENH-TUNGSTEN', name: 'Tungsten Reinforcement', cat: 'LIMBS', price: 500, hcost: 3, stock: 'IN STOCK', attachesTo: ['GORILLA-ARMS'] },
+    { code: 'MEDTECH-BAG', name: 'Medtech Bag', cat: 'GEAR', price: 100, hcost: 0, stock: 'IN STOCK' },
+  ];
+
+  function chromeApi(list = async () => CATALOG_ROWS) {
+    return fakeApi({ items: { list: vi.fn(list) } });
+  }
+
+  it('carrega so o que e implantavel do catalogo', async () => {
+    const controller = createWizardController({ api: chromeApi() });
+    await controller.loadCatalog();
+    expect(controller.state.catalogStatus).toBe('ready');
+    expect(controller.state.catalog.map((item) => item.code)).toEqual(['GORILLA-ARMS', 'ENH-TUNGSTEN']);
+  });
+
+  it('busca o catalogo uma vez so', async () => {
+    const api = chromeApi();
+    const controller = createWizardController({ api });
+    await controller.loadCatalog();
+    await controller.loadCatalog();
+    expect(api.items.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('catalogo fora do ar nao impede criar a ficha sem chrome', async () => {
+    const controller = createWizardController({ api: chromeApi(async () => { throw new Error('offline'); }) });
+    await controller.loadCatalog();
+    expect(controller.state.catalogStatus).toBe('error');
+    expect(controller.state.catalog).toEqual([]);
+  });
+
+  it('instala, explica a recusa e remove', async () => {
+    const controller = createWizardController({ api: chromeApi() });
+    await controller.loadCatalog();
+
+    controller.handlers.buyChrome('ENH-TUNGSTEN');
+    expect(controller.state.draft.chrome).toEqual([]);
+    expect(controller.state.chromeHint).toContain('GORILLA-ARMS');
+
+    controller.handlers.buyChrome('GORILLA-ARMS');
+    controller.handlers.buyChrome('ENH-TUNGSTEN');
+    expect(controller.state.draft.chrome.map((item) => item.code)).toEqual(['GORILLA-ARMS', 'ENH-TUNGSTEN']);
+    expect(controller.state.chromeHint).toBe('');
+
+    controller.handlers.sellChrome('GORILLA-ARMS');
+    expect(controller.state.draft.chrome).toEqual([]);
+  });
+
+  it('manda chrome instalado, codigos e o dinheiro que sobrou no payload', async () => {
+    const controller = createWizardController({ api: chromeApi() });
+    await controller.loadCatalog();
+    controller.state.draft = completeDraft('chrome kid');
+    controller.handlers.buyChrome('GORILLA-ARMS');
+    controller.handlers.buyChrome('ENH-TUNGSTEN');
+
+    const payload = buildCharacterPayload(controller.state.draft);
+    expect(payload.credits).toBe(2550 - 1500);
+    expect(payload.owned).toEqual(['GORILLA-ARMS', 'ENH-TUNGSTEN']);
+    expect(payload.equipped[0]).toMatchObject({ code: 'GORILLA-ARMS', hcost: 14, enhancements: ['ENH-TUNGSTEN'] });
+    // A perda de HUMANITY sai do hcost do equipado; gravar tambem humanityLoss
+    // cobraria a mesma cirurgia duas vezes.
+    expect(payload.humanityLoss).toBeUndefined();
+  });
+
+  it('sem chrome, comeca com o orcamento inteiro em dinheiro vivo', () => {
+    const payload = buildCharacterPayload(completeDraft('sem chrome'));
+    expect(payload.credits).toBe(2550);
+    expect(payload.equipped).toEqual([]);
+    expect(payload.owned).toEqual([]);
+  });
+});

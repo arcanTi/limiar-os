@@ -61,6 +61,13 @@ export const CPRED_SKILL_BASIC_ALLOCATION = CPRED_SKILL_BUDGET_TOTAL - CPRED_SKI
 // At creation no skill goes above 6, and a trained skill starts at 2 (p.42/88/90).
 export const CPRED_SKILL_CREATION_MAX = 6;
 export const CPRED_SKILL_TRAINED_MIN = 2;
+
+// Complete Package starting money (CPR p.42/104/105): 2.550eb buy gear, armor
+// and cyberware — surgery included, free at creation (p.110) — and whatever is
+// left becomes the character's cash. A separate 800eb only buys Fashion and
+// Fashionware, and any part of it not spent is lost instead of banked.
+export const CPRED_CREATION_CASH = 2550;
+export const CPRED_CREATION_FASHION_CASH = 800;
 // Cultural Origin grants Language (origin) 4 for free (p.41/45, 89).
 export const CPRED_ORIGIN_LANGUAGE_LEVEL = 4;
 export const CPRED_CULTURAL_ORIGINS: { region: string; languages: string[] }[] = [

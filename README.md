@@ -220,6 +220,30 @@ records IP history:
 - difficult skill: doubled cost;
 - Role ability: `next rank * 30`.
 
+Every new player sheet is built by the guided wizard
+(`frontend/src/ui/views/onboarding.js`), whose steps are validated in
+`frontend/src/domain/character/characterWizard.ts`. Its fifth step spends the
+Complete Package's starting money (CPR p.42/104/105/110), and
+`frontend/src/domain/character/creationChrome.ts` holds those rules:
+
+- The operative starts with **2.550eb**. Cyberware and DLC enhancements are
+  bought there, and whatever is left over becomes the sheet's cash — a sheet
+  that buys no chrome starts play with the full 2.550eb.
+- Surgery is free at creation, but the implant's **Humanity cost is charged
+  immediately**. The loss is derived from `equipped`, so it is never written
+  to the sheet as a separate number.
+- An **enhancement** (Hydraulic Ram, Tungsten Reinforcement...) is a separate
+  purchase that only unlocks once its base implant is installed; removing the
+  base refunds the enhancements bolted to it.
+- Requirements from the install engine still apply — Kerenzikov asks for the
+  Neural Link, Linear Frames ask for the BODY. What the wizard ignores are the
+  rules that depend on body locations (paired limbs, slot pools): creation buys
+  one row per implant and never asks which arm it goes in.
+- The 800eb reserved for Fashion and Fashionware are settled with the GM: they
+  buy nothing in the wizard and, per RAW, never turn into cash.
+- `validate_character_creation` mirrors the budget server-side, so a
+  hand-crafted payload cannot open a sheet with more than 2.550eb.
+
 ### Dice and rolls
 
 `frontend/src/domain/dice/` parses `NdM` notation, organizes contributions

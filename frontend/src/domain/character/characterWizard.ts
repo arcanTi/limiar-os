@@ -19,18 +19,29 @@ import {
   CPRED_STAT_ROLL_SIDES,
   languageSkillName,
 } from './constants.ts';
+import { CPRED_CREATION_CASH } from './constants.ts';
+import {
+  addChrome,
+  chromeHumanityLoss,
+  chromeSpend,
+  creationCashLeft,
+  isChromeEnhancement,
+  removeChrome,
+} from './creationChrome.ts';
+import type { ChromeContext, ChromeItem } from './creationChrome.ts';
 import { normalizeSkills, normalizeStats, skillSpend } from './index.ts';
 import { DEFAULT_SYSTEM_ID, isSystemPlayable, systemMeta } from '../campaigns/systems.ts';
 
-export type WizardStepId = 'system' | 'identity' | 'attributes' | 'skills' | 'review';
+export type WizardStepId = 'system' | 'identity' | 'attributes' | 'skills' | 'chrome' | 'review';
 
-export const WIZARD_STEPS: WizardStepId[] = ['system', 'identity', 'attributes', 'skills', 'review'];
+export const WIZARD_STEPS: WizardStepId[] = ['system', 'identity', 'attributes', 'skills', 'chrome', 'review'];
 
 export const WIZARD_STEP_LABELS: Record<WizardStepId, string> = {
   system: 'Sistema',
   identity: 'Identidade',
   attributes: 'Atributos',
   skills: 'Pericias',
+  chrome: 'Chrome',
   review: 'Revisao',
 };
 
@@ -69,6 +80,11 @@ export interface WizardDraft {
    * key only. Anything above one per key is a reroll the GM gets to see.
    */
   statRolled: Record<string, number>;
+  /**
+   * Cyberware and DLC enhancements bought from the 2.550eb creation budget.
+   * Whatever is not spent here becomes the character's starting cash.
+   */
+  chrome: ChromeItem[];
 }
 
 export interface StepValidation {
@@ -98,6 +114,7 @@ export function createWizardDraft(overrides: Partial<WizardDraft> = {}): WizardD
     skills: overrides.skills || (normalizeSkills(null, normalizeStats(base)) as unknown as WizardSkill[]),
     statMethod: overrides.statMethod || 'points',
     statRolled: { ...(overrides.statRolled || {}) },
+    chrome: [...(overrides.chrome || [])],
   };
   return overrides.originLanguage ? setOriginLanguage(draft, overrides.originLanguage) : draft;
 }
@@ -303,6 +320,34 @@ export function setSkillLevel(draft: WizardDraft, skillId: string, value: unknow
   return { ...draft, skills };
 }
 
+// --- Chrome (cyberware bought at creation) ---
+
+/** Install an implant if the budget, the stock and the install rules allow. */
+export function buyChrome(draft: WizardDraft, item: ChromeItem | null | undefined, context: ChromeContext = {}): WizardDraft {
+  const chrome = addChrome(draft.chrome, item, context);
+  return chrome === draft.chrome ? draft : { ...draft, chrome };
+}
+
+/** Uninstall an implant, refunding its enhancements with it. */
+export function sellChrome(draft: WizardDraft, code: unknown): WizardDraft {
+  const chrome = removeChrome(draft.chrome, code);
+  return chrome.length === draft.chrome.length ? draft : { ...draft, chrome };
+}
+
+export function chromeSpendTotal(draft: Pick<WizardDraft, 'chrome'>): number {
+  return chromeSpend(draft.chrome);
+}
+
+/** Eurodollars the character starts play with (CPR p.104). */
+export function startingCash(draft: Pick<WizardDraft, 'chrome'>): number {
+  return creationCashLeft(draft.chrome);
+}
+
+/** Humanity paid for the chrome, charged at creation like any other install. */
+export function chromeHumanityCost(draft: Pick<WizardDraft, 'chrome'>): number {
+  return chromeHumanityLoss(draft.chrome);
+}
+
 // --- Step validation ---
 
 export function validateStep(step: WizardStepId, draft: WizardDraft): StepValidation {
@@ -336,6 +381,19 @@ export function validateStep(step: WizardStepId, draft: WizardDraft): StepValida
     const remaining = skillPointsRemaining(draft.skills);
     if (remaining > 0) errors.push(`Faltam ${remaining} pontos de perícia para distribuir.`);
     if (remaining < 0) errors.push(`Você passou ${Math.abs(remaining)} pontos do orçamento de perícias.`);
+  }
+
+  if (step === 'chrome') {
+    // Chrome is optional: a character may walk out of creation with 2.550eb in
+    // the pocket and no implants. Only an impossible cart blocks the step.
+    const spent = chromeSpendTotal(draft);
+    if (spent > CPRED_CREATION_CASH) {
+      errors.push(`Você passou ${spent - CPRED_CREATION_CASH}eb do orçamento de criação.`);
+    }
+    const orphans = draft.chrome.filter((item) => (
+      isChromeEnhancement(item) && !item.attachesTo.some((code) => draft.chrome.some((pick) => pick.code === code))
+    ));
+    orphans.forEach((item) => errors.push(`${item.name} precisa do cyberware base instalado.`));
   }
 
   if (step === 'review') {

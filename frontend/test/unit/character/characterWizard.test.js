@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   WIZARD_STEPS,
+  buyChrome,
   canAdvance,
   changeStat,
+  chromeHumanityCost,
+  chromeSpendTotal,
   createWizardDraft,
+  sellChrome,
+  startingCash,
   furthestReachableStep,
   nextStep,
   previousStep,
@@ -29,7 +34,20 @@ import {
   validateStep,
   wizardProgress,
 } from '../../../src/domain/character/characterWizard.ts';
-import { CPRED_CULTURAL_ORIGINS, CPRED_LANGUAGES, CPRED_SKILL_BUDGET, CPRED_STAT_BUDGET } from '../../../src/domain/character/constants.ts';
+import { chromeCatalog } from '../../../src/domain/character/creationChrome.ts';
+import {
+  CPRED_CREATION_CASH,
+  CPRED_CULTURAL_ORIGINS,
+  CPRED_LANGUAGES,
+  CPRED_SKILL_BUDGET,
+  CPRED_STAT_BUDGET,
+} from '../../../src/domain/character/constants.ts';
+
+const CHROME = chromeCatalog([
+  { code: 'GORILLA-ARMS', name: 'Gorilla Arms', cat: 'LIMBS', price: 1000, hcost: 14 },
+  { code: 'ENH-TUNGSTEN', name: 'Tungsten Reinforcement', cat: 'LIMBS', price: 500, hcost: 3, attachesTo: ['GORILLA-ARMS'] },
+]);
+const chrome = (code) => CHROME.find((item) => item.code === code);
 
 // Ten cheap, untrained skills at the creation cap of 6 spend exactly 60.
 function spendAll(draft) {
@@ -194,6 +212,50 @@ describe('pericias', () => {
   it('ignora pericia inexistente', () => {
     const draft = createWizardDraft();
     expect(setSkillLevel(draft, 'nao-existe', 5)).toBe(draft);
+  });
+});
+
+describe('chrome comprado na criacao', () => {
+  it('comeca sem implante e com o orcamento inteiro no bolso', () => {
+    const draft = createWizardDraft();
+    expect(draft.chrome).toEqual([]);
+    expect(startingCash(draft)).toBe(CPRED_CREATION_CASH);
+    expect(canAdvance('chrome', draft)).toBe(true);
+  });
+
+  it('instalar desconta eurodolares e HUMANITY', () => {
+    const draft = buyChrome(createWizardDraft(), chrome('GORILLA-ARMS'));
+    expect(chromeSpendTotal(draft)).toBe(1000);
+    expect(startingCash(draft)).toBe(CPRED_CREATION_CASH - 1000);
+    expect(chromeHumanityCost(draft)).toBe(14);
+  });
+
+  it('aprimoramento so entra depois da peca base', () => {
+    const solto = buyChrome(createWizardDraft(), chrome('ENH-TUNGSTEN'));
+    expect(solto.chrome).toEqual([]);
+    const comBase = buyChrome(buyChrome(createWizardDraft(), chrome('GORILLA-ARMS')), chrome('ENH-TUNGSTEN'));
+    expect(comBase.chrome.map((item) => item.code)).toEqual(['GORILLA-ARMS', 'ENH-TUNGSTEN']);
+  });
+
+  it('remover a peca base devolve o aprimoramento junto', () => {
+    const draft = buyChrome(buyChrome(createWizardDraft(), chrome('GORILLA-ARMS')), chrome('ENH-TUNGSTEN'));
+    const after = sellChrome(draft, 'GORILLA-ARMS');
+    expect(after.chrome).toEqual([]);
+    expect(startingCash(after)).toBe(CPRED_CREATION_CASH);
+  });
+
+  it('trava o passo quando o rascunho vem com aprimoramento orfao', () => {
+    const draft = createWizardDraft({ chrome: [chrome('ENH-TUNGSTEN')] });
+    const result = validateStep('chrome', draft);
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toContain('cyberware base');
+  });
+
+  it('trava o passo quando o rascunho estoura o orcamento', () => {
+    const caro = { ...chrome('GORILLA-ARMS'), code: 'CARO', price: CPRED_CREATION_CASH + 50 };
+    const result = validateStep('chrome', createWizardDraft({ chrome: [caro] }));
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toContain('50eb');
   });
 });
 

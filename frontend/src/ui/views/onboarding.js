@@ -10,12 +10,16 @@
 import {
   WIZARD_STEPS,
   WIZARD_ROLES,
+  buyChrome,
   changeStat,
+  chromeHumanityCost,
+  chromeSpendTotal,
   createWizardDraft,
   nextStep,
   previousStep,
   rollStat,
   rollStats,
+  sellChrome,
   setOriginLanguage,
   setSkillLevel,
   setStatMethod,
@@ -23,6 +27,7 @@ import {
   skillFloor,
   skillPointsRemaining,
   skillStepCost,
+  startingCash,
   statBounds,
   statChangeMessage,
   statMethodGuide,
@@ -33,13 +38,24 @@ import {
   unrolledStats,
   wizardProgress,
 } from '../../domain/character/characterWizard.ts';
+import {
+  chromeAttachments,
+  chromeBlock,
+  chromeBlockMessage,
+  chromeCatalog,
+  chromeEquipped,
+  isChromeEnhancement,
+} from '../../domain/character/creationChrome.ts';
 import { RPG_SYSTEMS, implementationLabel, isSystemPlayable } from '../../domain/campaigns/systems.ts';
 import {
+  CPRED_CREATION_CASH,
+  CPRED_CREATION_FASHION_CASH,
   CPRED_CULTURAL_ORIGINS,
   CPRED_SKILL_CREATION_MAX,
   CPRED_STAT_BUDGET,
   CPRED_STAT_ORDER,
 } from '../../domain/character/constants.ts';
+import canonicalRules from '../../../../data/canonical/cpr-canonical-rules.json' with { type: 'json' };
 
 export const WIZARD_MODES = ['first', 'new'];
 
@@ -305,6 +321,102 @@ function skillsStep(draft, filter) {
     </div>`;
 }
 
+const money = (value) => Number(value || 0).toLocaleString('pt-BR');
+
+/**
+ * Money bar for the chrome step. Unlike the point budgets, an unspent
+ * eurodollar is not a mistake: it is the cash the operative starts with
+ * (p.104), so the bar never turns into a warning while the cart fits.
+ */
+function cashBar(draft) {
+  const spent = chromeSpendTotal(draft);
+  const left = startingCash(draft);
+  const humanity = chromeHumanityCost(draft);
+  const over = spent > CPRED_CREATION_CASH;
+  const tone = over
+    ? 'text-cyber-red bg-cyber-red/10 border-cyber-red/30'
+    : 'text-cyber-cyan bg-cyber-cyan/10 border-cyber-cyan/30';
+  const headline = over
+    ? `<strong class="font-mono text-[17px]">${money(spent - CPRED_CREATION_CASH)}eb</strong> acima do orçamento de ${money(CPRED_CREATION_CASH)}eb.`
+    : `<strong class="font-mono text-[17px]">${money(left)}eb</strong> de ${money(CPRED_CREATION_CASH)}eb livres · ${money(spent)}eb em chrome`
+      + (humanity ? ` · <span class="text-cyber-red">−${humanity} HUMANITY</span>` : ' · sem custo de HUMANITY');
+  return `<div data-wiz-budget role="status" class="flex flex-col gap-1 border px-4 py-3 ${tone}">
+    <span class="font-sans text-[13px] font-bold">${headline}</span>
+    <span class="${GUIDE}">O que sobrar vira o dinheiro vivo inicial. A cirurgia é grátis na criação, mas a HUMANITY é cobrada na hora. Os ${money(CPRED_CREATION_FASHION_CASH)}eb de roupas e Fashionware são gastos com o mestre e não viram dinheiro.</span>
+  </div>`;
+}
+
+function chromeCard(item, { bought, blockedMessage }) {
+  const enhancement = isChromeEnhancement(item);
+  const tone = bought
+    ? 'border-cyber-cyan/40 bg-cyber-cyan/5'
+    : (blockedMessage ? 'border-cyber-gold/15 bg-cyber-bg/40 opacity-60' : 'border-cyber-gold/20 bg-cyber-bg/55');
+  const action = bought
+    ? `<button type="button" data-wiz-chrome-remove="${esc(item.code)}" class="${STEPPER_BTN} w-auto px-2 text-[10px] tracking-wider">REMOVER</button>`
+    : `<button type="button" data-wiz-chrome-buy="${esc(item.code)}" ${blockedMessage ? 'disabled aria-disabled="true"' : ''}
+              title="${esc(blockedMessage || '')}" class="${STEPPER_BTN} w-auto px-2 text-[10px] tracking-wider ${blockedMessage ? '' : 'border-cyber-cyan text-cyber-cyan'}">INSTALAR</button>`;
+  return `
+    <div class="flex items-start gap-2 border px-3 py-2.5 ${tone}">
+      <span class="flex-1 min-w-0 flex flex-col leading-tight">
+        <span class="font-sans text-[13px] text-cyber-bright truncate">${esc(item.name)}</span>
+        <em class="not-italic font-mono text-[9px] tracking-wider text-cyber-text/45">
+          ${esc(item.cat)} · ${money(item.price)}eb${item.hcost ? ` · −${item.hcost} HUM` : ''}${enhancement ? ` · aprimoramento de ${esc(item.attachesTo.join(', '))}` : ''}
+        </em>
+        ${item.desc ? `<em class="not-italic font-sans text-[11px] text-cyber-text/50 mt-1 line-clamp-2">${esc(item.desc)}</em>` : ''}
+      </span>
+      ${action}
+    </div>`;
+}
+
+function chromeStep(draft, state) {
+  const catalog = state.catalog || [];
+  const filter = String(state.chromeFilter || '').trim().toLowerCase();
+  const bought = new Set(draft.chrome.map((item) => item.code));
+  const installed = chromeAttachments(draft.chrome);
+  const visible = catalog.filter((item) => (
+    !bought.has(item.code)
+    && (!filter || item.name.toLowerCase().includes(filter) || item.cat.toLowerCase().includes(filter))
+  ));
+  const context = { catalog: state.rawCatalog || [], canonicalRules };
+
+  let list = '';
+  if (state.catalogStatus === 'loading') {
+    list = '<div class="font-sans text-xs text-cyber-text/45 py-2.5">Carregando o catálogo de chrome...</div>';
+  } else if (state.catalogStatus === 'error') {
+    list = '<div class="font-sans text-xs text-cyber-red py-2.5">Não foi possível carregar o catálogo. Você pode criar a ficha sem chrome e instalar depois.</div>';
+  } else {
+    list = `<div class="grid grid-cols-fit-lg gap-3">${visible.map((item) => {
+      const block = chromeBlock(draft.chrome, item, context);
+      return chromeCard(item, { bought: false, blockedMessage: block.reason ? chromeBlockMessage(block, item) : '' });
+    }).join('') || '<div class="font-sans text-xs text-cyber-text/45 py-2.5">Nenhum implante encontrado.</div>'}</div>`;
+  }
+
+  const installedBlock = installed.length
+    ? `<section class="flex flex-col gap-2">
+        <span class="${FIELD_LABEL} mb-0">Instalado · ${money(chromeSpendTotal(draft))}eb</span>
+        <div class="flex flex-col gap-2">${installed.map((row) => `
+          ${chromeCard(row.parent, { bought: true, blockedMessage: '' })}
+          ${row.enhancements.map((enhancement) => `<div class="pl-6">${chromeCard(enhancement, { bought: true, blockedMessage: '' })}</div>`).join('')}
+        `).join('')}</div>
+      </section>`
+    : '';
+
+  return `
+    <div class="flex flex-col gap-4">
+      ${cashBar(draft)}
+      ${installedBlock}
+      <label class="block">
+        <span class="${FIELD_LABEL}">Buscar implante</span>
+        <input type="search" data-wiz-chrome-filter value="${esc(state.chromeFilter || '')}" autocomplete="off"
+               placeholder="Ex.: Cyberarm, Kerenzikov, OPTICS..." class="${FIELD_INPUT}">
+      </label>
+      ${list}
+      ${state.chromeHint
+    ? `<p data-wiz-hint role="status" class="m-0 font-sans text-[13px] text-cyber-gold bg-cyber-gold/10 border-l-[3px] border-cyber-gold px-3 py-2">${esc(state.chromeHint)}</p>`
+    : '<p data-wiz-hint hidden></p>'}
+    </div>`;
+}
+
 function reviewStep(draft, campaignName, mode = 'first') {
   const raised = draft.skills.filter((skill) => skill.level > skillFloor(skill));
   const rolled = draft.statMethod === 'roll';
@@ -334,6 +446,15 @@ function reviewStep(draft, campaignName, mode = 'first') {
     : '<span class="font-sans text-xs text-cyber-text/45">Nenhuma perícia acima do nível inicial.</span>'}
         </div>
       </section>
+      <section class="flex flex-col gap-2">
+        <span class="${FIELD_LABEL} mb-0">Chrome instalado · ${money(chromeSpendTotal(draft))}eb${chromeHumanityCost(draft) ? ` · −${chromeHumanityCost(draft)} HUMANITY` : ''}</span>
+        <div class="flex flex-wrap gap-2">
+          ${draft.chrome.length
+    ? draft.chrome.map((item) => `<span class="font-sans text-xs text-cyber-bright bg-cyber-cyan/10 border border-cyber-cyan/25 px-2.5 py-1">${esc(item.name)}${isChromeEnhancement(item) ? ' <em class="not-italic text-cyber-gold">aprim.</em>' : ''}</span>`).join('')
+    : '<span class="font-sans text-xs text-cyber-text/45">Nenhum implante — a carne ainda manda.</span>'}
+        </div>
+        <span class="${GUIDE}">Começa com <strong class="font-mono text-cyber-gold">${money(startingCash(draft))}eb</strong> em dinheiro vivo.</span>
+      </section>
       ${campaignName ? `<div class="font-sans text-[13px] text-cyber-bright bg-cyber-gold/10 border-l-[3px] border-cyber-gold px-3 py-2.5">${wizardCopy(mode).campaignNote(campaignName)}</div>` : ''}
     </div>`;
 }
@@ -346,6 +467,7 @@ function render(root, state) {
     identity: () => identityStep(state.draft),
     attributes: () => attributesStep(state.draft, state.hint),
     skills: () => skillsStep(state.draft, state.skillFilter),
+    chrome: () => chromeStep(state.draft, state),
     review: () => reviewStep(state.draft, state.campaignName, state.mode),
   }[state.step]();
 
@@ -392,6 +514,13 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
     saving: false,
     campaignId,
     campaignName,
+    /** Chrome step: normalized implants, plus the raw rows the engine needs. */
+    catalog: [],
+    rawCatalog: [],
+    catalogStatus: 'idle',
+    chromeFilter: '',
+    /** Transient explanation of why an implant could not be installed. */
+    chromeHint: '',
   };
 
   const handlers = {
@@ -428,6 +557,19 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
       if (skill) state.draft = setSkillLevel(state.draft, id, skill.level + delta);
     },
     setSkillFilter(value) { state.skillFilter = value; },
+    setChromeFilter(value) { state.chromeFilter = value; },
+    buyChrome(code) {
+      const item = (state.catalog || []).find((row) => row.code === code);
+      const context = { catalog: state.rawCatalog, canonicalRules };
+      const block = chromeBlock(state.draft.chrome, item, context);
+      if (block.reason) { state.chromeHint = chromeBlockMessage(block, item); return; }
+      state.draft = buyChrome(state.draft, item, context);
+      state.chromeHint = '';
+    },
+    sellChrome(code) {
+      state.draft = sellChrome(state.draft, code);
+      state.chromeHint = '';
+    },
     back() { state.hint = ''; state.step = previousStep(state.step); },
     next() {
       if (!wizardProgress(state.step, state.draft).canAdvance) return false;
@@ -436,6 +578,26 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
       return true; // Signal that the completed draft is ready to persist.
     },
   };
+
+  /**
+   * Fetch the chrome catalog once. A failure is not fatal: the step then says
+   * so and the player creates the sheet without implants.
+   */
+  async function loadCatalog() {
+    if (state.catalogStatus === 'loading' || state.catalogStatus === 'ready') return state.catalog;
+    state.catalogStatus = 'loading';
+    try {
+      const items = await (api && api.items ? api.items.list() : Promise.resolve([]));
+      state.rawCatalog = Array.isArray(items) ? items : [];
+      state.catalog = chromeCatalog(state.rawCatalog);
+      state.catalogStatus = 'ready';
+    } catch (_) {
+      state.rawCatalog = [];
+      state.catalog = [];
+      state.catalogStatus = 'error';
+    }
+    return state.catalog;
+  }
 
   async function finish() {
     if (state.saving) return { ok: false };
@@ -458,7 +620,7 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
     }
   }
 
-  return { state, handlers, finish };
+  return { state, handlers, finish, loadCatalog };
 }
 
 /**
@@ -488,6 +650,13 @@ export function buildCharacterPayload(draft, { svgCard } = {}) {
       statRerolls: draft.statMethod === 'roll' ? statRerollCount(draft) : 0,
       originLanguage: draft.originLanguage || '',
     },
+    // RAW p.104: chrome is paid out of the 2.550eb budget and the rest is the
+    // cash the operative starts with. The implants go in installed (surgery is
+    // free at creation, p.110); their Humanity cost is derived from `equipped`,
+    // so it is never written here as a separate loss.
+    credits: startingCash(draft),
+    equipped: chromeEquipped(draft.chrome),
+    owned: draft.chrome.map((item) => item.code),
     base: { ...draft.base },
     skills: draft.skills.map((skill) => ({
       id: skill.id,
@@ -505,7 +674,7 @@ export function buildCharacterPayload(draft, { svgCard } = {}) {
 export function activeFieldSelector(documentRef) {
   const active = documentRef && documentRef.activeElement;
   if (!active || !active.getAttribute) return '';
-  for (const attr of ['data-wiz-stat', 'data-wiz-skill', 'data-wiz-name', 'data-wiz-skill-filter']) {
+  for (const attr of ['data-wiz-stat', 'data-wiz-skill', 'data-wiz-name', 'data-wiz-skill-filter', 'data-wiz-chrome-filter']) {
     const value = active.getAttribute(attr);
     if (value !== null) return value ? `[${attr}="${value}"]` : `[${attr}]`;
   }
@@ -585,6 +754,11 @@ export function mountOnboardingWizard({
     const statDec = target.closest('[data-wiz-stat-dec]');
     if (statDec) { controller.handlers.bumpStat(statDec.getAttribute('data-wiz-stat-dec'), -1); return paint(); }
 
+    const chromeBuy = target.closest('[data-wiz-chrome-buy]');
+    if (chromeBuy) { controller.handlers.buyChrome(chromeBuy.getAttribute('data-wiz-chrome-buy')); return paint(); }
+    const chromeRemove = target.closest('[data-wiz-chrome-remove]');
+    if (chromeRemove) { controller.handlers.sellChrome(chromeRemove.getAttribute('data-wiz-chrome-remove')); return paint(); }
+
     const skillInc = target.closest('[data-wiz-skill-inc]');
     if (skillInc) { controller.handlers.bumpSkill(skillInc.getAttribute('data-wiz-skill-inc'), 1); return paint(); }
     const skillDec = target.closest('[data-wiz-skill-dec]');
@@ -614,6 +788,7 @@ export function mountOnboardingWizard({
       return;
     }
     if (target.hasAttribute('data-wiz-skill-filter')) { controller.handlers.setSkillFilter(target.value); return; }
+    if (target.hasAttribute('data-wiz-chrome-filter')) { controller.handlers.setChromeFilter(target.value); return; }
     if (target.hasAttribute('data-wiz-stat')) {
       controller.handlers.setStat(target.getAttribute('data-wiz-stat'), target.value);
       paint();
@@ -631,8 +806,14 @@ export function mountOnboardingWizard({
     if (target.hasAttribute('data-wiz-role')) { controller.handlers.setRole(target.value); paint(); }
     if (target.hasAttribute('data-wiz-origin')) { controller.handlers.setOriginLanguage(target.value); paint(); }
     if (target.hasAttribute('data-wiz-skill-filter')) paint();
+    if (target.hasAttribute('data-wiz-chrome-filter')) paint();
   });
 
   paint();
+  // The chrome step needs the catalog, and it is three steps away: fetch it now
+  // so it is already there, and repaint only if the wizard is still mounted.
+  controller.loadCatalog().then(() => {
+    if (root.dataset.mounted === 'true') paint();
+  });
   return root;
 }

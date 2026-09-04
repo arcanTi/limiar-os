@@ -124,6 +124,7 @@ CPRED_SKILL_LEVEL_MAX = 6  # creation cap (p.42/90); 10 is reached with IP later
 CPRED_SKILL_TRAINED_MIN = 2  # a trained skill never starts at 1 (p.88)
 CPRED_DEFAULT_SKILL_LEVEL = 2
 CPRED_ORIGIN_LANGUAGE_LEVEL = 4  # free Cultural Origin language (p.41/45)
+CPRED_CREATION_CASH = 2550  # gear + cyberware budget; the rest is starting cash (p.104)
 CPRED_DEFAULT_SKILL_NAMES = frozenset(
     {
         "Athletics",
@@ -238,6 +239,33 @@ def _validate_creation_skills(skills: object, origin_language: str, errors: list
         errors.append(f"'skills' spend {spent} points; the limit is {CPRED_SKILL_BUDGET}")
 
 
+def _validate_creation_cash(payload: dict[str, object], errors: list[str]) -> None:
+    """Starting money never exceeds the Complete Package budget (p.104).
+
+    What the sheet keeps as cash plus what it spent on the chrome it already
+    wears must fit in 2.550eb. Prices come from the payload, so this is a guard
+    against the obvious hand-crafted sheet, not an audit of the catalog.
+    """
+    credits = payload.get("credits")
+    if credits is None:
+        return
+    if isinstance(credits, bool) or not isinstance(credits, int) or credits < 0:
+        errors.append("'credits' must be a non-negative integer")
+        return
+    spent = 0
+    equipped = payload.get("equipped")
+    if isinstance(equipped, list):
+        for row in equipped:
+            price = row.get("price") if isinstance(row, dict) else None
+            if isinstance(price, int) and not isinstance(price, bool) and price > 0:
+                spent += price
+    if credits + spent > CPRED_CREATION_CASH:
+        errors.append(
+            f"'credits' plus installed gear total {credits + spent}eb; "
+            f"the creation budget is {CPRED_CREATION_CASH}eb"
+        )
+
+
 def validate_character_creation(payload: dict[str, object]) -> None:
     """Guard a brand-new player sheet against an illegal starting spread.
 
@@ -253,6 +281,7 @@ def validate_character_creation(payload: dict[str, object]) -> None:
         _validate_creation_stats(payload.get("base"), method, errors)
     if "skills" in payload:
         _validate_creation_skills(payload.get("skills"), _origin_language(payload), errors)
+    _validate_creation_cash(payload, errors)
     if errors:
         raise ValidationError(errors)
 

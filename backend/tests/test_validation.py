@@ -173,3 +173,33 @@ def test_character_creation_free_skill_levels_do_not_count():
                      "Persuasion", "Stealth")
     ]
     validate_character_creation({"name": "V", "skills": defaults + [{"name": f"S{i}", "level": 6} for i in range(10)]})
+
+
+def test_character_creation_accepts_the_starting_budget():
+    validate_character_creation({
+        "name": "V",
+        "credits": 1050,
+        "equipped": [{"code": "GORILLA-ARMS", "price": 1000}, {"code": "ENH-HYD-RAM", "price": 500}],
+    })
+
+
+def test_character_creation_accepts_a_sheet_that_bought_nothing():
+    validate_character_creation({"name": "V", "credits": 2550, "equipped": []})
+
+
+def test_character_creation_rejects_cash_above_the_creation_budget():
+    with pytest.raises(ValidationError) as excinfo:
+        validate_character_creation({"name": "V", "credits": 99999})
+    assert "creation budget is 2550eb" in str(excinfo.value)
+
+
+def test_character_creation_counts_installed_chrome_against_the_budget():
+    with pytest.raises(ValidationError) as excinfo:
+        validate_character_creation({"name": "V", "credits": 2550, "equipped": [{"code": "X", "price": 1000}]})
+    assert "3550eb" in str(excinfo.value)
+
+
+def test_character_creation_rejects_negative_cash():
+    with pytest.raises(ValidationError) as excinfo:
+        validate_character_creation({"name": "V", "credits": -5})
+    assert "'credits' must be a non-negative integer" in str(excinfo.value)
