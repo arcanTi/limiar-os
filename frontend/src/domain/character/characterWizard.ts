@@ -17,9 +17,9 @@ import {
   CPRED_STAT_ORDER,
   CPRED_STAT_ROLL_MAX,
   CPRED_STAT_ROLL_SIDES,
+  CPRED_CREATION_CASH,
   languageSkillName,
 } from './constants.ts';
-import { CPRED_CREATION_CASH } from './constants.ts';
 import {
   addChrome,
   chromeHumanityLoss,
@@ -29,12 +29,16 @@ import {
   removeChrome,
 } from './creationChrome.ts';
 import type { ChromeContext, ChromeItem } from './creationChrome.ts';
+import { addGear, gearBlock, gearSpend, removeGear } from './creationGear.ts';
+import type { GearItem, GearPick } from './creationGear.ts';
+import { createLifestyle, defaultLifestyleFor, fromPreset, lifestyleRecord, setLifestyleField } from './lifestyle.ts';
+import type { LifestyleChoice } from './lifestyle.ts';
 import { normalizeSkills, normalizeStats, skillSpend } from './index.ts';
 import { DEFAULT_SYSTEM_ID, isSystemPlayable, systemMeta } from '../campaigns/systems.ts';
 
-export type WizardStepId = 'system' | 'identity' | 'attributes' | 'skills' | 'chrome' | 'review';
+export type WizardStepId = 'system' | 'identity' | 'attributes' | 'skills' | 'chrome' | 'arsenal' | 'lifestyle' | 'review';
 
-export const WIZARD_STEPS: WizardStepId[] = ['system', 'identity', 'attributes', 'skills', 'chrome', 'review'];
+export const WIZARD_STEPS: WizardStepId[] = ['system', 'identity', 'attributes', 'skills', 'chrome', 'arsenal', 'lifestyle', 'review'];
 
 export const WIZARD_STEP_LABELS: Record<WizardStepId, string> = {
   system: 'Sistema',
@@ -42,6 +46,8 @@ export const WIZARD_STEP_LABELS: Record<WizardStepId, string> = {
   attributes: 'Atributos',
   skills: 'Pericias',
   chrome: 'Chrome',
+  arsenal: 'Arsenal',
+  lifestyle: 'Vida',
   review: 'Revisao',
 };
 
@@ -85,6 +91,10 @@ export interface WizardDraft {
    * Whatever is not spent here becomes the character's starting cash.
    */
   chrome: ChromeItem[];
+  /** Weapons, armor, ammo and gear bought from that same budget. */
+  gear: GearPick[];
+  /** Where the operative lives and what that costs per month. */
+  lifestyle: LifestyleChoice;
 }
 
 export interface StepValidation {
@@ -115,6 +125,8 @@ export function createWizardDraft(overrides: Partial<WizardDraft> = {}): WizardD
     statMethod: overrides.statMethod || 'points',
     statRolled: { ...(overrides.statRolled || {}) },
     chrome: [...(overrides.chrome || [])],
+    gear: [...(overrides.gear || [])],
+    lifestyle: overrides.lifestyle || createLifestyle(overrides.role || 'Solo'),
   };
   return overrides.originLanguage ? setOriginLanguage(draft, overrides.originLanguage) : draft;
 }
@@ -338,9 +350,77 @@ export function chromeSpendTotal(draft: Pick<WizardDraft, 'chrome'>): number {
   return chromeSpend(draft.chrome);
 }
 
+// --- Arsenal (weapons, armor, ammo and gear) ---
+
+export function gearSpendTotal(draft: Pick<WizardDraft, 'gear'>): number {
+  return gearSpend(draft.gear);
+}
+
+/**
+ * The single creation pool (p.104): chrome and gear come out of the same
+ * 2.550eb, so each side's budget is what the other left behind.
+ */
+export function creationSpend(draft: Pick<WizardDraft, 'chrome' | 'gear'>): number {
+  return chromeSpend(draft.chrome) + gearSpend(draft.gear);
+}
+
+export function chromeBudget(draft: Pick<WizardDraft, 'gear'>): number {
+  return Math.max(0, CPRED_CREATION_CASH - gearSpend(draft.gear));
+}
+
+export function gearBudget(draft: Pick<WizardDraft, 'chrome'>): number {
+  return Math.max(0, CPRED_CREATION_CASH - chromeSpend(draft.chrome));
+}
+
+/** Buy one unit of a catalog item with the money chrome has not taken. */
+export function buyGear(draft: WizardDraft, item: GearItem | null | undefined): WizardDraft {
+  const gear = addGear(draft.gear, item, { cashLeft: startingCash(draft) });
+  return gear === draft.gear ? draft : { ...draft, gear };
+}
+
+/** Sell one unit back into the budget. */
+export function sellGear(draft: WizardDraft, code: unknown): WizardDraft {
+  const gear = removeGear(draft.gear, code);
+  return gear === draft.gear ? draft : { ...draft, gear };
+}
+
+export function gearPurchaseBlock(draft: WizardDraft, item: GearItem | null | undefined) {
+  return gearBlock(draft.gear, item, { cashLeft: startingCash(draft) });
+}
+
+// --- Lifestyle and housing ---
+
+/** Switch preset (Cargo Container, Corporate Conapt, Nomad camp, custom). */
+export function setLifestylePreset(draft: WizardDraft, id: unknown): WizardDraft {
+  return { ...draft, lifestyle: fromPreset(id) };
+}
+
+export function setLifestyleDetail(draft: WizardDraft, field: 'housing' | 'food' | 'monthlyCost', value: unknown): WizardDraft {
+  return { ...draft, lifestyle: setLifestyleField(draft.lifestyle, field, value) };
+}
+
+/**
+ * Follow the Role while the player has not touched the lifestyle: an Exec and
+ * a Nomad do not start in the same place as everyone else, and picking the
+ * Role is the moment that is decided.
+ */
+export function setRole(draft: WizardDraft, role: unknown): WizardDraft {
+  const next = String(role || '').trim();
+  const untouched = draft.lifestyle.id === defaultLifestyleFor(draft.role);
+  return {
+    ...draft,
+    role: next,
+    lifestyle: untouched ? fromPreset(defaultLifestyleFor(next)) : draft.lifestyle,
+  };
+}
+
+export function lifestyleForSheet(draft: Pick<WizardDraft, 'lifestyle'>) {
+  return lifestyleRecord(draft.lifestyle);
+}
+
 /** Eurodollars the character starts play with (CPR p.104). */
-export function startingCash(draft: Pick<WizardDraft, 'chrome'>): number {
-  return creationCashLeft(draft.chrome);
+export function startingCash(draft: Pick<WizardDraft, 'chrome' | 'gear'>): number {
+  return Math.max(0, creationCashLeft(draft.chrome) - gearSpend(draft.gear));
 }
 
 /** Humanity paid for the chrome, charged at creation like any other install. */
@@ -402,6 +482,23 @@ export function validateStep(step: WizardStepId, draft: WizardDraft): StepValida
         errors.push(`${parent.name} carrega ${attached.length} aprimoramentos; cada peça aceita um por vez.`);
       }
     });
+  }
+
+  if (step === 'arsenal') {
+    // Buying nothing is legal: the money simply stays in the pocket. Only a
+    // cart that does not fit the shared pool blocks the step.
+    const spent = creationSpend(draft);
+    if (spent > CPRED_CREATION_CASH) {
+      errors.push(`Você passou ${spent - CPRED_CREATION_CASH}eb do orçamento de criação.`);
+    }
+  }
+
+  if (step === 'lifestyle') {
+    const lifestyle = draft.lifestyle;
+    if (!String(lifestyle.housing || '').trim()) errors.push('Diga onde o operativo dorme no primeiro mês.');
+    if (!Number.isFinite(Number(lifestyle.monthlyCost)) || Number(lifestyle.monthlyCost) < 0) {
+      errors.push('O custo mensal não pode ser negativo.');
+    }
   }
 
   if (step === 'review') {

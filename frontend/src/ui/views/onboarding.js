@@ -11,16 +11,26 @@ import {
   WIZARD_STEPS,
   WIZARD_ROLES,
   buyChrome,
+  buyGear,
   changeStat,
+  chromeBudget,
   chromeHumanityCost,
   chromeSpendTotal,
   createWizardDraft,
+  creationSpend,
+  gearPurchaseBlock,
+  gearSpendTotal,
+  lifestyleForSheet,
   nextStep,
   previousStep,
   rollStat,
   rollStats,
   sellChrome,
+  sellGear,
+  setLifestyleDetail,
+  setLifestylePreset,
   setOriginLanguage,
+  setRole,
   setSkillLevel,
   setStatMethod,
   skillBudgetView,
@@ -46,6 +56,13 @@ import {
   chromeEquipped,
   isChromeEnhancement,
 } from '../../domain/character/creationChrome.ts';
+import {
+  gearBlockMessage,
+  gearCatalog,
+  gearCount,
+  gearInventory,
+} from '../../domain/character/creationGear.ts';
+import { CPRED_LIFESTYLES, lifestyleSummary } from '../../domain/character/lifestyle.ts';
 import { RPG_SYSTEMS, implementationLabel, isSystemPlayable } from '../../domain/campaigns/systems.ts';
 import {
   CPRED_CREATION_CASH,
@@ -328,23 +345,33 @@ const money = (value) => Number(value || 0).toLocaleString('pt-BR');
  * eurodollar is not a mistake: it is the cash the operative starts with
  * (p.104), so the bar never turns into a warning while the cart fits.
  */
-function cashBar(draft) {
-  const spent = chromeSpendTotal(draft);
+/**
+ * The shared creation pool. Chrome and arsenal spend the same 2.550eb, so the
+ * bar always shows both sides and the money still free between them.
+ */
+function cashBar(draft, guide) {
+  const chrome = chromeSpendTotal(draft);
+  const gear = gearSpendTotal(draft);
+  const spent = creationSpend(draft);
   const left = startingCash(draft);
   const humanity = chromeHumanityCost(draft);
   const over = spent > CPRED_CREATION_CASH;
   const tone = over
     ? 'text-cyber-red bg-cyber-red/10 border-cyber-red/30'
     : 'text-cyber-cyan bg-cyber-cyan/10 border-cyber-cyan/30';
+  const parts = [`${money(chrome)}eb em chrome`, `${money(gear)}eb em equipamento`];
+  if (humanity) parts.push(`<span class="text-cyber-red">−${humanity} HUMANITY</span>`);
   const headline = over
     ? `<strong class="font-mono text-[17px]">${money(spent - CPRED_CREATION_CASH)}eb</strong> acima do orçamento de ${money(CPRED_CREATION_CASH)}eb.`
-    : `<strong class="font-mono text-[17px]">${money(left)}eb</strong> de ${money(CPRED_CREATION_CASH)}eb livres · ${money(spent)}eb em chrome`
-      + (humanity ? ` · <span class="text-cyber-red">−${humanity} HUMANITY</span>` : ' · sem custo de HUMANITY');
+    : `<strong class="font-mono text-[17px]">${money(left)}eb</strong> de ${money(CPRED_CREATION_CASH)}eb livres · ${parts.join(' · ')}`;
   return `<div data-wiz-budget role="status" class="flex flex-col gap-1 border px-4 py-3 ${tone}">
     <span class="font-sans text-[13px] font-bold">${headline}</span>
-    <span class="${GUIDE}">O que sobrar vira o dinheiro vivo inicial. A cirurgia é grátis na criação, mas a HUMANITY é cobrada na hora. Os ${money(CPRED_CREATION_FASHION_CASH)}eb de roupas e Fashionware são gastos com o mestre e não viram dinheiro.</span>
+    <span class="${GUIDE}">${guide}</span>
   </div>`;
 }
+
+const CHROME_GUIDE = `Chrome e equipamento saem do mesmo bolso, e o que sobrar vira o dinheiro vivo inicial. A cirurgia é grátis na criação, mas a HUMANITY é cobrada na hora. Os ${money(CPRED_CREATION_FASHION_CASH)}eb de roupas e Fashionware são gastos com o mestre e não viram dinheiro.`;
+const ARSENAL_GUIDE = 'Armas, armadura, munição e equipamento saem do mesmo orçamento do chrome. Nada começa equipado: quem está com o quê na mão é decisão de mesa.';
 
 function chromeCard(item, { bought, blockedMessage }) {
   const enhancement = isChromeEnhancement(item);
@@ -377,7 +404,7 @@ function chromeStep(draft, state) {
     !bought.has(item.code)
     && (!filter || item.name.toLowerCase().includes(filter) || item.cat.toLowerCase().includes(filter))
   ));
-  const context = { catalog: state.rawCatalog || [], canonicalRules };
+  const context = { catalog: state.rawCatalog || [], canonicalRules, budget: chromeBudget(draft) };
 
   let list = '';
   if (state.catalogStatus === 'loading') {
@@ -403,7 +430,7 @@ function chromeStep(draft, state) {
 
   return `
     <div class="flex flex-col gap-4">
-      ${cashBar(draft)}
+      ${cashBar(draft, CHROME_GUIDE)}
       ${installedBlock}
       <label class="block">
         <span class="${FIELD_LABEL}">Buscar implante</span>
@@ -414,6 +441,108 @@ function chromeStep(draft, state) {
       ${state.chromeHint
     ? `<p data-wiz-hint role="status" class="m-0 font-sans text-[13px] text-cyber-gold bg-cyber-gold/10 border-l-[3px] border-cyber-gold px-3 py-2">${esc(state.chromeHint)}</p>`
     : '<p data-wiz-hint hidden></p>'}
+    </div>`;
+}
+
+function gearCard(item, { qty, blockedMessage }) {
+  const tone = qty
+    ? 'border-cyber-cyan/40 bg-cyber-cyan/5'
+    : (blockedMessage ? 'border-cyber-gold/15 bg-cyber-bg/40 opacity-60' : 'border-cyber-gold/20 bg-cyber-bg/55');
+  const buy = `<button type="button" data-wiz-gear-buy="${esc(item.code)}" ${blockedMessage ? 'disabled aria-disabled="true"' : ''}
+          aria-label="Comprar ${esc(item.name)}" title="${esc(blockedMessage || '')}"
+          class="${STEPPER_BTN} ${blockedMessage ? '' : 'border-cyber-cyan text-cyber-cyan'}">+</button>`;
+  const sell = qty
+    ? `<button type="button" data-wiz-gear-remove="${esc(item.code)}" aria-label="Vender ${esc(item.name)}" class="${STEPPER_BTN}">−</button>
+       <output class="w-7 text-center font-mono text-[13px] font-bold text-cyber-bright">${qty}</output>`
+    : '';
+  return `
+    <div class="flex items-start gap-2 border px-3 py-2.5 ${tone}">
+      <span class="flex-1 min-w-0 flex flex-col leading-tight">
+        <span class="font-sans text-[13px] text-cyber-bright truncate">${esc(item.name)}</span>
+        <em class="not-italic font-mono text-[9px] tracking-wider text-cyber-text/45">
+          ${esc(item.type || item.cat)} · ${money(item.price)}eb${item.dmg ? ` · ${esc(item.dmg)}` : ''}
+        </em>
+        ${item.desc ? `<em class="not-italic font-sans text-[11px] text-cyber-text/50 mt-1 line-clamp-2">${esc(item.desc)}</em>` : ''}
+      </span>
+      ${sell}${buy}
+    </div>`;
+}
+
+function arsenalStep(draft, state) {
+  const catalog = state.gearCatalog || [];
+  const filter = String(state.gearFilter || '').trim().toLowerCase();
+  const qtyOf = (code) => (draft.gear.find((pick) => pick.code === code) || {}).qty || 0;
+  const visible = catalog.filter((item) => (
+    !filter || item.name.toLowerCase().includes(filter) || item.cat.toLowerCase().includes(filter) || String(item.type || '').toLowerCase().includes(filter)
+  ));
+
+  let list = '';
+  if (state.catalogStatus === 'loading') {
+    list = '<div class="font-sans text-xs text-cyber-text/45 py-2.5">Carregando o catálogo...</div>';
+  } else if (state.catalogStatus === 'error') {
+    list = '<div class="font-sans text-xs text-cyber-red py-2.5">Não foi possível carregar o catálogo. Você pode criar a ficha sem equipamento e comprar depois.</div>';
+  } else {
+    list = `<div class="grid grid-cols-fit-lg gap-3">${visible.map((item) => gearCard(item, {
+      qty: qtyOf(item.code),
+      blockedMessage: gearBlockMessage(gearPurchaseBlock(draft, item), item),
+    })).join('') || '<div class="font-sans text-xs text-cyber-text/45 py-2.5">Nenhum item encontrado.</div>'}</div>`;
+  }
+
+  const bought = draft.gear.length
+    ? `<section class="flex flex-col gap-2">
+        <span class="${FIELD_LABEL} mb-0">Na mochila · ${gearCount(draft.gear)} ${gearCount(draft.gear) === 1 ? 'item' : 'itens'} · ${money(gearSpendTotal(draft))}eb</span>
+        <div class="flex flex-wrap gap-2">${draft.gear.map((pick) => `
+          <span class="font-sans text-xs text-cyber-bright bg-cyber-cyan/10 border border-cyber-cyan/25 px-2.5 py-1">
+            ${esc(pick.name)}${pick.qty > 1 ? ` <em class="not-italic font-bold text-cyber-cyan">x${pick.qty}</em>` : ''}
+          </span>`).join('')}</div>
+      </section>`
+    : '';
+
+  return `
+    <div class="flex flex-col gap-4">
+      ${cashBar(draft, ARSENAL_GUIDE)}
+      ${bought}
+      <label class="block">
+        <span class="${FIELD_LABEL}">Buscar equipamento</span>
+        <input type="search" data-wiz-gear-filter value="${esc(state.gearFilter || '')}" autocomplete="off"
+               placeholder="Ex.: Assault Rifle, ARMOR, Agent..." class="${FIELD_INPUT}">
+      </label>
+      ${list}
+    </div>`;
+}
+
+function lifestyleStep(draft) {
+  const lifestyle = draft.lifestyle;
+  const on = 'border-cyber-cyan bg-cyber-cyan/15 text-cyber-cyan';
+  const off = 'border-cyber-gold/30 text-cyber-text/60 hover:border-cyber-gold/60 hover:text-cyber-gold';
+  return `
+    <div class="flex flex-col gap-4">
+      <div data-wiz-budget role="status" class="flex flex-col gap-1 border px-4 py-3 text-cyber-cyan bg-cyber-cyan/10 border-cyber-cyan/30">
+        <span class="font-sans text-[13px] font-bold">${esc(lifestyleSummary(lifestyle))}</span>
+        <span class="${GUIDE}">${esc(lifestyle.note)}</span>
+      </div>
+      <div class="flex flex-wrap gap-2" role="group" aria-label="Moradia inicial">
+        ${CPRED_LIFESTYLES.map((preset) => `
+          <button type="button" data-wiz-lifestyle="${esc(preset.id)}" aria-pressed="${lifestyle.id === preset.id}"
+                  class="${TOGGLE_BTN} ${lifestyle.id === preset.id ? on : off}">${esc(preset.label.toUpperCase())}</button>`).join('')}
+      </div>
+      <div class="grid grid-cols-fit-lg gap-3">
+        <label class="block">
+          <span class="${FIELD_LABEL}">Moradia</span>
+          <input type="text" data-wiz-lifestyle-housing value="${esc(lifestyle.housing)}" autocomplete="off"
+                 placeholder="Onde o operativo dorme" class="${FIELD_INPUT}">
+        </label>
+        <label class="block">
+          <span class="${FIELD_LABEL}">Alimentação</span>
+          <input type="text" data-wiz-lifestyle-food value="${esc(lifestyle.food)}" autocomplete="off"
+                 placeholder="Kibble, Good Prepak..." class="${FIELD_INPUT}">
+        </label>
+        <label class="block">
+          <span class="${FIELD_LABEL}">Custo mensal (eb)</span>
+          <input type="number" data-wiz-lifestyle-cost value="${esc(lifestyle.monthlyCost)}" min="0" step="50" class="${FIELD_INPUT}">
+        </label>
+      </div>
+      <p class="m-0 ${GUIDE}">A cobrança começa depois do mês de carência, no dia 1º. A ficha guarda o valor e a carência; qual primeiro dia do mês é esse fica com o mestre.</p>
     </div>`;
 }
 
@@ -453,7 +582,19 @@ function reviewStep(draft, campaignName, mode = 'first') {
     ? draft.chrome.map((item) => `<span class="font-sans text-xs text-cyber-bright bg-cyber-cyan/10 border border-cyber-cyan/25 px-2.5 py-1">${esc(item.name)}${isChromeEnhancement(item) ? ' <em class="not-italic text-cyber-gold">aprim.</em>' : ''}</span>`).join('')
     : '<span class="font-sans text-xs text-cyber-text/45">Nenhum implante — a carne ainda manda.</span>'}
         </div>
+      </section>
+      <section class="flex flex-col gap-2">
+        <span class="${FIELD_LABEL} mb-0">Arsenal · ${gearCount(draft.gear)} ${gearCount(draft.gear) === 1 ? 'item' : 'itens'} · ${money(gearSpendTotal(draft))}eb</span>
+        <div class="flex flex-wrap gap-2">
+          ${draft.gear.length
+    ? draft.gear.map((pick) => `<span class="font-sans text-xs text-cyber-bright bg-cyber-cyan/10 border border-cyber-cyan/25 px-2.5 py-1">${esc(pick.name)}${pick.qty > 1 ? ` <em class="not-italic font-bold text-cyber-cyan">x${pick.qty}</em>` : ''}</span>`).join('')
+    : '<span class="font-sans text-xs text-cyber-text/45">Saiu de mãos vazias.</span>'}
+        </div>
         <span class="${GUIDE}">Começa com <strong class="font-mono text-cyber-gold">${money(startingCash(draft))}eb</strong> em dinheiro vivo.</span>
+      </section>
+      <section class="flex flex-col gap-2">
+        <span class="${FIELD_LABEL} mb-0">Vida em Night City</span>
+        <span class="font-sans text-[13px] text-cyber-bright">${esc(lifestyleSummary(draft.lifestyle))}</span>
       </section>
       ${campaignName ? `<div class="font-sans text-[13px] text-cyber-bright bg-cyber-gold/10 border-l-[3px] border-cyber-gold px-3 py-2.5">${wizardCopy(mode).campaignNote(campaignName)}</div>` : ''}
     </div>`;
@@ -468,6 +609,8 @@ function render(root, state) {
     attributes: () => attributesStep(state.draft, state.hint),
     skills: () => skillsStep(state.draft, state.skillFilter),
     chrome: () => chromeStep(state.draft, state),
+    arsenal: () => arsenalStep(state.draft, state),
+    lifestyle: () => lifestyleStep(state.draft),
     review: () => reviewStep(state.draft, state.campaignName, state.mode),
   }[state.step]();
 
@@ -518,6 +661,9 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
     catalog: [],
     rawCatalog: [],
     catalogStatus: 'idle',
+    /** Arsenal step: weapons, armor, ammo and gear that carry a price. */
+    gearCatalog: [],
+    gearFilter: '',
     chromeFilter: '',
     /** Transient explanation of why an implant could not be installed. */
     chromeHint: '',
@@ -529,7 +675,8 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
       state.draft = { ...state.draft, system: id };
     },
     setName(value) { state.draft = { ...state.draft, name: value }; },
-    setRole(value) { state.draft = { ...state.draft, role: value }; },
+    // Role changes may move the operative's starting housing (Exec, Nomad).
+    setRole(value) { state.draft = setRole(state.draft, value); },
     setOriginLanguage(value) { state.draft = setOriginLanguage(state.draft, value); },
     setStat(key, value) {
       const change = changeStat(state.draft, key, value);
@@ -570,6 +717,14 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
       state.draft = sellChrome(state.draft, code);
       state.chromeHint = '';
     },
+    setGearFilter(value) { state.gearFilter = value; },
+    buyGear(code) {
+      const item = (state.gearCatalog || []).find((row) => row.code === code);
+      state.draft = buyGear(state.draft, item);
+    },
+    sellGear(code) { state.draft = sellGear(state.draft, code); },
+    setLifestylePreset(id) { state.draft = setLifestylePreset(state.draft, id); },
+    setLifestyleDetail(field, value) { state.draft = setLifestyleDetail(state.draft, field, value); },
     back() { state.hint = ''; state.step = previousStep(state.step); },
     next() {
       if (!wizardProgress(state.step, state.draft).canAdvance) return false;
@@ -590,10 +745,12 @@ export function createWizardController({ api, campaignId = '', campaignName = ''
       const items = await (api && api.items ? api.items.list() : Promise.resolve([]));
       state.rawCatalog = Array.isArray(items) ? items : [];
       state.catalog = chromeCatalog(state.rawCatalog);
+      state.gearCatalog = gearCatalog(state.rawCatalog);
       state.catalogStatus = 'ready';
     } catch (_) {
       state.rawCatalog = [];
       state.catalog = [];
+      state.gearCatalog = [];
       state.catalogStatus = 'error';
     }
     return state.catalog;
@@ -657,6 +814,10 @@ export function buildCharacterPayload(draft, { svgCard } = {}) {
     credits: startingCash(draft),
     equipped: chromeEquipped(draft.chrome),
     owned: draft.chrome.map((item) => item.code),
+    gear: gearInventory(draft.gear),
+    // Housing and monthly cost so the table knows what the first of the month
+    // costs this operative (p.105).
+    lifestyle: lifestyleForSheet(draft),
     base: { ...draft.base },
     skills: draft.skills.map((skill) => ({
       id: skill.id,
@@ -674,7 +835,11 @@ export function buildCharacterPayload(draft, { svgCard } = {}) {
 export function activeFieldSelector(documentRef) {
   const active = documentRef && documentRef.activeElement;
   if (!active || !active.getAttribute) return '';
-  for (const attr of ['data-wiz-stat', 'data-wiz-skill', 'data-wiz-name', 'data-wiz-skill-filter', 'data-wiz-chrome-filter']) {
+  for (const attr of [
+    'data-wiz-stat', 'data-wiz-skill', 'data-wiz-name', 'data-wiz-skill-filter',
+    'data-wiz-chrome-filter', 'data-wiz-gear-filter',
+    'data-wiz-lifestyle-housing', 'data-wiz-lifestyle-food', 'data-wiz-lifestyle-cost',
+  ]) {
     const value = active.getAttribute(attr);
     if (value !== null) return value ? `[${attr}="${value}"]` : `[${attr}]`;
   }
@@ -759,6 +924,14 @@ export function mountOnboardingWizard({
     const chromeRemove = target.closest('[data-wiz-chrome-remove]');
     if (chromeRemove) { controller.handlers.sellChrome(chromeRemove.getAttribute('data-wiz-chrome-remove')); return paint(); }
 
+    const gearBuy = target.closest('[data-wiz-gear-buy]');
+    if (gearBuy) { controller.handlers.buyGear(gearBuy.getAttribute('data-wiz-gear-buy')); return paint(); }
+    const gearRemove = target.closest('[data-wiz-gear-remove]');
+    if (gearRemove) { controller.handlers.sellGear(gearRemove.getAttribute('data-wiz-gear-remove')); return paint(); }
+
+    const lifestyle = target.closest('[data-wiz-lifestyle]');
+    if (lifestyle) { controller.handlers.setLifestylePreset(lifestyle.getAttribute('data-wiz-lifestyle')); return paint(); }
+
     const skillInc = target.closest('[data-wiz-skill-inc]');
     if (skillInc) { controller.handlers.bumpSkill(skillInc.getAttribute('data-wiz-skill-inc'), 1); return paint(); }
     const skillDec = target.closest('[data-wiz-skill-dec]');
@@ -789,6 +962,23 @@ export function mountOnboardingWizard({
     }
     if (target.hasAttribute('data-wiz-skill-filter')) { controller.handlers.setSkillFilter(target.value); return; }
     if (target.hasAttribute('data-wiz-chrome-filter')) { controller.handlers.setChromeFilter(target.value); return; }
+    if (target.hasAttribute('data-wiz-gear-filter')) { controller.handlers.setGearFilter(target.value); return; }
+    // Lifestyle text/number fields refresh only validation so the caret stays.
+    if (target.hasAttribute('data-wiz-lifestyle-housing')) {
+      controller.handlers.setLifestyleDetail('housing', target.value);
+      refreshValidation(root, controller.state);
+      return;
+    }
+    if (target.hasAttribute('data-wiz-lifestyle-food')) {
+      controller.handlers.setLifestyleDetail('food', target.value);
+      refreshValidation(root, controller.state);
+      return;
+    }
+    if (target.hasAttribute('data-wiz-lifestyle-cost')) {
+      controller.handlers.setLifestyleDetail('monthlyCost', target.value);
+      refreshValidation(root, controller.state);
+      return;
+    }
     if (target.hasAttribute('data-wiz-stat')) {
       controller.handlers.setStat(target.getAttribute('data-wiz-stat'), target.value);
       paint();
@@ -807,6 +997,8 @@ export function mountOnboardingWizard({
     if (target.hasAttribute('data-wiz-origin')) { controller.handlers.setOriginLanguage(target.value); paint(); }
     if (target.hasAttribute('data-wiz-skill-filter')) paint();
     if (target.hasAttribute('data-wiz-chrome-filter')) paint();
+    if (target.hasAttribute('data-wiz-gear-filter')) paint();
+    if (target.hasAttribute('data-wiz-lifestyle-cost')) paint();
   });
 
   paint();

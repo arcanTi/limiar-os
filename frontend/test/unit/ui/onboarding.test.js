@@ -295,3 +295,83 @@ describe('passo de chrome', () => {
     expect(payload.owned).toEqual([]);
   });
 });
+
+describe('passo de arsenal', () => {
+  const CATALOG_ROWS = [
+    { code: 'GORILLA-ARMS', name: 'Gorilla Arms', cat: 'LIMBS', price: 1000, hcost: 14, stock: 'IN STOCK' },
+    { code: 'ASSAULT-RIFLE', name: 'Assault Rifle', cat: 'WEAPONS', weaponClass: 'Assault Rifle', price: 500, dmg: '5d6', stock: 'IN STOCK' },
+    { code: 'AGENT', name: 'Agent', cat: 'GEAR', price: 100, stock: 'IN STOCK' },
+    { code: 'BRAWLING-BODY-MID', name: 'Brawling, BODY 5-6', cat: 'WEAPONS', price: 0 },
+  ];
+
+  function shopApi() {
+    return fakeApi({ items: { list: vi.fn(async () => CATALOG_ROWS) } });
+  }
+
+  it('separa a prateleira de equipamento da de chrome', async () => {
+    const controller = createWizardController({ api: shopApi() });
+    await controller.loadCatalog();
+    expect(controller.state.catalog.map((i) => i.code)).toEqual(['GORILLA-ARMS']);
+    expect(controller.state.gearCatalog.map((i) => i.code)).toEqual(['ASSAULT-RIFLE', 'AGENT']);
+  });
+
+  it('chrome e arsenal gastam o mesmo bolso', async () => {
+    const controller = createWizardController({ api: shopApi() });
+    await controller.loadCatalog();
+    controller.state.draft = completeDraft('arsenal kid');
+    controller.handlers.buyChrome('GORILLA-ARMS');
+    controller.handlers.buyGear('ASSAULT-RIFLE');
+    controller.handlers.buyGear('AGENT');
+    controller.handlers.buyGear('AGENT');
+
+    const payload = buildCharacterPayload(controller.state.draft);
+    expect(payload.credits).toBe(2550 - 1000 - 500 - 200);
+    expect(payload.gear).toHaveLength(2);
+    expect(payload.gear[0]).toMatchObject({ code: 'ASSAULT-RIFLE', qty: 1, dmg: '5d6', equipped: false });
+    expect(payload.gear[1]).toMatchObject({ code: 'AGENT', qty: 2 });
+  });
+
+  it('vender item devolve o dinheiro', async () => {
+    const controller = createWizardController({ api: shopApi() });
+    await controller.loadCatalog();
+    controller.handlers.buyGear('ASSAULT-RIFLE');
+    controller.handlers.sellGear('ASSAULT-RIFLE');
+    expect(controller.state.draft.gear).toEqual([]);
+    expect(buildCharacterPayload(controller.state.draft).credits).toBe(2550);
+  });
+
+  it('sem compras, o payload sai com a mochila vazia', () => {
+    const payload = buildCharacterPayload(completeDraft('sem nada'));
+    expect(payload.gear).toEqual([]);
+    expect(payload.credits).toBe(2550);
+  });
+});
+
+describe('passo de vida', () => {
+  it('grava moradia, custo mensal e carencia na ficha', () => {
+    const payload = buildCharacterPayload(completeDraft('sem teto'));
+    expect(payload.lifestyle).toMatchObject({
+      id: 'default',
+      housing: 'Cargo Container',
+      food: 'Kibble',
+      monthlyCost: 1100,
+      graceMonths: 1,
+    });
+  });
+
+  it('trocar o Role move a moradia inicial enquanto o jogador nao escolheu', () => {
+    const controller = createWizardController({ api: fakeApi() });
+    controller.handlers.setRole('Exec');
+    expect(controller.state.draft.lifestyle.id).toBe('exec');
+    expect(buildCharacterPayload(controller.state.draft).lifestyle.monthlyCost).toBe(600);
+  });
+
+  it('escolha manual sobrevive a uma troca de Role', () => {
+    const controller = createWizardController({ api: fakeApi() });
+    controller.handlers.setLifestylePreset('custom');
+    controller.handlers.setLifestyleDetail('housing', 'Cobertura no Corpo Plaza');
+    controller.handlers.setLifestyleDetail('monthlyCost', '3000');
+    controller.handlers.setRole('Exec');
+    expect(controller.state.draft.lifestyle).toMatchObject({ id: 'custom', housing: 'Cobertura no Corpo Plaza', monthlyCost: 3000 });
+  });
+});

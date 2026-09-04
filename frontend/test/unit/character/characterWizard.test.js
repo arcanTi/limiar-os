@@ -2,6 +2,16 @@ import { describe, it, expect } from 'vitest';
 import {
   WIZARD_STEPS,
   buyChrome,
+  buyGear,
+  chromeBudget,
+  creationSpend,
+  gearBudget,
+  gearSpendTotal,
+  lifestyleForSheet,
+  sellGear,
+  setLifestyleDetail,
+  setLifestylePreset,
+  setRole,
   canAdvance,
   changeStat,
   chromeHumanityCost,
@@ -35,6 +45,7 @@ import {
   wizardProgress,
 } from '../../../src/domain/character/characterWizard.ts';
 import { chromeCatalog } from '../../../src/domain/character/creationChrome.ts';
+import { gearCatalog } from '../../../src/domain/character/creationGear.ts';
 import {
   CPRED_CREATION_CASH,
   CPRED_CULTURAL_ORIGINS,
@@ -48,6 +59,13 @@ const CHROME = chromeCatalog([
   { code: 'ENH-TUNGSTEN', name: 'Tungsten Reinforcement', cat: 'LIMBS', price: 500, hcost: 3, attachesTo: ['GORILLA-ARMS'] },
 ]);
 const chrome = (code) => CHROME.find((item) => item.code === code);
+
+const GEAR = gearCatalog([
+  { code: 'ASSAULT-RIFLE', name: 'Assault Rifle', cat: 'WEAPONS', price: 500, stock: 'IN STOCK' },
+  { code: 'AGENT', name: 'Agent', cat: 'GEAR', price: 100, stock: 'IN STOCK' },
+  { code: 'HEAVY-ARMOR', name: 'Metalgear', cat: 'ARMOR', price: 5000, stock: 'IN STOCK' },
+]);
+const gear = (code) => GEAR.find((item) => item.code === code);
 
 // Ten cheap, untrained skills at the creation cap of 6 spend exactly 60.
 function spendAll(draft) {
@@ -256,6 +274,69 @@ describe('chrome comprado na criacao', () => {
     const result = validateStep('chrome', createWizardDraft({ chrome: [caro] }));
     expect(result.ok).toBe(false);
     expect(result.errors[0]).toContain('50eb');
+  });
+});
+
+describe('arsenal e chrome dividem o mesmo bolso', () => {
+  it('comprar equipamento reduz o dinheiro final', () => {
+    const draft = buyGear(createWizardDraft(), gear('ASSAULT-RIFLE'));
+    expect(gearSpendTotal(draft)).toBe(500);
+    expect(startingCash(draft)).toBe(CPRED_CREATION_CASH - 500);
+    expect(canAdvance('arsenal', draft)).toBe(true);
+  });
+
+  it('o orcamento de cada lado e o que o outro deixou', () => {
+    const draft = buyChrome(buyGear(createWizardDraft(), gear('ASSAULT-RIFLE')), chrome('GORILLA-ARMS'));
+    expect(creationSpend(draft)).toBe(1500);
+    expect(chromeBudget(draft)).toBe(CPRED_CREATION_CASH - 500);
+    expect(gearBudget(draft)).toBe(CPRED_CREATION_CASH - 1000);
+    expect(startingCash(draft)).toBe(1050);
+  });
+
+  it('chrome caro impede a arma que nao cabe mais', () => {
+    const draft = buyChrome(createWizardDraft(), chrome('GORILLA-ARMS'));
+    const caro = buyGear(draft, gear('HEAVY-ARMOR'));
+    expect(caro.gear).toEqual([]);
+    expect(buyGear(draft, gear('ASSAULT-RIFLE')).gear).toHaveLength(1);
+  });
+
+  it('vender devolve o dinheiro ao bolso', () => {
+    let draft = buyGear(buyGear(createWizardDraft(), gear('AGENT')), gear('AGENT'));
+    expect(startingCash(draft)).toBe(CPRED_CREATION_CASH - 200);
+    draft = sellGear(draft, 'AGENT');
+    expect(startingCash(draft)).toBe(CPRED_CREATION_CASH - 100);
+  });
+
+  it('trava o passo quando o rascunho estoura o bolso comum', () => {
+    const caro = { ...gear('HEAVY-ARMOR'), qty: 1, price: CPRED_CREATION_CASH + 100 };
+    const result = validateStep('arsenal', createWizardDraft({ gear: [caro] }));
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toContain('100eb');
+  });
+});
+
+describe('moradia inicial', () => {
+  it('segue o Role enquanto o jogador nao mexeu', () => {
+    const draft = setRole(createWizardDraft(), 'Exec');
+    expect(draft.lifestyle.id).toBe('exec');
+    expect(setRole(draft, 'Nomad').lifestyle.id).toBe('nomad');
+  });
+
+  it('para de seguir o Role depois de uma escolha manual', () => {
+    const chosen = setLifestylePreset(createWizardDraft(), 'custom');
+    expect(setRole(chosen, 'Exec').lifestyle.id).toBe('custom');
+  });
+
+  it('exige dizer onde o operativo dorme', () => {
+    const vazio = setLifestylePreset(createWizardDraft(), 'custom');
+    expect(validateStep('lifestyle', vazio).ok).toBe(false);
+    const preenchido = setLifestyleDetail(vazio, 'housing', 'Motel do Kabuki');
+    expect(validateStep('lifestyle', preenchido).ok).toBe(true);
+  });
+
+  it('o padrao ja passa sem digitar nada', () => {
+    expect(canAdvance('lifestyle', createWizardDraft())).toBe(true);
+    expect(lifestyleForSheet(createWizardDraft()).monthlyCost).toBe(1100);
   });
 });
 

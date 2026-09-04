@@ -239,12 +239,33 @@ def _validate_creation_skills(skills: object, origin_language: str, errors: list
         errors.append(f"'skills' spend {spent} points; the limit is {CPRED_SKILL_BUDGET}")
 
 
+def _row_spend(rows: object, *, with_quantity: bool = False) -> int:
+    """Sum the prices a payload claims for a list of bought rows."""
+    total = 0
+    if not isinstance(rows, list):
+        return total
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        price = row.get("price")
+        if isinstance(price, bool) or not isinstance(price, int) or price <= 0:
+            continue
+        qty = 1
+        if with_quantity:
+            raw_qty = row.get("qty", 1)
+            if isinstance(raw_qty, bool) or not isinstance(raw_qty, int) or raw_qty < 0:
+                raw_qty = 1
+            qty = raw_qty
+        total += price * qty
+    return total
+
+
 def _validate_creation_cash(payload: dict[str, object], errors: list[str]) -> None:
     """Starting money never exceeds the Complete Package budget (p.104).
 
-    What the sheet keeps as cash plus what it spent on the chrome it already
-    wears must fit in 2.550eb. Prices come from the payload, so this is a guard
-    against the obvious hand-crafted sheet, not an audit of the catalog.
+    Chrome, arsenal and the cash left over share one 2.550eb pool. Prices come
+    from the payload, so this is a guard against the obvious hand-crafted
+    sheet, not an audit of the catalog.
     """
     credits = payload.get("credits")
     if credits is None:
@@ -252,18 +273,30 @@ def _validate_creation_cash(payload: dict[str, object], errors: list[str]) -> No
     if isinstance(credits, bool) or not isinstance(credits, int) or credits < 0:
         errors.append("'credits' must be a non-negative integer")
         return
-    spent = 0
-    equipped = payload.get("equipped")
-    if isinstance(equipped, list):
-        for row in equipped:
-            price = row.get("price") if isinstance(row, dict) else None
-            if isinstance(price, int) and not isinstance(price, bool) and price > 0:
-                spent += price
+    spent = _row_spend(payload.get("equipped")) + _row_spend(payload.get("gear"), with_quantity=True)
     if credits + spent > CPRED_CREATION_CASH:
         errors.append(
             f"'credits' plus installed gear total {credits + spent}eb; "
             f"the creation budget is {CPRED_CREATION_CASH}eb"
         )
+
+
+def _validate_creation_lifestyle(payload: dict[str, object], errors: list[str]) -> None:
+    """Housing and its monthly bill (p.105) are a small, well-formed record."""
+    lifestyle = payload.get("lifestyle")
+    if lifestyle is None:
+        return
+    if not isinstance(lifestyle, dict):
+        errors.append("'lifestyle' must be an object")
+        return
+    for field in ("monthlyCost", "graceMonths"):
+        value = lifestyle.get(field, 0)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            errors.append(f"'lifestyle.{field}' must be a non-negative integer")
+    for field in ("housing", "food", "note", "id"):
+        value = lifestyle.get(field, "")
+        if value is not None and not isinstance(value, str):
+            errors.append(f"'lifestyle.{field}' must be a string")
 
 
 def _validate_creation_enhancements(payload: dict[str, object], errors: list[str]) -> None:
@@ -299,6 +332,7 @@ def validate_character_creation(payload: dict[str, object]) -> None:
         _validate_creation_skills(payload.get("skills"), _origin_language(payload), errors)
     _validate_creation_cash(payload, errors)
     _validate_creation_enhancements(payload, errors)
+    _validate_creation_lifestyle(payload, errors)
     if errors:
         raise ValidationError(errors)
 

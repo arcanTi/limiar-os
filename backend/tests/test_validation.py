@@ -224,3 +224,41 @@ def test_character_creation_rejects_two_enhancements_on_one_piece():
             "equipped": [{"code": "GORILLA-ARMS", "enhancements": ["ENH-HYD-RAM", "ENH-PNEU-ACT"]}],
         })
     assert "a piece takes one at a time" in str(excinfo.value)
+
+
+def test_character_creation_counts_gear_quantity_against_the_budget():
+    with pytest.raises(ValidationError) as excinfo:
+        validate_character_creation({
+            "name": "V",
+            "credits": 550,
+            "gear": [{"code": "AGENT", "price": 100, "qty": 30}],
+        })
+    assert "3550eb" in str(excinfo.value)
+
+
+def test_character_creation_accepts_chrome_and_gear_sharing_the_pool():
+    validate_character_creation({
+        "name": "V",
+        "credits": 850,
+        "equipped": [{"code": "GORILLA-ARMS", "price": 1000}],
+        "gear": [{"code": "ASSAULT-RIFLE", "price": 500, "qty": 1}, {"code": "AGENT", "price": 100, "qty": 2}],
+    })
+
+
+def test_character_creation_accepts_a_lifestyle_record():
+    validate_character_creation({
+        "name": "V",
+        "lifestyle": {"id": "default", "housing": "Cargo Container", "food": "Kibble", "monthlyCost": 1100, "graceMonths": 1},
+    })
+
+
+def test_character_creation_rejects_a_negative_monthly_cost():
+    with pytest.raises(ValidationError) as excinfo:
+        validate_character_creation({"name": "V", "lifestyle": {"housing": "Cargo Container", "monthlyCost": -100}})
+    assert "'lifestyle.monthlyCost' must be a non-negative integer" in str(excinfo.value)
+
+
+def test_character_creation_rejects_a_lifestyle_that_is_not_an_object():
+    with pytest.raises(ValidationError) as excinfo:
+        validate_character_creation({"name": "V", "lifestyle": "cargo container"})
+    assert "'lifestyle' must be an object" in str(excinfo.value)

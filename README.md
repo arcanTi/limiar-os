@@ -245,6 +245,22 @@ Complete Package's starting money (CPR p.42/104/105/110), and
   one row per implant and never asks which arm it goes in.
 - The 800eb reserved for Fashion and Fashionware are settled with the GM: they
   buy nothing in the wizard and, per RAW, never turn into cash.
+
+The **Arsenal** step spends what is left of that same pool on weapons, armor,
+ammunition, attachments, decks and gear (`creationGear.ts`). A row is on the
+shelf only if it belongs to one of those categories and carries a price — a
+zero-price row is reference data (the Brawling damage table) or a catalog gap,
+and either way a free item would quietly break the budget; `unsellableGear`
+lists them for the GM. Buying the same item twice raises its quantity, nothing
+starts equipped, and the picks are written to the sheet's `gear` inventory.
+
+The **Vida** step records where the operative lives (`lifestyle.ts`, CPR
+p.105). Everyone starts with a free month in a Cargo Container eating Kibble
+and owes 1.100eb from the first of the next month; an Exec's Corporation covers
+a Corporate Conapt so only the 600eb Good Prepak is paid, and a Nomad lives
+with the family pack and its Motorpool. The preset follows the Role until the
+player picks one themselves. The sheet stores housing, food, `monthlyCost` and
+`graceMonths` — never a due date: the campaign calendar belongs to the table.
 - `validate_character_creation` mirrors the budget server-side, so a
   hand-crafted payload cannot open a sheet with more than 2.550eb.
 
