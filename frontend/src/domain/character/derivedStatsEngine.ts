@@ -131,9 +131,15 @@ export function deriveStats({ stats, character, installedCyberware = [] }: Deriv
   const shield = normalizeShield(c.shield);
   const penalty = Math.max(armor.head.penalty || 0, armor.body.penalty || 0);
   const aggregate = aggregateConditions(c);
+  const effectiveEmp = Math.max(0, Math.min(base.EMP || 0, deriveEffectiveEmp(humanityCurrent)));
   const adjusted = { ...base, BODY: effectiveBody };
   CPRED_ARMOR_PENALTY_STATS.forEach(k => { adjusted[k] = Math.max(0, (adjusted[k] || 0) - penalty); });
   Object.keys(aggregate.statPenalties).forEach(k => { adjusted[k as CpredStat] = Math.max(0, (adjusted[k as CpredStat] || 0) - aggregate.statPenalties[k]); });
+  // Chrome does not only cost a number on the sheet: EMP itself drops to the
+  // tens digit of Humanity (p.80), so every EMP check and EMP-based skill —
+  // Conversation, Human Perception, Persuasion — falls with it. The base EMP on
+  // the sheet is untouched; this is the value rolls are made against.
+  adjusted.EMP = Math.min(adjusted.EMP || 0, effectiveEmp);
   const seriouslyWounded = Math.ceil(hpMax / 2);
   const healthCur = c.health && c.health.cur != null ? asNumber(c.health.cur, hpMax, 0, hpMax) : hpMax;
   const woundState = woundStateFor(hpMax, healthCur);
@@ -171,7 +177,7 @@ export function deriveStats({ stats, character, installedCyberware = [] }: Deriv
     humanityCurrent,
     cyberpsychosisActive,
     cyberpsychosisExtreme,
-    effectiveEmp: Math.max(0, Math.min(base.EMP || 0, deriveEffectiveEmp(humanityCurrent))),
+    effectiveEmp,
     armorPenalty: penalty,
     headSp: armor.head.sp,
     bodySp: armor.body.sp,

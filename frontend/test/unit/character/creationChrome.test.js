@@ -20,6 +20,9 @@ import seed from '../../../../data/seed/limiar-seed.json' with { type: 'json' };
 const CATALOG = [
   { code: 'GORILLA-ARMS', name: 'Gorilla Arms', cat: 'LIMBS', price: 1000, hcost: 14, stock: 'IN STOCK', desc: 'bracos de forca' },
   { code: 'ENH-TUNGSTEN', name: 'Tungsten Reinforcement', cat: 'LIMBS', price: 500, hcost: 3, stock: 'IN STOCK', attachesTo: ['GORILLA-ARMS'] },
+  { code: 'ENH-HYDRAULIC', name: 'Hydraulic Ram', cat: 'LIMBS', price: 1000, hcost: 3, stock: 'IN STOCK', attachesTo: ['GORILLA-ARMS'] },
+  { code: 'MANTIS-BLADE', name: 'Mantis Blade', cat: 'LIMBS', price: 500, hcost: 14, stock: 'IN STOCK' },
+  { code: 'ENH-MONO', name: 'Monomolecular Edge', cat: 'LIMBS', price: 500, hcost: 3, stock: 'IN STOCK', attachesTo: ['MANTIS-BLADE'] },
   { code: 'NEURAL-LINK', name: 'Neural Link', cat: 'NEURAL', price: 500, hcost: 7, stock: 'IN STOCK' },
   { code: 'BORG-FULL', name: 'Full Borg Conversion', cat: 'BORG', price: 2000, hcost: 40, stock: 'IN STOCK' },
   { code: 'CHROME-GONE', name: 'Peca esgotada', cat: 'OPTICS', price: 100, hcost: 2, stock: 'SOLD OUT' },
@@ -35,7 +38,7 @@ describe('catalogo de chrome da criacao', () => {
     expect(codes).toContain('GORILLA-ARMS');
     expect(codes).toContain('NEURAL-LINK');
     expect(codes).not.toContain('MEDTECH-BAG');
-    expect(codes).toHaveLength(5);
+    expect(codes).toHaveLength(8);
   });
 
   it('mantem aprimoramento mesmo se a categoria nao for de implante', () => {
@@ -95,6 +98,30 @@ describe('aprimoramentos exigem a peca base', () => {
     picks = addChrome(picks, byCode('NEURAL-LINK'));
     const after = removeChrome(picks, 'GORILLA-ARMS');
     expect(after.map((item) => item.code)).toEqual(['NEURAL-LINK']);
+  });
+
+  it('recusa um segundo aprimoramento na mesma peca (Mission Kit DLC 2)', () => {
+    let picks = addChrome([], byCode('GORILLA-ARMS'));
+    picks = addChrome(picks, byCode('ENH-TUNGSTEN'));
+    const block = chromeBlock(picks, byCode('ENH-HYDRAULIC'));
+    expect(block.reason).toBe('occupied');
+    expect(block.occupant.code).toBe('ENH-TUNGSTEN');
+    expect(chromeBlockMessage(block, byCode('ENH-HYDRAULIC'))).toContain('Tungsten Reinforcement');
+    expect(addChrome(picks, byCode('ENH-HYDRAULIC'))).toHaveLength(2);
+  });
+
+  it('libera a peca de novo depois que o aprimoramento sai', () => {
+    let picks = addChrome([], byCode('GORILLA-ARMS'));
+    picks = addChrome(picks, byCode('ENH-TUNGSTEN'));
+    picks = removeChrome(picks, 'ENH-TUNGSTEN');
+    expect(chromeBlock(picks, byCode('ENH-HYDRAULIC')).reason).toBeNull();
+  });
+
+  it('a mesma peca instalada duas vezes nao existe, mas duas pecas diferentes aceitam um cada', () => {
+    let picks = addChrome([], byCode('GORILLA-ARMS'));
+    picks = addChrome(picks, byCode('MANTIS-BLADE'));
+    picks = addChrome(picks, byCode('ENH-TUNGSTEN'));
+    expect(chromeBlock(picks, byCode('ENH-MONO')).reason).toBeNull();
   });
 
   it('agrupa o instalado como peca base e seus aprimoramentos', () => {

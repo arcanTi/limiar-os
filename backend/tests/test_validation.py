@@ -203,3 +203,24 @@ def test_character_creation_rejects_negative_cash():
     with pytest.raises(ValidationError) as excinfo:
         validate_character_creation({"name": "V", "credits": -5})
     assert "'credits' must be a non-negative integer" in str(excinfo.value)
+
+
+def test_character_creation_accepts_one_enhancement_per_piece():
+    validate_character_creation({
+        "name": "V",
+        "credits": 550,
+        "equipped": [
+            {"code": "GORILLA-ARMS", "price": 1000, "enhancements": ["ENH-HYD-RAM"]},
+            {"code": "ENH-HYD-RAM", "price": 1000, "enhancements": []},
+        ],
+    })
+
+
+def test_character_creation_rejects_two_enhancements_on_one_piece():
+    with pytest.raises(ValidationError) as excinfo:
+        validate_character_creation({
+            "name": "V",
+            "credits": 0,
+            "equipped": [{"code": "GORILLA-ARMS", "enhancements": ["ENH-HYD-RAM", "ENH-PNEU-ACT"]}],
+        })
+    assert "a piece takes one at a time" in str(excinfo.value)

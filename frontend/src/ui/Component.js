@@ -969,14 +969,13 @@ class Component extends DCLogic {
   normalizeCharacterList(characters) {
     return (characters || []).map(c => this.normalizeCharacter(c));
   }
+  // The attribute values the sheet rolls against: cyberware mods, armor and
+  // condition penalties, and the EMP that Humanity loss leaves behind. It is
+  // deriveStats' own `effectiveStats` so the sheet and combat cannot drift
+  // apart — the untouched spread stays on `character.base`.
   effAttrs(character) {
     const target = character || this.activeCharacter();
-    const b = this.applyCyberwareStatMods(target.base || this.state.base, target);
-    const penalty = this.armorPenalty(target);
-    CPRED_ARMOR_PENALTY_STATS.forEach(k => { b[k] = Math.max(0, (b[k] || 0) - penalty); });
-    const aggregate = condAggregateConditions(target);
-    Object.keys(aggregate.statPenalties).forEach(k => { b[k] = Math.max(0, (b[k] || 0) - aggregate.statPenalties[k]); });
-    return b;
+    return { ...this.derivedStats(target.base || this.state.base, target).effectiveStats };
   }
   armorTotal(character) {
     const target = character || this.activeCharacter();

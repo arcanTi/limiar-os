@@ -83,7 +83,6 @@ import {
 } from '../../src/domain/cyberware/index.ts';
 import {
   deriveEffectiveEmp,
-  effectiveMoveStat,
   deriveStats,
   effectiveMoveStat,
 } from '../../src/domain/character/derivedStatsEngine.ts';
@@ -265,9 +264,32 @@ describe('CPR RAW character rules', () => {
         LUCK: 5,
         MOVE: 3,
         BODY: 10,
-        EMP: 3,
+        // Humanity is below zero here, so the EMP that rolls use is 0 while the
+        // sheet keeps its base 3 (p.80: EMP is the tens digit of Humanity).
+        EMP: 0,
       },
     });
+  });
+
+  it('Given Humanity loss, When deriving stats, Then EMP checks fall to the tens digit while the base spread is untouched', () => {
+    const base = { INT: 5, REF: 6, DEX: 5, TECH: 4, COOL: 5, WILL: 7, LUCK: 5, MOVE: 5, BODY: 8, EMP: 4 };
+    const chromed = deriveStats({
+      stats: base,
+      character: { base },
+      installedCyberware: [{ code: 'GORILLA-ARMS', hcost: 14 }, { code: 'ENH-HYD-RAM', hcost: 3 }],
+    });
+
+    expect(chromed.humanityCurrent).toBe(23);
+    expect(chromed.effectiveEmp).toBe(2);
+    expect(chromed.effectiveStats.EMP).toBe(2);
+    expect(base.EMP).toBe(4);
+    // An EMP-based skill rolls against the degraded value, not the sheet's 4.
+    // Human Perception is a basic skill (free level 2), raised to 4 here.
+    expect(normalizeSkills([{ name: 'Human Perception', level: 4 }], chromed.effectiveStats)
+      .find(skill => skill.name === 'Human Perception').total).toBe(6);
+    // A skill on another STAT is untouched by the Humanity loss.
+    expect(normalizeSkills([{ name: 'Persuasion', level: 4 }], chromed.effectiveStats)
+      .find(skill => skill.name === 'Persuasion').total).toBe(9);
   });
 
   it('Given BODY and WILL, When deriving HP maximum, Then the RAW formula is 10 plus five times rounded-up average', () => {

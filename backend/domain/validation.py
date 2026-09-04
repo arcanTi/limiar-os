@@ -266,6 +266,22 @@ def _validate_creation_cash(payload: dict[str, object], errors: list[str]) -> No
         )
 
 
+def _validate_creation_enhancements(payload: dict[str, object], errors: list[str]) -> None:
+    """One Cyberware Enhancement per piece of cyberware (Mission Kit DLC #2)."""
+    equipped = payload.get("equipped")
+    if not isinstance(equipped, list):
+        return
+    for row in equipped:
+        if not isinstance(row, dict):
+            continue
+        attached = row.get("enhancements")
+        if isinstance(attached, list) and len(attached) > 1:
+            code = row.get("code") or "cyberware"
+            errors.append(
+                f"'{code}' carries {len(attached)} enhancements; a piece takes one at a time"
+            )
+
+
 def validate_character_creation(payload: dict[str, object]) -> None:
     """Guard a brand-new player sheet against an illegal starting spread.
 
@@ -282,6 +298,7 @@ def validate_character_creation(payload: dict[str, object]) -> None:
     if "skills" in payload:
         _validate_creation_skills(payload.get("skills"), _origin_language(payload), errors)
     _validate_creation_cash(payload, errors)
+    _validate_creation_enhancements(payload, errors)
     if errors:
         raise ValidationError(errors)
 

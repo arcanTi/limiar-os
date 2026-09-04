@@ -235,6 +235,10 @@ Complete Package's starting money (CPR p.42/104/105/110), and
 - An **enhancement** (Hydraulic Ram, Tungsten Reinforcement...) is a separate
   purchase that only unlocks once its base implant is installed; removing the
   base refunds the enhancements bolted to it.
+- **One enhancement per piece of cyberware** (Mission Kit DLC #2). A second one
+  is refused naming the enhancement already in the way, in the wizard and in
+  play (`ToggleCyberwareEnhancement`); swapping means detaching first. The
+  backend refuses a creation payload that stacked two on one piece.
 - Requirements from the install engine still apply — Kerenzikov asks for the
   Neural Link, Linear Frames ask for the BODY. What the wizard ignores are the
   rules that depend on body locations (paired limbs, slot pools): creation buys
@@ -273,6 +277,13 @@ in the logs.
 immunities, cyberweapon modes, modifiers, damage, ablation and healing.
 Installed cyberware is the source of truth; the catalog supplies the
 structured rules.
+
+Chrome is not only a number on the sheet. The Humanity an implant costs is
+summed from `equipped`, and EMP follows it down to the tens digit of the
+remaining Humanity (p.80). `deriveStats` publishes that as
+`effectiveStats.EMP`, which is what the sheet displays and what every roll —
+EMP checks, Conversation, Human Perception — is made against; the spread the
+player bought at creation stays untouched on `character.base`.
 
 ### Night City Tarot
 

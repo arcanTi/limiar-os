@@ -394,6 +394,14 @@ export function validateStep(step: WizardStepId, draft: WizardDraft): StepValida
       isChromeEnhancement(item) && !item.attachesTo.some((code) => draft.chrome.some((pick) => pick.code === code))
     ));
     orphans.forEach((item) => errors.push(`${item.name} precisa do cyberware base instalado.`));
+    // One enhancement per piece (Mission Kit DLC #2): a draft that stacked two
+    // on the same implant never leaves this step.
+    draft.chrome.filter((item) => !isChromeEnhancement(item)).forEach((parent) => {
+      const attached = draft.chrome.filter((item) => isChromeEnhancement(item) && item.attachesTo.includes(parent.code));
+      if (attached.length > 1) {
+        errors.push(`${parent.name} carrega ${attached.length} aprimoramentos; cada peça aceita um por vez.`);
+      }
+    });
   }
 
   if (step === 'review') {

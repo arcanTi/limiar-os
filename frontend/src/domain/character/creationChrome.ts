@@ -87,6 +87,23 @@ export function isChromeEnhancement(item: ChromeItem | null | undefined): boolea
   return !!item && item.attachesTo.length > 0;
 }
 
+/** Installed pieces this enhancement could be bolted onto. */
+export function installedParentsOf(picks: ChromeItem[] | null | undefined, item: ChromeItem | null | undefined): ChromeItem[] {
+  if (!item || !isChromeEnhancement(item)) return [];
+  return (picks || []).filter((pick) => item.attachesTo.includes(pick.code));
+}
+
+/**
+ * The enhancement already installed on `parentCode`, if any. RAW (Mission Kit
+ * DLC #2): a piece of cyberware carries only one enhancement at a time, so
+ * this is what a second one collides with.
+ */
+export function enhancementOccupant(picks: ChromeItem[] | null | undefined, parentCode: unknown): ChromeItem | null {
+  const parent = toText(parentCode);
+  if (!parent) return null;
+  return (picks || []).find((pick) => isChromeEnhancement(pick) && pick.attachesTo.includes(parent)) || null;
+}
+
 export function chromeSpend(picks: ChromeItem[] | null | undefined): number {
   return (picks || []).reduce((sum, item) => sum + Math.max(0, toInt(item && item.price, 0)), 0);
 }
@@ -103,12 +120,14 @@ export function creationCashLeft(picks: ChromeItem[] | null | undefined, budget:
   return Math.max(0, budget) - chromeSpend(picks);
 }
 
-export type ChromeBlockReason = 'duplicate' | 'soldout' | 'funds' | 'parent' | 'install' | null;
+export type ChromeBlockReason = 'duplicate' | 'soldout' | 'funds' | 'parent' | 'occupied' | 'install' | null;
 
 export interface ChromeBlock {
   reason: ChromeBlockReason;
   /** Engine issues when the reason is `install`. */
   issues?: ValidationIssue[];
+  /** The enhancement already holding the piece, when the reason is `occupied`. */
+  occupant?: ChromeItem;
 }
 
 function issueSignature(issue: ValidationIssue): string {
@@ -173,8 +192,14 @@ export function chromeBlock(
   if (!item) return { reason: 'install' };
   if (current.some((pick) => pick.code === item.code)) return { reason: 'duplicate' };
   if (item.stock === 'SOLD OUT') return { reason: 'soldout' };
-  if (isChromeEnhancement(item) && !item.attachesTo.some((code) => current.some((pick) => pick.code === code))) {
-    return { reason: 'parent' };
+  if (isChromeEnhancement(item)) {
+    const parents = installedParentsOf(current, item);
+    if (!parents.length) return { reason: 'parent' };
+    // One enhancement per piece of cyberware at a time (Mission Kit DLC #2).
+    // Only a piece that is still free can take this one.
+    if (parents.every((parent) => enhancementOccupant(current, parent.code))) {
+      return { reason: 'occupied', occupant: enhancementOccupant(current, parents[0].code) as ChromeItem };
+    }
   }
   if (item.price > creationCashLeft(current, budget)) return { reason: 'funds' };
   const rows = (Array.isArray(catalog) ? catalog : []) as LegacyCatalogItem[];
@@ -192,6 +217,10 @@ export function chromeBlockMessage(block: ChromeBlock, item: ChromeItem | null |
   if (block.reason === 'parent') {
     const parents = (item && item.attachesTo.join(', ')) || 'o cyberware base';
     return `${name} é um aprimoramento: instale ${parents} primeiro.`;
+  }
+  if (block.reason === 'occupied') {
+    const occupant = (block.occupant && block.occupant.name) || 'outro aprimoramento';
+    return `Cada peça de cyberware aceita um aprimoramento por vez: ${occupant} já ocupa essa peça.`;
   }
   const detail = (block.issues || []).map((issue) => issue.message).join('; ');
   return `${name} não pode ser instalado${detail ? ': ' + detail : '.'}`;
