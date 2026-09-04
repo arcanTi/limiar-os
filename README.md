@@ -495,37 +495,66 @@ deixa um registro compreensivel para o GM.
 
 ## Running locally
 
-Copy the environment template, replace both passwords, and start the clean
-PostgreSQL deployment:
+**The current environment is the native run on `http://127.0.0.1:8765`.** The
+Compose stack is deliberately parked (`limiar-os-app-1` is stopped) — see
+[Why Compose is parked](#why-compose-is-parked) before starting it again.
 
 ```bash
-cp .env.example .env
-docker compose up --build
+cp .env.example .env   # first time only; fill in the values
+./run-local.sh
 ```
 
-Use a URL-safe PostgreSQL password such as `openssl rand -hex 32`; Compose
-constructs `LIMIAR_DATABASE_URL` from that same value, so database credentials
-cannot drift between the two services.
-
-Open:
+`run-local.sh` loads `.env`, rebuilds the frontend into `dist/`, refuses to
+start if something else already holds the port, and serves:
 
 ```text
 http://127.0.0.1:8765/Limiar%20OS.dc-2.html
 ```
 
-`LIMIAR_DATABASE_URL` is mandatory in the application container. Startup fails
-instead of silently creating SQLite when it is absent.
+Pass `--no-build` to skip the Vite build when only backend code changed.
 
-For native development, point the process at a reachable PostgreSQL database:
+`LIMIAR_DATABASE_URL` is mandatory. Startup fails instead of silently creating
+SQLite when it is absent, and — unlike Compose — the native process does not
+derive it from `POSTGRES_PASSWORD`, so `.env` spells it out. The database is the
+standalone `limiar-dev-postgres` container on host port 55433:
 
 ```bash
-cd frontend && npm run build && cd ..
-LIMIAR_DATABASE_URL='postgresql://limiar:password@127.0.0.1:5432/limiar' python3 server.py
+docker start limiar-dev-postgres   # if it is not already up
 ```
 
 The real server serves the UI, `/api/*`, WebSocket events and PostgreSQL. A
 static server can show HTML/CSS but proves nothing about auth, persistence or
 API-backed rules.
+
+### Why Compose is parked
+
+The `app` container has no source mount: `dist/` is baked into the image at
+build time. A frontend rebuild on the host therefore never reaches it, and the
+UI silently serves whatever bundle the image was built with.
+
+Worse, both servers claimed port 8765 — the container on `0.0.0.0`, the native
+process on `127.0.0.1`. Which one answered depended on whether the client
+resolved `localhost` to IPv4 or IPv6, so the same URL served two different
+builds from two different databases.
+
+So the `app` service now sits behind the `deploy` Compose profile. A bare
+`docker compose up` brings up **only PostgreSQL** and can no longer resurrect the
+conflict by accident. The deployment still works — it just has to be asked for:
+
+```bash
+lsof -nP -iTCP:8765 -sTCP:LISTEN   # make sure the native process is stopped
+./run.sh                           # or: docker compose --profile deploy up --build
+```
+
+`run.sh` passes the profile, refuses to start when the port is already taken, and
+always passes `--build` — without it the container ships the bundle from whenever
+the image was last built.
+
+Use a URL-safe PostgreSQL password such as `openssl rand -hex 32`; Compose
+constructs `LIMIAR_DATABASE_URL` from that same value, so database credentials
+cannot drift between the two services. Note that Compose uses its own
+`limiar-os-postgres-1` database, which has different users and access tokens
+than the native `limiar-dev-postgres`.
 
 ### Disposable database policy
 
@@ -539,7 +568,18 @@ docker compose down --volumes --remove-orphans
 
 Without `--volumes`, PostgreSQL survives normal container recreation. With
 `--volumes`, all campaigns, users, sessions and maps are permanently removed;
-the next `docker compose up` creates schema version 1 and a fresh admin.
+the next `docker compose --profile deploy up` creates schema version 1 and a
+fresh admin.
+
+`down` removes every container in the project regardless of profiles — the
+parked `app` included — and it is **not** honoured by `--dry-run` in Compose v5:
+the containers are really removed. That is safe without `--volumes` (the data
+lives in `limiar-os_limiar-postgres`, and `docker compose up -d postgres` brings
+it back intact), but do not reach for `--dry-run` expecting a preview.
+
+None of this touches the native run: `./run-local.sh` talks to the standalone
+`limiar-dev-postgres` container, whose data is in the `limiar-dev-pgdata` volume
+and is untouched by `docker compose down`.
 
 ## Local login
 
@@ -579,7 +619,16 @@ Leaving `LIMIAR_MASTER_TOKEN` unset is the recommended path: a random token is
 generated on first boot and written once to the server log —
 
 ```bash
-docker compose logs app | grep 'master account'
+grep 'master account' /path/to/run-local.log   # native run: wherever you sent stdout
+docker compose logs app | grep 'master account' # Compose run
+```
+
+Once the account exists, the log line is gone for good. Read the token back from
+the database instead:
+
+```bash
+docker exec limiar-dev-postgres psql -U limiar -d limiar \
+  -tAc "SELECT username, access_token, role FROM users ORDER BY role, username;"
 ```
 
 Set it explicitly only if you need a token you already know:
@@ -622,7 +671,8 @@ rotate the token of an account that already exists. To revoke every session and
 reissue a token, stop the server and run:
 
 ```bash
-docker compose exec app python scripts/rotate-credentials.py
+python3 scripts/rotate-credentials.py            # native run (loads .env via run-local.sh's vars)
+docker compose exec app python scripts/rotate-credentials.py  # Compose run
 ```
 
 The new token is printed once. Use `--user ana` to pick another account, or
@@ -699,3 +749,26 @@ kill <PID>
 ```
 
 Confirm the PID belongs to the server you intend to stop.
+
+`lsof` only reports sockets bound on the address it is asked about, so a Docker
+container publishing on `0.0.0.0:8765` and a native process on `127.0.0.1:8765`
+can coexist without either one failing to start. Check both:
+
+```bash
+lsof -nP -iTCP:8765 -sTCP:LISTEN
+docker ps --format '{{.Names}}\t{{.Ports}}' | grep 8765
+```
+
+When two servers share the port, which one answers depends on whether the client
+resolved IPv4 or IPv6 — `curl http://127.0.0.1:8765/` and
+`curl http://localhost:8765/` can return different builds. Compare the hashed
+bundle each address serves:
+
+```bash
+for h in 127.0.0.1 localhost; do
+  printf '%s -> ' "$h"
+  curl -s "http://$h:8765/" | grep -o 'assets/index-[A-Za-z0-9_-]*\.js' | head -1
+done
+```
+
+Two different hashes means two different servers. Stop one.

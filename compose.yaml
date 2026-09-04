@@ -24,6 +24,18 @@ services:
 
   app:
     build: .
+    # Opt-in only. `docker compose up` must NOT start this service: the image
+    # bakes `dist/` in at build time, so it serves whatever bundle it was built
+    # with while the host keeps rebuilding a `dist/` it never reads. Worse, it
+    # publishes on 0.0.0.0:8765 while the native run (`./run-local.sh`) binds
+    # 127.0.0.1:8765 — both start without error, and which one answers depends
+    # on whether the client resolved `localhost` to IPv4 or IPv6. Two builds,
+    # two databases, one URL.
+    #
+    # The deployment itself still works and is still supported:
+    #   docker compose --profile deploy up --build
+    # Stop the native server first; `--build` is required or you ship a stale UI.
+    profiles: ["deploy"]
     restart: unless-stopped
     depends_on:
       postgres:
