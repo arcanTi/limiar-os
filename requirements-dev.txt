@@ -21,7 +21,7 @@ click==8.4.2 \
     --hash=sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6 \
     --hash=sha256:e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76
     # via uvicorn
-coverage==7.15.4 \
+coverage[toml]==7.15.4 \
     --hash=sha256:002a438859f7b430bc99afeaf01a6d187dad1d0dc907b64cdeffc632a5db8fd8 \
     --hash=sha256:050467a7983b8e2fe7dd41a78bb30c3e7f8c0b8cafda14b1c46f8b5e3cf2dd3c \
     --hash=sha256:050f66a08805acb5b8a23c6d4a517b1ecf82c08e81ed0e4bd727df065e5c6624 \
@@ -410,7 +410,7 @@ pluggy==1.6.0 \
     # via
     #   pytest
     #   pytest-cov
-psycopg==3.3.4 \
+psycopg[binary,pool]==3.3.4 \
     --hash=sha256:b6bbc25ccf05c8fad3b061d9db2ef0909a555171b84b07f29458a447253d679a \
     --hash=sha256:e21207764952cff81b6b8bdacad9a3939f2793367fdac2987b3aac36a651b5bc
     # via -r requirements.in
@@ -795,11 +795,15 @@ typing-extensions==4.16.0 \
     --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5
     # via
     #   alembic
+    #   anyio
     #   fastapi
+    #   httpx2
+    #   psycopg
     #   psycopg-pool
     #   pydantic
     #   pydantic-core
     #   sqlalchemy
+    #   starlette
     #   typing-inspection
 typing-inspection==0.4.2 \
     --hash=sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7 \
@@ -807,9 +811,9 @@ typing-inspection==0.4.2 \
     # via
     #   fastapi
     #   pydantic
-uvicorn==0.40.0 \
-    --hash=sha256:839676675e87e73694518b5574fd0f24c9d97b46bea16df7b8c05ea1a51071ea \
-    --hash=sha256:c6c8f55bc8bf13eb6fa9ff87ad62308bbbc33d0b67f84293151efe87e0d5f2ee
+uvicorn[standard]==0.52.4 \
+    --hash=sha256:73acfee47a0b133c5de13d219492d62d8a31e935f4fe6e41a232451a15379f86 \
+    --hash=sha256:f86e41a149d7d05a9969337e3946a9c171c06a5d42680896daaba624aeac8da1
     # via -r requirements.in
 uvloop==0.22.1 \
     --hash=sha256:017bd46f9e7b78e81606329d07141d3da446f8798c6baeec124260e22c262772 \
