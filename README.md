@@ -206,6 +206,32 @@ straight to the resist check. Load one from the weapon row in the combat
 cockpit; the button cycles through the rounds that weapon accepts and back to
 none.
 
+## Ciclo de vida dos escudos
+
+Escudos balisticos sao itens com HP proprio, nunca SP. Cada unidade comprada
+guarda `shieldHp` e `maxHp` na propria instancia do inventario, portanto dano
+nao desaparece ao guardar, soltar ou recarregar a ficha.
+
+- **Bulletproof Shield:** 10 HP. Pode ser instalado em Popup Shield.
+- **High-Density Bulletproof Shield:** 15 HP. Nao pode ser instalado em Popup
+  Shield.
+- **Equipar:** exige uma unidade possuida e funcional, ocupa um braco/uma mao e
+  impede Evasion contra ataques a distancia enquanto estiver empunhado.
+- **Absorver dano:** um ataque a distancia interceptado reduz primeiro o HP do
+  escudo. Dano excedente e informado ao mestre; nao e aplicado
+  automaticamente ao portador. Ataques corpo a corpo ignoram o escudo.
+- **Quebrar:** ao chegar a 0 HP, o escudo deixa de proteger e sai da mao, mas a
+  instancia quebrada continua no inventario para reparo ou descarte.
+- **Guardar ou soltar:** ambos removem a protecao e liberam o braco. Guardar
+  mantem o item carregado; soltar o deixa no local da cena. Nenhuma das acoes
+  restaura HP.
+- **Reparar:** recupera HP ate `maxHp`; nao converte HP em SP nem aumenta a
+  capacidade original. Um escudo em 0 HP precisa ser reparado antes de ser
+  equipado novamente.
+- **Popup Shield:** e o cyberarm que aloja um Bulletproof Shield normal. Ocultar
+  ou ejetar nao repara o escudo; uma unidade destruida deve ser substituida ou
+  reparada. O modelo High-Density e incompativel.
+
 ## GM table console
 
 **MESA // PERSONAGENS** is the GM-only band above the sheet tabs in the main
@@ -648,6 +674,38 @@ docker start limiar-dev-postgres   # if it is not already up
 The real server serves the UI, `/api/*`, WebSocket events and PostgreSQL. A
 static server can show HTML/CSS but proves nothing about auth, persistence or
 API-backed rules.
+
+### Hands-on testing: `./run-test.sh`
+
+`run-local.sh` serves the **real** development database, so anything created
+while clicking around the UI stays there — that is how test characters ended up
+in the live roster. Use `run-test.sh` for exploratory or manual testing instead:
+
+```bash
+./run-test.sh              # build the frontend, serve on 127.0.0.1:8766
+./run-test.sh --no-build   # skip the Vite build
+./run-test.sh --keep       # leave the database up after Ctrl-C
+```
+
+It ignores `.env` on purpose (inheriting `LIMIAR_DATABASE_URL` is the exact
+accident it prevents) and gives the run its own everything:
+
+| | development run | test run |
+|---|---|---|
+| database | `limiar-dev-postgres`, port 55433, on disk | `compose.livetest.yaml`, port 55434, tmpfs |
+| uploads | `uploads/` | `tmp/livetest-uploads/`, deleted on exit |
+| port | 8765 | 8766 |
+| GM token | from `.env` | `TEST23` (override: `LIMIAR_TEST_MASTER_TOKEN`) |
+
+The database starts empty, so the server migrates and seeds it on boot: every
+run begins from the seed roster and ends with the container and its tmpfs gone.
+`LIMIAR_UPLOAD_DIR` is what relocates the uploads; `/uploads/` is resolved
+against it, keeping its containment check and sandbox CSP.
+
+This is separate from `compose.test.yaml`, which belongs to the pytest suite
+(`scripts/test-backend-postgres.sh`, port 55432) and is torn down at the end of
+every run — different project names and ports, so a test run and a pytest run
+never collide.
 
 ### Why Compose is parked
 

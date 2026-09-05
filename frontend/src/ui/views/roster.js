@@ -3,6 +3,7 @@ import { CPRED_CRITICAL_INJURIES } from '../../domain/character/constants.ts';
 import { CPRED_STATUS_PRESETS } from '../../domain/conditions/index.ts';
 import { effectPresetCatalog } from '../../domain/effects/customEffects.ts';
 import { CPRED_NETRUNNING_ABILITIES } from '../../domain/netrunning/constants.ts';
+import { BREACH_CONNECTIONS, breachConnectionOptions, breachTierForDv, normalizeBreachConnection } from '../../domain/netrunning/index.ts';
 
 // SYS.01/MESA // GM roster: every sheet at this table on one screen, with the
 // switch that makes one of them active. Everything the GM edits — inventory,
@@ -154,6 +155,11 @@ export function rosterRenderVals(state = {}, deps = {}) {
   const netTargets = netAll ? pcs : (activeCharacter.id ? [activeCharacter] : []);
   const netLabel = netAbility ? netAbility.name.toUpperCase() : (netLabelDraft.trim().toUpperCase() || 'TESTE NET');
   const activeInterface = interfaceRankOf(activeCharacter);
+  // The link the test is rolled through: it modifies the check itself and,
+  // once the run opens, the trace and the clock (see buildBreachConfig).
+  const netConnection = normalizeBreachConnection(S.rosterNetConnection);
+  const netConnectionRow = BREACH_CONNECTIONS[netConnection];
+  const netTierLabel = netDv == null ? null : breachTierForDv(netDv);
 
   return {
     rosterOpen: open,
@@ -212,6 +218,16 @@ export function rosterRenderVals(state = {}, deps = {}) {
       style: 'lm-roster-chip' + (netDv === dv ? ' lm-roster-chip--on' : ''),
       onClick: () => deps.setState({ rosterNetDv: String(dv) }),
     })),
+    rosterNetConnectionOptions: breachConnectionOptions().map(link => ({
+      value: link.id,
+      label: link.label.toUpperCase() + ' // ' + link.hint,
+      selected: link.id === netConnection,
+      notSelected: link.id !== netConnection,
+    })),
+    onRosterNetConnection: (e) => deps.setState({ rosterNetConnection: e.target.value }),
+    rosterNetConnectionSummary: netConnectionRow.label.toUpperCase()
+      + (netConnectionRow.checkMod ? ' // CHECK ' + (netConnectionRow.checkMod > 0 ? '+' : '') + netConnectionRow.checkMod : ' // CHECK +0')
+      + ' // TRACE x' + netConnectionRow.traceMultiplier.toFixed(2),
     rosterNetAll: netAll,
     rosterNetAllStyle: 'lm-roster-chip' + (netAll ? ' lm-roster-chip--on' : ''),
     toggleRosterNetAll: () => deps.setState({ rosterNetAll: !netAll }),
@@ -219,7 +235,9 @@ export function rosterRenderVals(state = {}, deps = {}) {
       ? 'TODOS OS PJS (' + pcs.length + ')'
       : (activeCharacter.name || 'OPERATIVE') + ' // INTERFACE ' + activeInterface,
     rosterNetNoInterface: !netAll && !!activeCharacter.id && activeInterface === 0,
-    rosterNetPreview: netLabel + ' :: 1d10 + INTERFACE' + (netDv != null ? ' vs DV ' + netDv : ' (DV a criterio do mestre)'),
+    rosterNetPreview: netLabel + ' :: 1d10 + INTERFACE'
+      + (netConnectionRow.checkMod ? ' ' + (netConnectionRow.checkMod > 0 ? '+' : '') + netConnectionRow.checkMod : '')
+      + (netDv != null ? ' vs DV ' + netDv + ' // ARCHITECTURE ' + String(netTierLabel).toUpperCase() : ' (DV a criterio do mestre)'),
     canSendNetTest: netTargets.length > 0 && (netAbility != null || netLabelDraft.trim().length > 0),
     sendRosterNetTest: () => {
       if (netTargets.length === 0) return;
@@ -229,6 +247,7 @@ export function rosterRenderVals(state = {}, deps = {}) {
         abilityId: netAbility ? netAbility.id : ROSTER_NET_CUSTOM_ABILITY,
         label: netLabel,
         dv: netDv,
+        connection: netConnection,
       });
     },
     rosterCards,
@@ -413,22 +432,27 @@ export function rosterHandlers(component) {
 
     // NET test: one comms request per target, each carrying that target's
     // own Interface rank as the modifier (like initiative carries REF), so
-    // the player rolls it with one tap and the result comes back tagged.
+    // the player rolls it with one tap and the result comes back tagged. The
+    // link the run happens over rides along: it modifies this very check and
+    // then shapes the Breach run the roll opens.
     requestNetTest(draft) {
       if (!component.ensureGm('Login do mestre necessario para pedir teste')) return false;
       const targets = Array.isArray(draft && draft.targets) ? draft.targets : [];
       if (targets.length === 0) return false;
       const label = String((draft && draft.label) || 'TESTE NET').trim().toUpperCase() || 'TESTE NET';
       const dv = draft && draft.dv != null && !Number.isNaN(Number(draft.dv)) ? Number(draft.dv) : null;
+      const connection = normalizeBreachConnection(draft && draft.connection);
+      const link = BREACH_CONNECTIONS[connection];
       const names = [];
       targets.forEach(id => {
         const character = component.characterById(id);
         if (!character || !character.id) return;
-        const mod = interfaceRankOf(character);
-        const opts = { label, sides: 10, count: 1, mod, check: true, combatantId: character.id, netrunning: draft.abilityId || ROSTER_NET_CUSTOM_ABILITY };
+        const mod = interfaceRankOf(character) + link.checkMod;
+        const opts = { label, sides: 10, count: 1, mod, check: true, combatantId: character.id, netrunning: draft.abilityId || ROSTER_NET_CUSTOM_ABILITY, netConnection: connection };
         if (dv != null) opts.dv = dv;
         const text = 'Pedido de teste NET para ' + (character.name || 'OPERATIVO') + ': ' + label
-          + ' (Interface ' + mod + ' + 1d10' + (dv != null ? ' vs DV ' + dv : '') + ')';
+          + ' (Interface ' + interfaceRankOf(character) + (link.checkMod ? ' ' + (link.checkMod > 0 ? '+' : '') + link.checkMod + ' ' + link.label.toUpperCase() : '')
+          + ' + 1d10' + (dv != null ? ' vs DV ' + dv : '') + ')';
         component.postChat({ kind: 'request', text, request: opts });
         names.push(character.name || 'OPERATIVO');
       });

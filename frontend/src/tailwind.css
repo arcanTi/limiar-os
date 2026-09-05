@@ -203,6 +203,19 @@
   .lm-ui-textarea--detail { min-height:76px; }
   .lm-sheet-section-title { font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin:22px 0 10px;display:flex;align-items:center;gap:8px; }
   .lm-sheet-section-title::after { content:"";flex:1;height:1px;background:rgba(214,170,78,0.15); }
+  /* Foldable variant of the section title: same typography, plus a caret and a
+     hit area. Only the GM sees it - a player's own sheet keeps the plain title. */
+  .lm-sheet-fold { width:100%;font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin:22px 0 10px;display:flex;align-items:center;gap:8px;background:transparent;border:0;padding:0;cursor:pointer;text-align:left; }
+  .lm-sheet-fold::after { content:"";flex:1;height:1px;background:rgba(214,170,78,0.15); }
+  .lm-sheet-fold:hover { color:#d6aa4e; }
+  .lm-sheet-fold:hover::after { background:rgba(214,170,78,0.32); }
+  .lm-sheet-fold:hover .lm-sheet-fold-caret { color:#d6aa4e; }
+  .lm-sheet-fold-caret { flex:none;width:9px;font-size:9px;line-height:1;color:#3fe0d0; }
+  /* Section title that carries a trailing status (the notes autosave state).
+     Kept off .lm-sheet-section-title, whose ::after would draw a second rule
+     after that status. */
+  .lm-sheet-notes-title { font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin:22px 0 8px;display:flex;align-items:center;gap:8px; }
+  .lm-sheet-notes-autosave { color:#3fe0d0; }
   .lm-core-attrs { display:grid;grid-template-columns:repeat(5,1fr);gap:10px; }
   .lm-core-attr-btn { position:relative;background:linear-gradient(180deg,rgba(214,170,78,.055),#0b0e0a);border:1px solid rgba(214,170,78,0.22);cursor:pointer;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .15s;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));min-width:0; }
   .lm-core-attr-btn:hover { border-color:#d6aa4e;background:rgba(214,170,78,0.08); }
@@ -259,6 +272,9 @@
 
   .lm-skill-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:8px;align-items:start; }
   .lm-skill-col { display:flex;flex-direction:column;gap:6px;min-width:0; }
+  /* Each catalog row is a roll button plus a "?" that opens a reference
+     balloon; the balloon spans both columns so it never squeezes the row. */
+  .lm-skill-item { display:grid;grid-template-columns:minmax(0,1fr) 22px;gap:4px;align-items:start;min-width:0; }
   .lm-skill-row { display:grid;grid-template-columns:minmax(0,1fr) 36px 48px 40px;gap:8px;align-items:center;text-align:left;background:#0b0e0a;border:1px solid rgba(214,170,78,0.14);padding:8px 9px;cursor:pointer;min-width:0;transition:border-color .15s,background .15s; }
   .lm-skill-row:hover { border-color:#3fe0d0;background:rgba(63,224,208,0.06); }
   .lm-skill-name-wrap { display:flex;align-items:center;gap:5px;min-width:0; }
@@ -268,6 +284,12 @@
   .lm-skill-stat { font:9px 'Share Tech Mono',monospace;color:#d6aa4e; }
   .lm-skill-level { font:9px 'Share Tech Mono',monospace;color:#6f7a64; }
   .lm-skill-total { font:700 13px 'Share Tech Mono',monospace;color:#3fe0d0;text-align:right; }
+  .lm-skill-info { align-self:stretch;font:700 10px 'Share Tech Mono',monospace;color:#6f7a64;background:#0b0e0a;border:1px solid rgba(214,170,78,0.14);cursor:pointer;padding:0;line-height:1;transition:color .15s,border-color .15s,background .15s; }
+  .lm-skill-info:hover { color:#d6aa4e;border-color:rgba(214,170,78,0.45); }
+  .lm-skill-info--on { color:#080a07;background:#d6aa4e;border-color:#d6aa4e; }
+  .lm-skill-tip { grid-column:1/-1;position:relative;margin-top:2px;background:#0b0e0a;border:1px solid rgba(214,170,78,0.34);border-left:2px solid #d6aa4e;padding:8px 9px;font:11px/1.5 'Chakra Petch',sans-serif;color:#cfc9b8; }
+  .lm-skill-tip::before { content:'';position:absolute;top:-5px;right:9px;width:8px;height:8px;background:#0b0e0a;border-left:1px solid rgba(214,170,78,0.34);border-top:1px solid rgba(214,170,78,0.34);transform:rotate(45deg); }
+  .lm-skill-tip-stat { display:inline-block;margin-right:6px;font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#d6aa4e;border:1px solid rgba(214,170,78,0.35);padding:1px 4px;vertical-align:1px; }
   .lm-ip-row { display:grid;grid-template-columns:1.35fr .52fr .52fr .58fr .62fr;gap:7px;align-items:center;background:#080a07;border:1px solid rgba(214,170,78,0.13);padding:8px; }
   .lm-ip-name { font:600 11px 'Chakra Petch',sans-serif;color:#cfc9b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .lm-ip-meta { font:8px 'Share Tech Mono',monospace;letter-spacing:1px;margin-top:2px; }
@@ -367,3 +389,39 @@
   .lm-ach-target-name { min-width:0;font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .lm-ach-target-meta { font:9px 'Share Tech Mono',monospace;color:#6f7a64;white-space:nowrap; }
 }
+
+/* Sheet rhythm.
+   The sheet's scroll pane uses Tailwind's `space-y-5`, which drops the same
+   20px between every direct child: a section header, the grid it introduces
+   and the next section all end up equally far apart, so nothing reads as
+   grouped. These rules put the hierarchy back.
+
+   Two cascade details matter here. They sit outside `@layer components`, or the
+   utility layer would win regardless of specificity. And they are scoped to
+   `.lm-sheet-scroll >` to reach specificity (0,3,0): the utility's selector is
+   `.space-y-5 > :not([hidden]) ~ :not([hidden])`, and each `:not([hidden])`
+   contributes its argument's specificity, so a plain `.a + .a` (0,2,0) loses. */
+
+/* The pane already has 20px of padding; the first block's own top margin was
+   stacking on it and pushing the content away from the tab bar. */
+.lm-sheet-scroll > :first-child { margin-top: 0; }
+
+/* The tab strip sits directly against the portrait column, which uses the same
+   `bg-cyber-surface`: with no inset and no colour difference the two read as one
+   band, so the tabs looked like part of the photo panel rather than the header
+   of the content beside it. It now sits on the page ground (`bg-cyber-bg`), and
+   this 8px inset lands the first tab's label on the same 24px text grid as the
+   content below it - 8px here plus the button's own 16px of padding. */
+.lm-sheet-tabs { padding-left: 8px; padding-right: 8px; }
+
+/* Folded sections are one line each. At 20px apart they read as unrelated
+   headings instead of a list of what the sheet holds. */
+.lm-sheet-scroll > .lm-sheet-fold + .lm-sheet-fold { margin-top: 8px; }
+
+/* Vitals and flags are two halves of the same dossier, not two sections. */
+.lm-sheet-scroll > .lm-character-detail-grid + .lm-character-detail-grid { margin-top: 8px; }
+
+/* A notes label belongs to the field under it. Proximity does the grouping;
+   the wrapper keeps the 20px rhythm between one field and the next. */
+.lm-sheet-note-field { display: block; }
+.lm-sheet-note-field > .lm-sheet-edit-section-title { margin: 0 0 6px; }

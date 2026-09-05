@@ -187,11 +187,21 @@ describe('ui/views/roster rosterRenderVals', () => {
     const vals = rosterRenderVals({ characters, activeCharacterId: 'wire', rosterTab: 'net', rosterNetAbility: 'pathfinder', rosterNetDv: '12' }, deps);
     expect(vals.rosterNetTargetLabel).toBe('Wire // INTERFACE 6');
     expect(vals.rosterNetNoInterface).toBe(false);
-    expect(vals.rosterNetPreview).toBe('PATHFINDER :: 1d10 + INTERFACE vs DV 12');
+    expect(vals.rosterNetPreview).toBe('PATHFINDER :: 1d10 + INTERFACE vs DV 12 // ARCHITECTURE ADVANCED');
     expect(vals.rosterNetDvChips.find(c => c.label === 'DV 12').style).toContain('lm-roster-chip--on');
     expect(vals.canSendNetTest).toBe(true);
     vals.sendRosterNetTest();
-    expect(deps.requestNetTest).toHaveBeenCalledWith({ targets: ['wire'], abilityId: 'pathfinder', label: 'PATHFINDER', dv: 12 });
+    expect(deps.requestNetTest).toHaveBeenCalledWith({ targets: ['wire'], abilityId: 'pathfinder', label: 'PATHFINDER', dv: 12, connection: 'wireless' });
+  });
+
+  it('offers the connection picker and shows what the link does to the test', () => {
+    const vals = rosterRenderVals({ characters, activeCharacterId: 'wire', rosterTab: 'net', rosterNetAbility: 'pathfinder', rosterNetDv: '12', rosterNetConnection: 'remote' }, deps);
+    expect(vals.rosterNetConnectionOptions.map(o => o.value)).toEqual(['hardline', 'wireless', 'remote']);
+    expect(vals.rosterNetConnectionOptions.find(o => o.value === 'remote').selected).toBe(true);
+    expect(vals.rosterNetConnectionSummary).toBe('REMOTO // CHECK -2 // TRACE x1.30');
+    expect(vals.rosterNetPreview).toBe('PATHFINDER :: 1d10 + INTERFACE -2 vs DV 12 // ARCHITECTURE ADVANCED');
+    vals.onRosterNetConnection({ target: { value: 'hardline' } });
+    expect(deps.setState).toHaveBeenLastCalledWith({ rosterNetConnection: 'hardline' });
   });
 
   it('warns when the target is not a Netrunner and leaves the DV open', () => {
@@ -200,7 +210,7 @@ describe('ui/views/roster rosterRenderVals', () => {
     expect(vals.rosterNetNoInterface).toBe(true);
     expect(vals.rosterNetPreview).toContain('(DV a criterio do mestre)');
     vals.sendRosterNetTest();
-    expect(deps.requestNetTest).toHaveBeenLastCalledWith({ targets: ['rook'], abilityId: 'scanner', label: 'SCANNER', dv: null });
+    expect(deps.requestNetTest).toHaveBeenLastCalledWith({ targets: ['rook'], abilityId: 'scanner', label: 'SCANNER', dv: null, connection: 'wireless' });
   });
 
   it('sends a custom-label NET test to every player character at once', () => {
@@ -211,7 +221,7 @@ describe('ui/views/roster rosterRenderVals', () => {
     expect(vals.rosterNetTargetLabel).toBe('TODOS OS PJS (2)');
     expect(vals.rosterNetAllStyle).toContain('lm-roster-chip--on');
     vals.sendRosterNetTest();
-    expect(deps.requestNetTest).toHaveBeenLastCalledWith({ targets: ['rook', 'wire'], abilityId: 'custom', label: 'FURAR FIREWALL', dv: 8 });
+    expect(deps.requestNetTest).toHaveBeenLastCalledWith({ targets: ['rook', 'wire'], abilityId: 'custom', label: 'FURAR FIREWALL', dv: 8, connection: 'wireless' });
     vals.toggleRosterNetAll();
     expect(deps.setState).toHaveBeenLastCalledWith({ rosterNetAll: false });
   });
@@ -326,10 +336,27 @@ describe('ui/views/roster rosterHandlers', () => {
     expect(component.posted[0]).toMatchObject({
       kind: 'request',
       text: 'Pedido de teste NET para Rook: BACKDOOR (Interface 0 + 1d10 vs DV 10)',
-      request: { label: 'BACKDOOR', sides: 10, count: 1, mod: 0, check: true, dv: 10, combatantId: 'rook', netrunning: 'backdoor' },
+      request: { label: 'BACKDOOR', sides: 10, count: 1, mod: 0, check: true, dv: 10, combatantId: 'rook', netrunning: 'backdoor', netConnection: 'wireless' },
     });
     expect(component.posted[1].request).toMatchObject({ mod: 6, combatantId: 'wire', dv: 10 });
     expect(component.flashes[0]).toBe('Teste NET enviado: Rook, Wire');
+  });
+
+  it('applies the connection modifier to the NET test and tags the request with the link', () => {
+    const component = fakeComponent();
+    rosterHandlers(component).requestNetTest({ targets: ['wire'], abilityId: 'backdoor', label: 'backdoor', dv: 10, connection: 'remote' });
+    expect(component.posted[0]).toMatchObject({
+      text: 'Pedido de teste NET para Wire: BACKDOOR (Interface 6 -2 REMOTO + 1d10 vs DV 10)',
+      // Interface 6 minus the remote link's 2, and the link rides along so the
+      // run the roll opens is shaped by it too.
+      request: { mod: 4, netConnection: 'remote' },
+    });
+
+    rosterHandlers(component).requestNetTest({ targets: ['wire'], abilityId: 'backdoor', label: 'backdoor', dv: 10, connection: 'hardline' });
+    expect(component.posted[1]).toMatchObject({
+      text: 'Pedido de teste NET para Wire: BACKDOOR (Interface 6 +1 HARDLINE + 1d10 vs DV 10)',
+      request: { mod: 7, netConnection: 'hardline' },
+    });
   });
 
   it('omits the DV from the request when the GM left it open', () => {

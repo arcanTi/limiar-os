@@ -113,6 +113,7 @@ export function rezzedProgramIds(programs: unknown): string[] {
 export function programRunModifiers(programs: unknown): {
   prepResults: { abilityId: 'backdoor'; success: true; margin: number; source: string }[];
   timeBonus: number;
+  speedBonus: number;
   traceMultiplier: number;
   mitigation: string[];
   labels: string[];
@@ -123,6 +124,13 @@ export function programRunModifiers(programs: unknown): {
   const prepResults: { abilityId: 'backdoor'; success: true; margin: number; source: string }[] = [];
   let timeBonus = 0;
   let traceMultiplier = 1;
+  // RAW Boosters that raise Speed feed the run's speed contest instead of
+  // handing out a flat clock bonus (see buildBreachConfig).
+  const speedBonus = [...ids].reduce((total, id) => {
+    const program = netrunningProgramById(id);
+    const modifiers = (program && (program as { modifiers?: { speed?: number } }).modifiers) || null;
+    return total + (Number(modifiers && modifiers.speed) || 0);
+  }, 0);
 
   // RAW -> Nexus adaptation for the abstract Architecture minigame:
   // +2 check boosters become softer run knobs; attackers stay inert until
@@ -131,10 +139,7 @@ export function programRunModifiers(programs: unknown): {
     prepResults.push({ abilityId: 'backdoor', success: true, margin: 2, source: 'Worm' });
     labels.push('Worm: Backdoor automatico');
   }
-  if (ids.has('speedy-gonzalvez')) {
-    timeBonus += 12;
-    labels.push('Speedy Gonzalvez: +12s');
-  }
+  if (speedBonus) labels.push('Boosters: +' + speedBonus + ' SPD');
   if (ids.has('eraser')) {
     traceMultiplier *= 0.9;
     labels.push('Eraser: trace x0.90');
@@ -146,7 +151,7 @@ export function programRunModifiers(programs: unknown): {
   if (ids.has('armor')) mitigation.push('Armor: -4 brain damage');
   if (ids.has('flak')) mitigation.push('Flak: Non-Black ICE ATK -> 0');
   if (ids.has('shield')) mitigation.push('Shield: cancela primeiro dano cerebral');
-  return { prepResults, timeBonus, traceMultiplier, mitigation, labels };
+  return { prepResults, timeBonus, speedBonus, traceMultiplier, mitigation, labels };
 }
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {

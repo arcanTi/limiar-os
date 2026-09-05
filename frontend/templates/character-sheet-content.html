@@ -121,14 +121,22 @@
             <sc-if value="{{ sheetCreating }}">
             <div class="lm-sheet-edit-section-title">{{ tx.story }}</div>
             <textarea value="{{ sheetNotes }}" onInput="{{ onSheetNotes }}" placeholder="{{ tx.storyPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--story"></textarea>
-            <div class="lm-sheet-edit-section-title">{{ tx.alliances }}</div>
-            <textarea value="{{ sheetAlliances }}" onInput="{{ onSheetAlliances }}" placeholder="{{ tx.alliancesPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--detail"></textarea>
-            <div class="lm-sheet-edit-section-title">{{ tx.enemies }}</div>
-            <textarea value="{{ sheetEnemies }}" onInput="{{ onSheetEnemies }}" placeholder="{{ tx.enemiesPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--detail"></textarea>
-            <div class="lm-sheet-edit-section-title">{{ tx.personalTraits }}</div>
-            <textarea value="{{ sheetPersonalTraits }}" onInput="{{ onSheetPersonalTraits }}" placeholder="{{ tx.personalTraitsPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--detail"></textarea>
-            <div class="lm-sheet-edit-section-title">{{ tx.hobbies }}</div>
-            <textarea value="{{ sheetHobbies }}" onInput="{{ onSheetHobbies }}" placeholder="{{ tx.hobbiesPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--detail"></textarea>
+            <label class="lm-sheet-note-field">
+              <div class="lm-sheet-edit-section-title">{{ tx.alliances }}</div>
+              <textarea value="{{ sheetAlliances }}" onInput="{{ onSheetAlliances }}" placeholder="{{ tx.alliancesPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--detail"></textarea>
+            </label>
+            <label class="lm-sheet-note-field">
+              <div class="lm-sheet-edit-section-title">{{ tx.enemies }}</div>
+              <textarea value="{{ sheetEnemies }}" onInput="{{ onSheetEnemies }}" placeholder="{{ tx.enemiesPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--detail"></textarea>
+            </label>
+            <label class="lm-sheet-note-field">
+              <div class="lm-sheet-edit-section-title">{{ tx.personalTraits }}</div>
+              <textarea value="{{ sheetPersonalTraits }}" onInput="{{ onSheetPersonalTraits }}" placeholder="{{ tx.personalTraitsPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--detail"></textarea>
+            </label>
+            <label class="lm-sheet-note-field">
+              <div class="lm-sheet-edit-section-title">{{ tx.hobbies }}</div>
+              <textarea value="{{ sheetHobbies }}" onInput="{{ onSheetHobbies }}" placeholder="{{ tx.hobbiesPlaceholder }}" class="lm-ui-input lm-ui-input--gold lm-ui-textarea lm-ui-textarea--detail"></textarea>
+            </label>
             </sc-if>
             </sc-if>
           </div>
@@ -300,7 +308,9 @@
 
         <sc-if value="{{ notSheetEditing }}">
           <sc-if value="{{ sheetTabCore }}">
-          <div class="lm-sheet-section-title">{{ tx.attributes }} // {{ tx.tapRollD10 }}</div>
+          <sc-if value="{{ coreSectionsFoldable }}"><button onClick="{{ toggleCoreAttrs }}" aria-expanded="{{ coreAttrsOpen }}" class="lm-sheet-fold"><span class="lm-sheet-fold-caret">{{ coreAttrsCaret }}</span>{{ tx.attributes }} // {{ tx.tapRollD10 }}</button></sc-if>
+          <sc-if value="{{ coreSectionsStatic }}"><div class="lm-sheet-section-title">{{ tx.attributes }} // {{ tx.tapRollD10 }}</div></sc-if>
+          <sc-if value="{{ coreAttrsOpen }}">
           <div class="lm-core-attrs">
             <sc-for list="{{ attrList }}" as="a" hint-placeholder-count="10">
               <button onClick="{{ a.onRoll }}" class="lm-core-attr-btn">
@@ -310,6 +320,9 @@
               </button>
             </sc-for>
           </div>
+          </sc-if>
+          <sc-if value="{{ coreSectionsFoldable }}"><button onClick="{{ toggleCoreStats }}" aria-expanded="{{ coreStatsOpen }}" class="lm-sheet-fold"><span class="lm-sheet-fold-caret">{{ coreStatsCaret }}</span>VITAIS // DERIVADOS</button></sc-if>
+          <sc-if value="{{ coreStatsOpen }}">
           <div class="lm-core-stat-grid">
             <div class="lm-core-stat lm-core-stat--teal"><div class="lm-core-stat-value lm-core-stat-value--teal">{{ health.max }}</div><div class="lm-core-stat-label">HITS</div></div>
             <div class="lm-core-stat lm-core-stat--danger"><div class="lm-core-stat-value lm-core-stat-value--danger">{{ derived.seriouslyWounded }}</div><div class="lm-core-stat-label">SERIOUS WOUND</div></div>
@@ -319,7 +332,10 @@
             <div class="lm-core-stat"><div class="lm-core-stat-value lm-core-stat-value--plain">-{{ derived.armorPenalty }}</div><div class="lm-core-stat-label">ARMOR PEN</div></div>
             <div class="lm-core-stat"><div class="lm-core-stat-value">{{ reputation }}</div><div class="lm-core-stat-label">{{ tx.reputation }}</div></div>
           </div>
-          <div class="lm-sheet-section-title">DOSSIER COMPLETO // STATUS OPERACIONAL</div>
+          </sc-if>
+          <sc-if value="{{ coreSectionsFoldable }}"><button onClick="{{ toggleCoreDossier }}" aria-expanded="{{ coreDossierOpen }}" class="lm-sheet-fold"><span class="lm-sheet-fold-caret">{{ coreDossierCaret }}</span>DOSSIER COMPLETO // STATUS OPERACIONAL</button></sc-if>
+          <sc-if value="{{ coreSectionsStatic }}"><div class="lm-sheet-section-title">DOSSIER COMPLETO // STATUS OPERACIONAL</div></sc-if>
+          <sc-if value="{{ coreDossierOpen }}">
           <div class="lm-character-detail-grid">
             <sc-for list="{{ characterDetailVitals }}" as="d" hint-placeholder-count="6">
               <div class="lm-character-detail-cell" style="--detail-color:{{ d.color }};">
@@ -338,6 +354,9 @@
               </div>
             </sc-for>
           </div>
+          </sc-if>
+          <sc-if value="{{ coreSectionsFoldable }}"><button onClick="{{ toggleCoreBrief }}" aria-expanded="{{ coreBriefOpen }}" class="lm-sheet-fold"><span class="lm-sheet-fold-caret">{{ coreBriefCaret }}</span>RESUMO // PERICIAS E EQUIPAMENTO</button></sc-if>
+          <sc-if value="{{ coreBriefOpen }}">
           <div class="lm-character-brief-grid">
             <div class="lm-character-brief-panel">
               <div class="lm-character-brief-title">MELHORES PERICIAS</div>
@@ -359,6 +378,7 @@
               <sc-if value="{{ noEquippedGearSummary }}"><div class="lm-character-empty">// nenhum item equipado</div></sc-if>
             </div>
           </div>
+          </sc-if>
           <sc-if value="{{ hasCyberpsychosisExtreme }}">
             <div class="lm-psychosis-banner lm-psychosis-banner--extreme">
               <div class="lm-psychosis-banner-title">&#9888; {{ cyberpsychosisExtremeTitle }}</div>
@@ -384,12 +404,16 @@
             <sc-for list="{{ skillRowColumns }}" as="col" hint-placeholder-count="2">
               <div class="lm-skill-col">
                 <sc-for list="{{ col.rows }}" as="sk" hint-placeholder-count="33">
+                  <div class="lm-skill-item">
                   <button onClick="{{ sk.onRoll }}" class="lm-skill-row">
                     <span class="lm-skill-name-wrap"><span class="lm-skill-name">{{ sk.name }}</span><sc-if value="{{ sk.difficult }}"><span class="lm-skill-badge">x2</span></sc-if><sc-if value="{{ sk.hasCyberBonus }}"><span title="{{ sk.cyberBonusTitle }}" class="lm-skill-badge lm-skill-badge--cyber">+{{ sk.cyberBonus }}</span></sc-if></span>
                     <span class="lm-skill-stat">{{ sk.stat }}</span>
                     <span class="lm-skill-level">LV {{ sk.level }}</span>
                     <span class="lm-skill-total">{{ sk.total }}</span>
                   </button>
+                  <sc-if value="{{ sk.hasDescription }}"><button onClick="{{ sk.onTip }}" class="{{ sk.tipStyle }}" title="{{ sk.tipLabel }}" aria-label="{{ sk.tipLabel }}">?</button></sc-if>
+                  <sc-if value="{{ sk.tipOpen }}"><div class="lm-skill-tip" role="note"><span class="lm-skill-tip-stat">{{ sk.stat }}</span>{{ sk.description }}</div></sc-if>
+                  </div>
                 </sc-for>
               </div>
             </sc-for>
@@ -563,10 +587,12 @@
                 <span class="col-span-2 text-[10px] text-cyber-muted">{{ w.type }}</span>
                 <span class="col-span-2 text-center text-[11px] text-cyber-bright font-bold">{{ w.dmgLabel }}</span>
                 <span class="col-span-1 text-center text-[10px] text-cyber-muted">{{ w.rofLabel }}</span>
-                <div class="col-span-2 text-center text-[11px] text-cyber-text">{{ w.ammoLabel }}</div>
+                <div class="col-span-2 text-center text-[11px] text-cyber-text" title="{{ w.ammoTypeLabel }}">{{ w.ammoLabel }}<div class="text-[8px] text-cyber-muted truncate">{{ w.ammoTypeLabel }}</div></div>
                 <div class="col-span-2 flex justify-center gap-1.5">
                   <button onClick="{{ w.attack }}" class="bg-cyber-cyan/20 border border-cyber-cyan/50 text-cyber-cyan text-[9px] uppercase px-2 py-1 hover:bg-cyber-cyan hover:text-black transition-all tracking-wider">{{ tx.attack }}</button>
                   <button onClick="{{ w.damage }}" class="bg-cyber-red/20 border border-cyber-red/50 text-cyber-red text-[9px] uppercase px-2 py-1 hover:bg-cyber-red hover:text-black transition-all tracking-wider">{{ tx.dmg }}</button>
+                  <sc-if value="{{ w.hasAmmunitionControl }}"><button onClick="{{ w.cycleAmmo }}" title="Escolher, trocar ou descarregar municao" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">MUN</button></sc-if>
+                  <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" title="Transferir municao do inventario" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">REC</button></sc-if>
                 </div>
               </div>
             </sc-for>
@@ -576,16 +602,24 @@
         </sc-if>
 
         <sc-if value="{{ sheetTabNotesExisting }}">
-          <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin:22px 0 8px;display:flex;align-items:center;gap:8px;">{{ tx.story }} <span style="flex:1;height:1px;background:rgba(214,170,78,0.15);"></span> <span style="color:#3fe0d0;">{{ sheetNotesAutosaveLabel }}</span></div>
+          <div class="lm-sheet-notes-title">{{ tx.story }} <span class="lm-sheet-rule"></span> <span class="lm-sheet-notes-autosave">{{ sheetNotesAutosaveLabel }}</span></div>
           <textarea value="{{ notesStory }}" onInput="{{ onNotesStory }}" placeholder="{{ tx.storyPlaceholder }}" class="lm-sheet-textarea"></textarea>
-          <div class="lm-sheet-edit-section-title">{{ tx.alliances }}</div>
-          <textarea value="{{ notesAlliances }}" onInput="{{ onNotesAlliances }}" placeholder="{{ tx.alliancesPlaceholder }}" class="lm-sheet-textarea lm-ui-textarea--detail"></textarea>
-          <div class="lm-sheet-edit-section-title">{{ tx.enemies }}</div>
-          <textarea value="{{ notesEnemies }}" onInput="{{ onNotesEnemies }}" placeholder="{{ tx.enemiesPlaceholder }}" class="lm-sheet-textarea lm-ui-textarea--detail"></textarea>
-          <div class="lm-sheet-edit-section-title">{{ tx.personalTraits }}</div>
-          <textarea value="{{ notesPersonalTraits }}" onInput="{{ onNotesPersonalTraits }}" placeholder="{{ tx.personalTraitsPlaceholder }}" class="lm-sheet-textarea lm-ui-textarea--detail"></textarea>
-          <div class="lm-sheet-edit-section-title">{{ tx.hobbies }}</div>
-          <textarea value="{{ notesHobbies }}" onInput="{{ onNotesHobbies }}" placeholder="{{ tx.hobbiesPlaceholder }}" class="lm-sheet-textarea lm-ui-textarea--detail"></textarea>
+          <label class="lm-sheet-note-field">
+            <div class="lm-sheet-edit-section-title">{{ tx.alliances }}</div>
+            <textarea value="{{ notesAlliances }}" onInput="{{ onNotesAlliances }}" placeholder="{{ tx.alliancesPlaceholder }}" class="lm-sheet-textarea lm-ui-textarea--detail"></textarea>
+          </label>
+          <label class="lm-sheet-note-field">
+            <div class="lm-sheet-edit-section-title">{{ tx.enemies }}</div>
+            <textarea value="{{ notesEnemies }}" onInput="{{ onNotesEnemies }}" placeholder="{{ tx.enemiesPlaceholder }}" class="lm-sheet-textarea lm-ui-textarea--detail"></textarea>
+          </label>
+          <label class="lm-sheet-note-field">
+            <div class="lm-sheet-edit-section-title">{{ tx.personalTraits }}</div>
+            <textarea value="{{ notesPersonalTraits }}" onInput="{{ onNotesPersonalTraits }}" placeholder="{{ tx.personalTraitsPlaceholder }}" class="lm-sheet-textarea lm-ui-textarea--detail"></textarea>
+          </label>
+          <label class="lm-sheet-note-field">
+            <div class="lm-sheet-edit-section-title">{{ tx.hobbies }}</div>
+            <textarea value="{{ notesHobbies }}" onInput="{{ onNotesHobbies }}" placeholder="{{ tx.hobbiesPlaceholder }}" class="lm-sheet-textarea lm-ui-textarea--detail"></textarea>
+          </label>
         </sc-if>
 
         <sc-if value="{{ sheetTabNetrunning }}">

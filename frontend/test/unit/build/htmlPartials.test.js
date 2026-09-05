@@ -14,7 +14,10 @@ describe('HTML partials', () => {
     expect(source.match(/@include frontend\/templates\/character-sheet-content\.html/g)).toHaveLength(2);
     expect(expanded).not.toContain('@include');
     expect(expanded.match(/data-limiar-skill-columns="edit"/g)).toHaveLength(2);
-    expect(expanded.match(/DOSSIER COMPLETO \/\/ STATUS OPERACIONAL/g)).toHaveLength(2);
+    // Two layouts, and inside each the CORE headings render twice: a foldable
+    // button for the GM and a plain title for the player.
+    expect(expanded.match(/DOSSIER COMPLETO \/\/ STATUS OPERACIONAL/g)).toHaveLength(4);
+    expect(expanded.match(/class="lm-sheet-fold"/g)).toHaveLength(8);
     expect(expanded.match(/NETRUNNING \/\/ INTERFACE/g)).toHaveLength(2);
     expect(expanded.match(/class="lm-core-attrs"/g)).toHaveLength(2);
   });

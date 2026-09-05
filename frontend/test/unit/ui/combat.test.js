@@ -126,6 +126,26 @@ describe('ui/views/combat combatRenderVals', () => {
     expect(vesperRow.netActions).toEqual({ isNetrunner: true, perTurn: 3 });
   });
 
+  it('shows toxin doses at qty 1 and exposes DV, damage, duration, condition, target, and delivery before confirmation', () => {
+    const alcohol = { id: 'dose-alcohol', name: 'Dose: Alcool', type: 'GEAR', qty: 1, toxinId: 'alcohol' };
+    const vals = combatRenderVals({
+      characters: [{ ...mira, gear: [alcohol] }, rook],
+      combatState: baseCombatState(),
+      toxins: [],
+      combatDosePending: { actorId: 'mira', itemId: alcohol.id, targetId: 'rook', delivery: 'injected' },
+    }, renderDeps());
+    const card = vals.combatRows.find(row => row.id === 'mira');
+
+    expect(card.utilityRows[0]).toMatchObject({ id: alcohol.id, isToxinDose: true, qtyLabel: '1' });
+    expect(card.hasDosePending).toBe(true);
+    expect(card.dosePending).toMatchObject({
+      toxinName: 'Alcool', dvLabel: 'DV 11', damageLabel: 'sem dano direto', durationLabel: '1 h',
+    });
+    expect(card.dosePending.conditionLabel).toContain('Embriagado');
+    expect(card.dosePending.targetOptions.find(option => option.id === 'rook').selected).toBe(true);
+    expect(card.dosePending.deliveryOptions.find(option => option.id === 'injected').selected).toBe(true);
+  });
+
   it('shows shield HP on combat cards and wires damage-to-shield for a shielded target', () => {
     const pistol = { id: 'pistol', name: 'Heavy Pistol', sides: 6, count: 3, skill: 'Handgun' };
     const shieldedRook = { ...rook, shield: { itemId: 'BULLETPROOF-SHIELD', hp: 6, maxHp: 10 } };
@@ -380,6 +400,47 @@ describe('ui/views/combat combatHandlers', () => {
     expect(component.stabilizeMortallyWounded).not.toHaveBeenCalled();
   });
 
+  it('stages a toxin dose without consuming it, then applies the selected exposure and consumes only on confirmation', () => {
+    const dose = { id: 'dose-arsenic', code: 'TOX-ARSENIC', name: 'Dose: Arsenico', type: 'GEAR', qty: 2, toxinId: 'arsenic' };
+    const actor = { ...mira, gear: [dose] };
+    const applyToxinExposure = vi.fn(() => ({ outcomes: [{ targetId: 'rook' }] }));
+    const component = fakeComponent({ state: { characters: [actor, rook], combatState: baseCombatState(), toxins: [] }, applyToxinExposure });
+    const h = combatHandlers(component);
+
+    h.useCombatUtility('mira', dose.id);
+    expect(component.state.combatDosePending).toMatchObject({ actorId: 'mira', itemId: dose.id, targetId: 'rook', delivery: 'ingested' });
+    expect(component.applyCharacterPatch).not.toHaveBeenCalled();
+    expect(applyToxinExposure).not.toHaveBeenCalled();
+
+    h.setCombatDoseField('targetId', 'rook');
+    h.setCombatDoseField('delivery', 'contact');
+    h.confirmCombatDose();
+
+    expect(applyToxinExposure).toHaveBeenCalledWith(expect.objectContaining({
+      toxin: expect.objectContaining({ id: 'arsenic', delivery: 'contact' }),
+      targetIds: ['rook'],
+      source: 'dose:TOX-ARSENIC',
+      persist: false,
+    }));
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', {
+      gear: [expect.objectContaining({ id: dose.id, qty: 1, lastUsedAt: expect.any(String) })],
+    });
+    expect(component.state.combatDosePending).toBeNull();
+  });
+
+  it('does not consume a toxin dose when exposure resolution is rejected', () => {
+    const dose = { id: 'dose-bad', name: 'Dose', type: 'GEAR', qty: 1, toxinId: 'arsenic' };
+    const component = fakeComponent({
+      state: { characters: [{ ...mira, gear: [dose] }, rook], combatState: baseCombatState(), toxins: [] },
+      applyToxinExposure: vi.fn(() => ({ error: 'Nenhum alvo selecionado' })),
+    });
+    const h = combatHandlers(component);
+    h.useCombatUtility('mira', dose.id);
+    h.confirmCombatDose();
+    expect(component.applyCharacterPatch).not.toHaveBeenCalled();
+    expect(component.state.combatDosePending).not.toBeNull();
+  });
+
   it('canRollCombatActor lets the GM roll for anyone but a player only for their own character', () => {
     const gm = combatHandlers(fakeComponent({ state: { gm: true, activeCharacterId: 'mira' } }));
     expect(gm.canRollCombatActor('rook')).toBe(true);
@@ -462,7 +523,7 @@ describe('ui/views/combat combatHandlers', () => {
     h.applyCombatShieldDamage('rook', 7);
 
     const updated = component.state.characters.find(c => c.id === 'rook');
-    expect(updated.shield).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 0, maxHp: 10 });
+    expect(updated.shield).toBeNull();
     expect(updated.health).toEqual({ cur: 35, max: 45 });
     expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('EXCESSO 3') }));
   });
@@ -671,7 +732,7 @@ describe('ui/views/combat combatHandlers', () => {
   });
 
   // --- CM0: weapon magazine ammo ---
-  it('rollCombatAttack spends ammo on fire and warns (without blocking) when the mag is empty', () => {
+  it('rollCombatAttack spends ammo on fire and blocks when the mag is empty', () => {
     const gunner = { ...mira, gear: [{ id: 'pistol', name: 'Heavy Pistol', skill: 'Handgun', magazine: 8, currentAmmo: 1 }] };
     const component = fakeComponent({
       state: { characters: [gunner, rook], gm: true, activeCharacterId: 'mira' },
@@ -691,10 +752,9 @@ describe('ui/views/combat combatHandlers', () => {
     });
     const emptyHandlers = combatHandlers(emptyComponent);
     emptyHandlers.rollCombatAttack('mira', empty);
-    // Advisory: the roll still happens even at 0 ammo, with a warning line.
-    expect(emptyComponent.roll).toHaveBeenCalled();
-    expect(emptyComponent.roll.mock.calls[0][0].breakdown.some(line => line.includes('SEM MUNICAO'))).toBe(true);
-    expect(emptyComponent.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...empty, currentAmmo: 0 }] });
+    expect(emptyComponent.roll).not.toHaveBeenCalled();
+    expect(emptyComponent.flash).toHaveBeenCalledWith(expect.stringContaining('Municao insuficiente'), 3200);
+    expect(emptyComponent.applyCharacterPatch).not.toHaveBeenCalled();
   });
 
   it('rollCombatAttack does not touch ammo for melee/exotic gear without a magazine', () => {
@@ -708,21 +768,100 @@ describe('ui/views/combat combatHandlers', () => {
     expect(component.applyCharacterPatch).not.toHaveBeenCalled();
   });
 
-  it('reloadWeapon refills to the magazine and is gated to the owner or GM', () => {
-    const weapon = { id: 'pistol', name: 'Heavy Pistol', magazine: 8, currentAmmo: 2 };
+  it('reloadWeapon transfers compatible inventory ammunition and is gated to the owner or GM', () => {
+    const weapon = { id: 'pistol', name: 'Heavy Pistol', magazine: 8, currentAmmo: 2, ammoType: 'H Pistol' };
+    const ammo = { id: 'ammo', code: 'AMMO-H-PISTOL', name: 'Heavy Pistol Ammunition', category: 'AMMUNITION', ammoType: 'H Pistol', qty: 10 };
     const component = fakeComponent({
-      state: { characters: [{ ...mira, gear: [weapon] }, rook], gm: false, activeCharacterId: 'mira' },
+      state: { characters: [{ ...mira, gear: [weapon, ammo] }, rook], gm: false, activeCharacterId: 'mira' },
       normalizeGearList: (gear) => gear,
     });
     const h = combatHandlers(component);
 
     h.reloadWeapon('mira', 'pistol');
-    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...weapon, currentAmmo: 8 }] });
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [
+      { ...weapon, currentAmmo: 8, loadedAmmoCode: 'AMMO-H-PISTOL', loadedAmmoType: 'H Pistol' },
+      { ...ammo, qty: 4 },
+    ] });
 
     component.applyCharacterPatch.mockClear();
     h.reloadWeapon('rook', 'pistol');
     expect(component.applyCharacterPatch).not.toHaveBeenCalled();
     expect(component.flash).toHaveBeenCalled();
+  });
+
+  it('cycleWeaponAmmo unloads the magazine and recovers its rounds in inventory', () => {
+    const weapon = { id: 'shotgun', name: 'Shotgun', magazine: 4, currentAmmo: 3, ammoType: 'Slug', loadedAmmoCode: 'AMMO-SLUG' };
+    const slugs = { id: 'slugs', code: 'AMMO-SLUG', name: 'Slugs', category: 'AMMUNITION', ammoType: 'Slug', qty: 2 };
+    const shells = { id: 'shells', code: 'AMMO-SHELL', name: 'Shells', category: 'AMMUNITION', ammoType: 'Shell', qty: 5 };
+    const component = fakeComponent({
+      state: { characters: [{ ...mira, gear: [weapon, slugs, shells] }, rook], gm: false, activeCharacterId: 'mira' },
+      normalizeGearList: (gear) => gear,
+    });
+
+    combatHandlers(component).cycleWeaponAmmo('mira', 'shotgun');
+
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [
+      { ...weapon, currentAmmo: 0, loadedAmmoCode: 'AMMO-SHELL', loadedAmmoType: 'Shell' },
+      { ...slugs, qty: 5 },
+      shells,
+    ] });
+  });
+
+  it('cycleWeaponAmmo only offers ammunition that exists with stock in the character inventory', () => {
+    const bow = { id: 'bow', name: 'Bow', ammoType: 'Arrow' };
+    const poison = { id: 'poison', code: 'AMMO-POISON', name: 'Poison Arrow', category: 'AMMUNITION', ammoType: 'Toxin', toxinAmmo: true, qty: 0 };
+    const biotoxin = { id: 'bio', code: 'AMMO-BIOTOXIN', name: 'Biotoxin Arrow', category: 'AMMUNITION', ammoType: 'Toxin', toxinAmmo: true, qty: 2 };
+    const component = fakeComponent({
+      state: { characters: [{ ...mira, gear: [bow, poison, biotoxin] }, rook], gm: false, activeCharacterId: 'mira' },
+      normalizeGearList: (gear) => gear,
+    });
+
+    combatHandlers(component).cycleWeaponAmmo('mira', 'bow');
+
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [
+      { ...bow, currentAmmo: undefined, loadedAmmoCode: 'AMMO-BIOTOXIN', loadedAmmoType: 'Toxin' },
+      poison,
+      biotoxin,
+    ] });
+  });
+
+  it('a toxic arrow requires inventory stock, consumes one on attack, and routes damage to the toxin engine', () => {
+    const bow = { id: 'bow', name: 'Bow', skill: 'Archery', ammoType: 'Arrow', loadedAmmoCode: 'AMMO-POISON' };
+    const poison = { id: 'poison', code: 'AMMO-POISON', name: 'Poison Arrow', category: 'AMMUNITION', ammoType: 'Toxin', toxinAmmo: true, qty: 1 };
+    const maybeApplyToxinAmmo = vi.fn();
+    const component = fakeComponent({
+      state: { characters: [{ ...mira, gear: [bow, poison] }, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState() },
+      normalizeGearList: (gear) => gear,
+      maybeApplyToxinAmmo,
+    });
+    const h = combatHandlers(component);
+
+    h.rollCombatAttack('mira', bow);
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [bow, { ...poison, qty: 0 }] });
+
+    const damageComponent = fakeComponent({
+      state: { characters: [{ ...mira, gear: [bow, poison] }, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState() },
+      normalizeGearList: (gear) => gear,
+      maybeApplyToxinAmmo,
+    });
+    const damageHandlers = combatHandlers(damageComponent);
+    expect(damageHandlers.combatTargetFor('mira')).toBe('rook');
+    damageHandlers.autoApplyCombatDamage('mira', bow, { total: 12 });
+    expect(maybeApplyToxinAmmo).toHaveBeenCalledWith(bow, 'rook');
+  });
+
+  it('blocks a bow whose selected toxic ammunition is absent from inventory', () => {
+    const bow = { id: 'bow', name: 'Bow', skill: 'Archery', ammoType: 'Arrow', loadedAmmoCode: 'AMMO-POISON' };
+    const component = fakeComponent({
+      state: { characters: [{ ...mira, gear: [bow] }, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState() },
+      normalizeGearList: (gear) => gear,
+    });
+
+    combatHandlers(component).rollCombatAttack('mira', bow);
+
+    expect(component.roll).not.toHaveBeenCalled();
+    expect(component.flash).toHaveBeenCalledWith(expect.stringContaining('Municao insuficiente'), 3200);
+    expect(component.applyCharacterPatch).not.toHaveBeenCalled();
   });
 
   // --- CM2: evasion as a prompt (G7) ---

@@ -104,6 +104,15 @@ As verificações são políticas do projeto, não obstáculos a serem contornad
 - Mudanças de regra devem usar o vocabulário do domínio e incluir testes de
   exemplos, invariantes e falhas relevantes.
 
+## Testes manuais na aplicação
+
+- Teste exploratório na UI roda em `./run-test.sh` (porta 8766, banco tmpfs,
+  uploads em `tmp/livetest-uploads/`), nunca em `./run-local.sh`.
+- `run-local.sh` serve o banco de desenvolvimento real: fichas, campanhas e
+  fotos criadas ali sobrevivem ao teste e aparecem para os jogadores.
+- Se um teste precisar do banco de desenvolvimento, diga isso antes e limpe as
+  linhas criadas ao terminar.
+
 ## Segredos, dados e artefatos
 
 - Nunca leia, imprima, versione ou transmita secrets além do estritamente

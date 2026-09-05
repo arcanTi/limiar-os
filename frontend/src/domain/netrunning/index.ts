@@ -5,15 +5,22 @@
 import { CPRED_NETRUNNING_ABILITIES } from './constants.ts';
 import type { NetInterfaceAbility } from './constants.ts';
 export {
+  BREACH_CONNECTIONS,
   BREACH_TIERS,
+  breachConnectionOptions,
+  breachTierForDv,
   breachTierOptions,
   buildBreachConfig,
+  normalizeBreachConnection,
   normalizeBreachTier,
 } from './breachConfigEngine.ts';
 export type {
   BreachConfig,
+  BreachConnection,
+  BreachConnectionId,
   BreachPrepAbilityId,
   BreachPrepResult,
+  BreachRunInput,
   BreachTier,
   BreachTierId,
 } from './breachConfigEngine.ts';

@@ -6,6 +6,7 @@ to ROOT, but ROOT is the project directory, so an unauthenticated
 session tokens included.
 """
 
+import backend.static_files as static_files
 from backend.config import INDEX_FILE, ROOT
 from backend.static_files import servable_path
 
@@ -65,3 +66,17 @@ def test_percent_encoded_index_resolves():
 def test_query_string_does_not_defeat_the_allowlist():
     assert resolve("/data/limiar.db?x=1") is None
     assert resolve("/dist/assets/limiar-app.js?v=2") == ROOT / "dist" / "assets" / "limiar-app.js"
+
+
+def test_uploads_resolve_against_a_relocated_upload_dir(tmp_path, monkeypatch):
+    # run-test.sh points LIMIAR_UPLOAD_DIR at a throwaway directory so a live
+    # test cannot write into the real uploads/; serving has to follow it there.
+    monkeypatch.setattr(static_files, "UPLOAD_DIR", tmp_path)
+    assert resolve("/uploads/portrait.png") == tmp_path / "portrait.png"
+
+
+def test_traversal_out_of_a_relocated_upload_dir_is_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(static_files, "UPLOAD_DIR", tmp_path)
+    assert resolve("/uploads/../../etc/passwd") is None
+    assert resolve("/uploads/%2e%2e/data/limiar.db") is None
+    assert resolve("/uploads/") is None

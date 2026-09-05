@@ -23,6 +23,20 @@ describe('domain/items/weaponProfileEngine', () => {
       expect(profile).toMatchObject({ count: 2, sides: 6, mod: 0, dmg: '2d6', skill: 'Handgun', hands: 1 });
     });
 
+    it('reads the catalog spellings damage/magazine, not just dmg/mag', () => {
+      // Catalog rows carry `damage`/`magazine`; only saved instances use the
+      // short names. Reading one spelling left every catalog weapon with no
+      // dice and no magazine, which is how a gear row saved as a bare code
+      // exported with an empty DANO column.
+      const profile = weaponProfile({ code: 'ASSAULT-RIFLE', damage: '5d6', magazine: 25, skill: 'Shoulder Arms' });
+      expect(profile).toMatchObject({ dmg: '5d6', count: 5, sides: 6, mag: 25 });
+    });
+
+    it('lets the instance spellings win over the catalog ones', () => {
+      const profile = weaponProfile({ dmg: '3d6', damage: '5d6', mag: 8, magazine: 25 });
+      expect(profile).toMatchObject({ dmg: '3d6', mag: 8 });
+    });
+
     it('reads count/sides/skill straight off the seed catalog entry (Wolvers already has its own fields)', () => {
       const wolvers = seedItem('WOLVERS');
       const profile = weaponProfile(wolvers);

@@ -5,7 +5,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
-UPLOAD_DIR = ROOT / "uploads"
+# Where uploaded assets are written and served from. Overridable so a throwaway
+# run (run-test.sh) keeps its portraits out of the real `uploads/` directory;
+# it may point outside ROOT, which is why `static_files` resolves `/uploads/`
+# against this value instead of against ROOT.
+UPLOAD_DIR = Path(
+    os.environ.get("LIMIAR_UPLOAD_DIR", "").strip() or (ROOT / "uploads")
+).expanduser().resolve()
 DATABASE_URL = os.environ.get("LIMIAR_DATABASE_URL", "").strip()
 POSTGRES_SCHEMA_PATH = ROOT / "backend" / "sql" / "postgres.sql"
 SEED_PATH = DATA_DIR / "seed" / "limiar-seed.json"

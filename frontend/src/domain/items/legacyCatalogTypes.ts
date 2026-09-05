@@ -17,8 +17,10 @@ export interface LegacyArmorSpec {
 
 export interface LegacyWeaponMode {
   mode?: string;
+  name?: string;
   damage?: string;
   ammoCost?: number;
+  attachmentCode?: string;
   [extra: string]: unknown;
 }
 
@@ -53,6 +55,7 @@ export interface LegacyCatalogItem {
   quality?: string | null;
   exotic?: boolean;
   attachmentSlots?: number | null;
+  slotsRequired?: number | null;
   rangeTable?: string | null;
   autofire?: { enabled: boolean; multiplier?: number } | null;
   suppressiveFire?: boolean;
@@ -110,6 +113,7 @@ export interface LegacyCatalogItem {
   balanceNotes?: string[] | string;
   weaponModes?: LegacyWeaponMode[];
   installedAttachments?: string[];
+  attachmentEffects?: { sourceCode?: string; type?: string; value?: unknown }[];
   armor?: LegacyArmorSpec;
   shieldHp?: number;
   maxHp?: number;

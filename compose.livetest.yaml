@@ -1,0 +1,33 @@
+# Throwaway PostgreSQL for hands-on testing of the running app (run-test.sh).
+#
+# Separate from compose.test.yaml on purpose: that one belongs to the pytest
+# suite and is torn down at the end of every run, while this one has to stay up
+# for as long as a person is clicking around the UI. Different project name,
+# different port, so a `pytest` run and a live test never fight over a database.
+#
+# Storage is tmpfs: the data dies with the container, which is the point — a
+# live test must never be able to leave rows behind.
+name: limiar-os-livetest
+
+services:
+  postgres-livetest:
+    image: postgres:18.4-trixie@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+    environment:
+      POSTGRES_DB: limiar_livetest
+      POSTGRES_USER: limiar_livetest
+      POSTGRES_PASSWORD: limiar_livetest_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "127.0.0.1:55434:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U limiar_livetest -d limiar_livetest"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"

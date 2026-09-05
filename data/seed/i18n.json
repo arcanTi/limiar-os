@@ -145,6 +145,14 @@
     "cancel": "CANCEL",
     "story": "STORY",
     "storyPlaceholder": "Origin, goal, debt/problem, allies, enemies, style signature...",
+    "alliances": "ALLIANCES",
+    "alliancesPlaceholder": "Who owes you one: fixer, gang, corp, family. Name plus what they actually do for you.",
+    "enemies": "ENEMIES",
+    "enemiesPlaceholder": "Who hunts you and why: name, faction, what happened between you, what they want now.",
+    "personalTraits": "PERSONAL TRAITS",
+    "personalTraitsPlaceholder": "How you behave under pressure: habits, moral code, the one thing you would never do.",
+    "hobbies": "HOBBIES & ROUTINE",
+    "hobbiesPlaceholder": "Life outside the job: the regular bar, music, your ride, a vice, where you sleep.",
     "level": "LEVEL",
     "credits": "CREDITS",
     "current": "CURRENT",
@@ -266,7 +274,12 @@
     "npcArmor": "ARMOR",
     "blockedNotice": "WHY THIS IS LOCKED",
     "blockedRequirement": "REQUIREMENT NOT MET",
-    "requirementPending": "REQUIREMENT PENDING"
+    "requirementPending": "REQUIREMENT PENDING",
+    "balanceAfterPurchase": "Balance after purchase:",
+    "perPack": "PER PACK",
+    "sp": "SP",
+    "armorPenalty": "ARMOR PENALTY",
+    "noPenalty": "NONE"
   },
   "pt": {
     "desktop": "DESKTOP",
@@ -414,6 +427,14 @@
     "cancel": "CANCELAR",
     "story": "HISTORIA",
     "storyPlaceholder": "Origem, objetivo, divida/problema, aliados, inimigos, estilo...",
+    "alliances": "ALIANCAS",
+    "alliancesPlaceholder": "Quem te deve favor: fixer, gangue, corpo, familia. Nome + o que fazem por voce.",
+    "enemies": "INIMIGOS",
+    "enemiesPlaceholder": "Quem te caca e por que: nome, faccao, o que aconteceu entre voces, o que querem agora.",
+    "personalTraits": "TRACOS PESSOAIS",
+    "personalTraitsPlaceholder": "Como voce age sob pressao: manias, codigo moral, a unica coisa que nunca faria.",
+    "hobbies": "HOBBIES E ROTINA",
+    "hobbiesPlaceholder": "Vida fora do trabalho: o bar de sempre, musica, seu veiculo, um vicio, onde dorme.",
     "level": "NIVEL",
     "credits": "CREDITOS",
     "current": "ATUAL",
@@ -535,6 +556,11 @@
     "npcArmor": "ARMADURA",
     "blockedNotice": "POR QUE NAO DA PARA INSTALAR",
     "blockedRequirement": "REQUISITO NAO CUMPRIDO",
-    "requirementPending": "REQUISITO PENDENTE"
+    "requirementPending": "REQUISITO PENDENTE",
+    "balanceAfterPurchase": "Saldo apos comprar:",
+    "perPack": "POR PACOTE",
+    "sp": "SP",
+    "armorPenalty": "PENALIDADE",
+    "noPenalty": "NENHUMA"
   }
 }
