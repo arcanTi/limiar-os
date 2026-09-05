@@ -1,0 +1,77 @@
+name: Relatar um defeito
+description: Informe um comportamento incorreto e reproduzível no Limiar OS.
+title: "[Bug]: "
+labels: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado pelo relato. Não publique vulnerabilidades ou dados sensíveis aqui; use a Política de Segurança.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verificações iniciais
+      options:
+        - label: Procurei issues existentes e não encontrei uma equivalente.
+          required: true
+        - label: Removi credenciais, dados pessoais e informações privadas do relato.
+          required: true
+        - label: Este relato não descreve uma vulnerabilidade de segurança.
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área afetada
+      options:
+        - Backend ou API
+        - Frontend ou ficha
+        - Mapa ou combate
+        - Catálogos ou regras do domínio
+        - Infraestrutura ou CI
+        - Documentação
+        - Outra
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Comportamento atual
+      description: Descreva objetivamente o que aconteceu.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      description: Inclua estado inicial, ações e dados mínimos necessários.
+      placeholder: |
+        1. Inicie uma campanha...
+        2. Execute...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento esperado
+      description: Explique qual resultado deveria ocorrer e, se aplicável, a regra do domínio envolvida.
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Versão ou commit
+      description: Informe o hash do commit, branch ou versão utilizada.
+      placeholder: main @ 782be9a
+  - type: textarea
+    id: environment
+    attributes:
+      label: Ambiente
+      description: Sistema operacional, navegador, Python, Node, Docker e PostgreSQL relevantes.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidências adicionais
+      description: Logs sanitizados, capturas de tela ou exemplos mínimos. Arraste arquivos para anexá-los.
+      render: shell

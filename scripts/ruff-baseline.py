@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Trava o numero de achados do ruff para que a divida pare de crescer.
 
-O projeto carrega 330 achados (a maioria E501). Ligar o ruff em modo bloqueante
-pararia todo commit ate que os 330 fossem resolvidos, e congelar sem medir
-deixaria a divida crescer em silencio — foi o que aconteceu: o comentario no
-`.github/workflows/ci.yml` falava em 233 achados quando o numero real ja era 330.
+O projeto ainda carrega achados preexistentes, registrados em
+`scripts/ruff-baseline.json`. Ligar o ruff em modo bloqueante pararia todo
+commit ate que fossem resolvidos, e congelar sem medir deixaria a divida crescer
+em silencio.
 
 Este script compara a contagem atual com a baseline versionada:
 

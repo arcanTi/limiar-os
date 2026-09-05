@@ -16,6 +16,10 @@ __pycache__/
 tmp/
 .pytest_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+coverage.json
+coverage.xml
 .vite/
 .docx-qa/
 

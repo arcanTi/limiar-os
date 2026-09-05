@@ -388,7 +388,7 @@ def test_campaign_event_service_authorizes_and_hides_adapters():
         "remember": 0,
         "expires_at": now + timedelta(days=1),
     }})
-    sessions = SessionService(identity, 3600, 7200, 300)
+    sessions = SessionService(identity, 3600, 7200, 300, clock=lambda: now)
 
     class Campaigns:
         @staticmethod

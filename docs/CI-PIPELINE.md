@@ -1,69 +1,78 @@
-# Pipeline de pull request do Limiar OS
+# Pipeline CI/CD do Limiar OS
 
-Este documento descreve os gates executados para cada pull request e para
-pushes nas branches protegidas. A pipeline foi desenhada para reproduzir o
-ambiente de producao: Python 3.13, Node.js 22 e PostgreSQL 18.
+Este documento descreve os gates executados em pull requests, a publicacao da
+imagem aprovada e o deploy na VM Linux de producao.
 
 ## Objetivos
 
-- impedir que arquivos locais, gerados ou sensiveis entrem no Git;
+- impedir arquivos locais, gerados ou sensiveis no Git;
 - detectar cruzamentos indevidos entre camadas;
 - validar backend e migrations em PostgreSQL real;
-- validar regras canonicas, testes, tipos e build frontend;
-- construir a mesma imagem usada em producao;
-- iniciar a imagem e provar as superficies HTTP principais;
-- cancelar execucoes antigas quando um novo commit chega ao mesmo PR.
+- validar dominio canonico, testes, tipos e build frontend;
+- instalar dependencias Python e npm de forma reproduzivel;
+- analisar dependencias e codigo para vulnerabilidades;
+- testar a mesma imagem que sera publicada;
+- publicar por digest imutavel e atestar sua procedencia;
+- exigir aprovacao antes do deploy e manter um caminho de rollback.
 
-## Quando a CI executa
+## Eventos
 
-O workflow `.github/workflows/ci.yml` executa em:
+`.github/workflows/ci.yml` executa em todo pull request para `main` e em todo
+push na `main`. Runs antigos de um mesmo PR sao cancelados; runs da `main` nao
+sao cancelados porque podem conter um deploy em andamento.
 
-- todo `pull_request`;
-- push em `main`;
-- push em `codex/clean-foundation` durante a troca da fundacao Git.
+`.github/workflows/security.yml` executa CodeQL em pull requests, pushes na
+`main` e semanalmente.
 
-Depois que a branch limpa se tornar a branch principal, o trigger temporario de
-`codex/clean-foundation` pode ser removido.
+## Reprodutibilidade
+
+As dependencias diretas ficam em `requirements.in` e `requirements-dev.in`. Os
+arquivos `requirements.txt` e `requirements-dev.txt` sao locks completos,
+gerados em Python 3.13 com hashes obrigatorios.
+
+Para atualizar os locks no mesmo Linux usado em producao:
+
+```bash
+./scripts/compile-python-locks.sh
+```
+
+O gate de higiene regenera os dois arquivos e exige diff vazio. Resolver no
+macOS nao e equivalente: dependencias condicionais de plataforma podem sumir
+do lock Linux.
+
+Actions usam SHAs completos e imagens Docker usam digests. Os comentarios de
+versao continuam permitindo que o Dependabot proponha atualizacoes legiveis.
 
 ## Gate 1 — Repository hygiene
 
-O job mais curto roda primeiro e falha quando encontra:
-
-- paths do Claude ou de outros assistentes;
-- `.env` real;
-- banco local ou backup de banco;
-- `node_modules`, `dist`, `uploads` ou `graphify-out` versionados;
-- bytecode/cache;
-- arquivos maiores que 10 MiB;
-- arquivo simultaneamente rastreado e ignorado;
-- marcadores de conflito;
-- whitespace invalido detectado por `git diff --check`.
-
-Comando local:
+O job recusa paths de assistentes, `.env`, bancos, dependencias instaladas,
+artefatos gerados, caches, arquivos acima de 10 MiB, paths rastreados e
+ignorados, marcadores de conflito e whitespace invalido.
 
 ```bash
 python3 scripts/check-repository-hygiene.py
 git diff --check
 ```
 
-O `.claude/` permanece no `.gitignore` como barreira preventiva. O diretorio e
-seu conteudo nao pertencem ao produto e o gate recusa qualquer path desse tipo
-que seja rastreado.
+## Gate 2 — Dependency review
 
-## Gate 2 — Backend
+Em pull requests, o GitHub compara o grafo de dependencias e bloqueia novas
+vulnerabilidades de severidade moderada ou superior. Dependabot continua
+abrindo PRs semanais para Actions, npm, pip e Docker.
 
-O GitHub Actions cria um PostgreSQL 18.4 vazio e instala as dependencias em
-Python 3.13.
+## Gate 3 — Backend
 
-Ordem:
+O job usa Python 3.13 e PostgreSQL 18.4:
 
-1. `alembic upgrade head` prova uma instalacao vazia;
-2. `scripts/check-architecture.py` verifica a direcao das dependencias;
-3. `scripts/ruff-baseline.py` impede crescimento da divida Ruff;
-4. pytest executa toda a suite backend;
-5. `LIMIAR_FAIL_ON_SKIP=1` transforma qualquer skip em falha.
+1. instala o lock com `--require-hashes` e roda `pip check`;
+2. prova `alembic upgrade head` em banco vazio;
+3. verifica fronteiras arquiteturais;
+4. impede crescimento da baseline Ruff;
+5. executa os 127 testes sem skips;
+6. coleta cobertura de todo `backend/` e publica o JSON por sete dias.
 
-Comando local equivalente, usando o container PostgreSQL de teste:
+O primeiro run com cobertura estabelece o valor real. Um piso bloqueante deve
+ser adicionado depois de revisar esse resultado, nunca estimado.
 
 ```bash
 ./scripts/test-backend-postgres.sh
@@ -71,128 +80,102 @@ python3 scripts/check-architecture.py
 python3 scripts/ruff-baseline.py
 ```
 
-## Gate 3 — Frontend e dominio canonico
+## Gate 4 — Frontend e dominio canonico
 
-O job usa Node.js 22 e instala exatamente `frontend/package-lock.json` com
-`npm ci`.
-
-Ordem:
-
-1. auditoria deterministica do catalogo;
-2. verificadores de armas, cyberware, efeitos, criticos, combate, REDmas e
-   homebrew;
-3. Vitest;
-4. cobertura com os pisos atuais;
-5. TypeScript strict;
-6. build Vite das tres entradas;
-7. upload do resumo de cobertura por sete dias.
-
-Comando local:
+O job instala `frontend/package-lock.json`, verifica catalogos canonicos, roda a
+suite Vitest com os pisos de cobertura, executa TypeScript strict e constroi as
+tres entradas Vite. `test:coverage` ja executa a suite inteira; ela nao e
+duplicada com `npm test` na CI.
 
 ```bash
 cd frontend
 npm ci
 npm run test:catalog
-npm test
 npm run test:coverage
 npm run typecheck
 npm run build
 ```
 
-Os verificadores de catalogo sao executados por `tsx`, fixado no lockfile. Isso
-permite importar os modulos TypeScript atuais e respeitar o alias `@seed`, sem
-manter copias `.js` aposentadas.
+## Gate 5 — Container build and smoke
 
-## Gate 4 — Container build and smoke
+Somente depois dos gates anteriores, a CI:
 
-Este job so inicia depois de hygiene, backend e frontend passarem.
+1. constroi a imagem multi-stage com bases fixadas por digest;
+2. inicia PostgreSQL em rede isolada;
+3. inicia a aplicacao como usuario nao-root;
+4. aguarda `/api/health`, que consulta PostgreSQL;
+5. verifica `/`, `/login.html` e `/campaign-map.html`;
+6. sempre publica logs e remove os containers temporarios.
 
-Etapas:
+Em pull requests o fluxo termina aqui. Em push na `main`, o mesmo job autentica
+no GHCR somente depois do smoke, publica exatamente a imagem testada com a tag
+do commit e `main`, resolve o digest e gera uma atestacao de procedencia.
 
-1. construir `Dockerfile` multi-stage;
-2. criar uma rede Docker isolada;
-3. iniciar PostgreSQL 18.4;
-4. aguardar `pg_isready`;
-5. iniciar a imagem do Limiar OS;
-6. aguardar `/api/health`;
-7. verificar `/`, `/login.html` e `/campaign-map.html`;
-8. publicar logs no job mesmo em falha;
-9. remover containers e rede em qualquer resultado.
+## Gate 6 — CodeQL
 
-Esse gate prova em conjunto:
+O workflow de seguranca analisa Python e JavaScript/TypeScript. Os resultados
+aparecem na aba Security e nos checks do pull request.
 
-- build frontend dentro do Docker;
-- instalacao das dependencias Python;
-- migrations no startup;
-- criacao do usuario inicial;
-- conexao real com PostgreSQL;
-- configuracao de static files;
-- processo rodando como usuario nao-root.
+## Deploy de producao
 
-## Dependencias
+O job `Deploy · Proxmox VM` recebe do job de container uma referencia
+`ghcr.io/...@sha256:...`; referencias mutaveis sao rejeitadas. O job usa o
+ambiente protegido `production`, copia os manifests por SSH com host key
+estrita e executa o runbook documentado em
+[Deploy em VM Proxmox](DEPLOY-PROXMOX-VM.md).
 
-`.github/dependabot.yml` abre PRs semanais separados para:
+## Protecao obrigatoria da main
 
-- GitHub Actions;
-- npm;
-- pip;
-- Docker.
-
-Esses PRs passam pelos mesmos quatro gates. Alertas novos nao alteram
-silenciosamente as versoes do projeto.
-
-## Protecao recomendada da branch principal
-
-Depois da fundacao limpa ser publicada:
+O ruleset deve:
 
 1. exigir pull request;
-2. exigir os checks `Repository hygiene`, `Backend`, `Frontend` e
-   `Container build and smoke`;
-3. exigir branch atualizada antes do merge;
-4. bloquear force-push;
-5. bloquear exclusao da branch principal;
+2. exigir branch atualizada;
+3. exigir os checks:
+   - `Repository hygiene`;
+   - `Dependency review`;
+   - `Backend · Python 3.13 · PostgreSQL 18`;
+   - `Frontend · Node 22`;
+   - `Container build and smoke`;
+   - `CodeQL · python`;
+   - `CodeQL · javascript-typescript`;
+4. bloquear force-push e exclusao;
+5. exigir resolucao de conversas;
 6. usar squash merge;
-7. exigir resolucao de conversas;
-8. apagar branches integradas automaticamente.
+7. apagar branches integradas automaticamente.
 
-## Particularidade da branch sem historico
+Em um projeto com apenas um mantenedor, exigir PR e checks sem aprovacao externa
+evita bloquear todo merge. Ao adicionar outro mantenedor, passe a exigir uma
+aprovacao e descarte aprovacoes antigas quando novos commits forem enviados.
 
-`codex/clean-foundation` possui um commit-raiz sem parent. Por isso ela nao pode
-ser integrada ao `main` historico por merge normal sem reintroduzir o historico
-antigo como outro parent.
+## Diagnostico
 
-O corte deve seguir uma destas operacoes administrativas:
+### Lock Python falhou
 
-1. tornar `codex/clean-foundation` a nova branch default; ou
-2. substituir `main` pela branch limpa com force-push deliberado.
-
-A segunda opcao exige autorizacao explicita, aviso a todos os clones e nova
-configuracao das protecoes. Ate essa decisao, o workflow valida pushes na branch
-limpa sem tocar no `origin/main`.
-
-## Diagnostico de falhas
-
-### Hygiene falhou
-
-Execute o script local e remova o path apontado do indice. Nao adicione uma
-excecao sem documentar por que o arquivo faz parte do produto.
+Altere o arquivo `.in`, regenere ambos os locks em Python 3.13 e versione a
+intencao e o resultado juntos. Nao edite pins transitivos manualmente.
 
 ### Backend falhou antes dos testes
 
-Se Alembic falhar, o schema nao pode ser criado do zero. Corrija a migration;
-nao prepare o banco manualmente no workflow.
+Se Alembic falhar, o schema nao nasce do zero. Corrija a migration; nao prepare
+o banco manualmente no workflow.
 
 ### Catalog audit alterou o working tree
 
-O catalogo e o relatorio estao divergentes. Revise a mudanca gerada e versione
-o relatorio correto junto da alteracao canonica.
+O catalogo e o relatorio divergiram. Revise e versione o relatorio correto com
+a mudanca canonica.
 
 ### Coverage falhou
 
-Uma alteracao reduziu um dos pisos globais. Adicione testes que exercitem o
-novo comportamento. Abaixar o piso requer decisao arquitetural explicita.
+Adicione testes que exercitem o comportamento novo. Abaixar um piso exige uma
+decisao explicita e justificativa no pull request.
 
 ### Smoke falhou
 
-Os logs do app e do PostgreSQL aparecem sempre no final do job. Reproduza com
-`docker build` e `docker run`; nao considere o build isolado prova de startup.
+Consulte os logs de app e PostgreSQL anexados ao job. Um `docker build` isolado
+nao prova startup, migrations, static files ou banco.
+
+### Deploy falhou
+
+O workflow mantem o backup pre-migration e tenta restaurar a imagem anterior se
+o health check interno falhar. Consulte o job, os logs na VM e o runbook antes
+de tentar novamente. Nunca restaure banco automaticamente.
