@@ -27,6 +27,12 @@ import {
   programRunModifiers,
 } from '../../domain/netrunning/index.ts';
 import { ipCost as econIpCost, ipRoleCost as econIpRoleCost, formatIpLogRows as econFormatIpLogRows } from '../../domain/economy/index.ts';
+import { mountOnboardingWizard } from './onboarding.js';
+import { BODY_TYPES as TOXIN_BODY_TYPES } from '../../domain/toxins/index.ts';
+import { characterEffectDigest } from '../../domain/effects/index.ts';
+import { effectPresetCatalog } from '../../domain/effects/customEffects.ts';
+import { uploadedPortrait } from '../../domain/character/portrait.ts';
+import { tableSeats } from '../../domain/campaigns/tableSeats.ts';
 
 // SYS.01 // CHARACTER: the sheet drawer — core stats, skills, conditions,
 // IP purchases, installed chrome, trauma team coverage, and the
@@ -43,9 +49,10 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const eff = deps.eff;
 
   const isPlayer = !!(S.authUser && S.authUser.role === 'player');
+  const sessionUsername = (S.authUser && S.authUser.username) || '';
+  const cleanTableName = (name) => String(name || '').trim().toUpperCase() || 'MESA SEM NOME';
   const canEditSheet = (S.gmAuthenticated && S.gm) || isPlayer;
   const canSaveSheet = canEditSheet || (S.sheetEditing && S.sheetCreating && !S.gmAuthenticated);
-  const canPlayerCreateSheet = S.sheetEditing && S.sheetCreating && !S.gmAuthenticated && S.authAuthenticated;
 
   const sheetDraft = S.sheetDraft || deps.sheetDraftFrom(activeCharacter);
   const updateSheetField = (key, value) => deps.setState(s => {
@@ -160,7 +167,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const isNetrunner = String(activeCharacter.role || '').toUpperCase() === 'NETRUNNER';
   const netrunnerRank = deps.asNumber(activeCharacter.roleAbilityRank, 0, 0, 10);
   const showNetrunningTab = isNetrunner && netrunnerRank > 0;
-  const sheetTabKeys = ['core', 'skills', 'conditions', 'ip', 'chrome', 'netrunning', 'notes'];
+  const sheetTabKeys = ['core', 'skills', 'conditions', 'ip', 'achievements', 'chrome', 'netrunning', 'notes'];
   const sheetTab = sheetTabKeys.includes(S.sheetTab) ? S.sheetTab : 'core';
   const sheetTabStyle = (active) => 'tab-btn text-[11px] uppercase px-4 py-3 tracking-wider' + (active ? ' active' : ' text-cyber-muted');
   const makeSheetTabs = (defs) => defs.map(tab => ({
@@ -174,6 +181,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     { key: 'skills', label: 'SKILLS' },
     { key: 'conditions', label: 'CONDICOES' },
     { key: 'ip', label: 'IP' },
+    { key: 'achievements', label: 'CONQUISTAS' },
     ...(showNetrunningTab ? [{ key: 'netrunning', label: 'NETRUNNING' }] : []),
     { key: 'notes', label: 'NOTES' },
   ]);
@@ -184,6 +192,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     { key: 'skills', label: 'SKILLS' },
     { key: 'conditions', label: 'CONDICOES' },
     { key: 'ip', label: 'IP' },
+    { key: 'achievements', label: 'CONQUISTAS' },
     { key: 'chrome', label: 'CHROME' },
     ...(showNetrunningTab ? [{ key: 'netrunning', label: 'NETRUNNING' }] : []),
     { key: 'notes', label: 'NOTES' },
@@ -307,33 +316,146 @@ export function sheetRenderVals(state = {}, deps = {}) {
       style: 'lm-char-btn' + (active ? ' lm-char-btn--active' : ''),
     };
   });
-  const playerCharacterCards = (S.characters || []).map(c => {
+  // One player, one sheet. Switching is a GM tool: a player who could pick
+  // another document would be driving a character the table did not seat them
+  // in. The drawer's initials row is therefore staff-only.
+  const isStaffSheet = !!(S.gmAuthenticated && S.gm);
+  const showCharacterSwitcher = isStaffSheet && sheetCharacterBtns.length > 1;
+  // Creating a second operative is a GM tool for the same reason. A player with
+  // no sheet still gets the CRIAR OPERATIVO card on the desktop, so this hides
+  // only the path that would leave an orphan document behind.
+  const showNewSheetButton = isStaffSheet;
+  // The table roster reads `campaign.roster` (username/role/class/portrait),
+  // the one cross-player view the backend publishes - character documents stay
+  // owner-scoped. The seat leads with the character (name, class, face, class
+  // colour) and names the player under it, because at the table you look for
+  // "the Nomad", not for an account. Only your own seat is a button, and all it
+  // does is open your own sheet: no seat ever switches who you control.
+  const seats = tableSeats(S.activeCampaign, { username: sessionUsername });
+  const GM_TONE = { label: 'GM', color: '#3fe0d0', rgb: '63,224,208' };
+  const tableSeatCards = seats.map(seat => {
+    // Same rule as the operative cards: the wizard's generated card art is not
+    // a face, so a seat showing it falls back to initials.
+    const photo = uploadedPortrait({ portraitUrl: seat.portraitUrl });
+    const hasCharacter = !!seat.characterName;
+    const tone = seat.isGm ? GM_TONE : deps.playerRoleTone(seat.characterRole || 'EDGERUNNER');
+    const initialsFrom = hasCharacter ? seat.characterName : seat.username;
+    return {
+      ...seat,
+      portraitUrl: photo,
+      hasPortrait: !!photo,
+      noPortrait: !photo,
+      initials: String(initialsFrom || 'OP').replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'OP',
+      hasCharacter,
+      // The character is the headline; the account holding it is the footnote.
+      title: hasCharacter ? seat.characterName : seat.username,
+      classLabel: hasCharacter
+        ? (seat.characterRole || 'EDGERUNNER').toUpperCase() + ' // LVL ' + seat.characterLevel
+        : (seat.isGm ? 'MESTRE DA MESA' : 'SEM FICHA'),
+      playerLabel: seat.username.toUpperCase(),
+      // The account line only earns its place under a character name - on a
+      // seat with no sheet the username is already the headline.
+      playerLine: hasCharacter
+        ? seat.username.toUpperCase() + (seat.isSelf ? ' // VOCE' : '')
+        : (seat.isSelf ? 'VOCE' : ''),
+      showPlayerLine: hasCharacter || seat.isSelf,
+      roleTag: tone.label,
+      vars: '--seat-accent:' + tone.color + ';--seat-rgb:' + tone.rgb + ';',
+      selfTag: seat.isSelf ? 'VOCE' : '',
+      isNotSelf: !seat.isSelf,
+      // An absent player's seat says who is holding their sheet, so nobody has
+      // to ask at the table who is rolling for whom.
+      isCovered: !!seat.controlledBy,
+      isNotCovered: !seat.controlledBy,
+      coverLabel: seat.controlledBy ? (seat.controlledByMe ? 'VOCE COBRE' : 'COBERTO POR ' + seat.controlledBy.toUpperCase()) : '',
+      openLabel: 'ABRIR FICHA',
+      onClick: seat.isSelf ? () => deps.setState({ sheetOpen: true }) : null,
+      style: 'lm-table-seat'
+        + (seat.isGm ? ' lm-table-seat--gm' : '')
+        + (seat.isSelf ? ' lm-table-seat--self' : '')
+        + (hasCharacter ? ' lm-table-seat--pc' : '')
+        + (seat.controlledBy ? ' lm-table-seat--covered' : ''),
+    };
+  });
+  // The desktop only ever offers sheets the table sanctioned: this player's own
+  // seat, plus any absent player's sheet a GM handed them. Owning a document is
+  // not enough - an older character nobody seated stays out of reach here.
+  const mySeat = seats.find(seat => seat.isSelf) || null;
+  const delegatedSeatIds = seats.filter(seat => seat.controlledByMe && !seat.isSelf).map(seat => seat.characterId);
+  const characterById = (id) => (S.characters || []).find(c => c.id === id) || null;
+  /**
+   * @param {object} c        character document
+   * @param {string} kind     'own' when this is the player's own operative
+   * @param {string} coverFor username being stood in for, '' when it is theirs
+   */
+  const operativeCard = (c, kind, coverFor) => {
     const active = c.id === S.activeCharacterId;
     const role = c.role || 'EDGERUNNER';
     const tone = deps.playerRoleTone(role);
     const initials = String(c.initials || (c.name || 'OP').slice(0, 2)).slice(0, 2).toUpperCase();
+    const own = kind === 'own';
+    // A face on the card is the point here, so the wizard's generated card art
+    // does not count as one - those cards keep their initials.
+    const portrait = uploadedPortrait(c);
     return {
       id: c.id,
       initials,
+      portrait,
+      hasPortrait: portrait.length > 0,
+      noPortrait: portrait.length === 0,
       name: c.name || 'OPERATIVE',
       role,
       roleTag: tone.label,
       level: c.level || 1,
-      status: active ? 'ACTIVE' : 'SELECT',
+      isDelegated: !own,
+      coverFor,
+      coverLabel: own ? '' : 'NO LUGAR DE ' + String(coverFor || '').toUpperCase(),
+      active,
+      status: active ? 'ABRIR FICHA' : (own ? 'VOLTAR AO SEU' : 'ASSUMIR CONTROLE'),
       statusColor: active ? '#3fe0d0' : '#6f7a64',
       badgeBg: tone.color,
       vars: '--pc-accent:' + tone.color + ';--pc-rgb:' + tone.rgb + ';',
-      onClick: () => deps.selectCharacter(c.id),
-      style: 'limiar-player-card lm-player-card-btn' + (active ? ' lm-player-card-btn--active' : ''),
+      // Opening the sheet is the only thing this card does for the operative
+      // already in play. Taking over a delegated sheet (or dropping back to
+      // their own) is a switch the table authorised, so it selects first.
+      onClick: () => {
+        if (!active) deps.selectCharacter(c.id);
+        deps.setState({ sheetOpen: true });
+      },
+      style: 'limiar-player-card lm-player-card-btn'
+        + (active ? ' lm-player-card-btn--active' : '')
+        + (own ? '' : ' lm-player-card-btn--delegated'),
     };
-  });
+  };
+  const myCharacter = characterById(mySeat && mySeat.characterId)
+    || (S.characters || []).find(c => c.id === S.activeCharacterId && !delegatedSeatIds.includes(c.id))
+    || (S.characters || [])[0]
+    || null;
+  const myOperativeCard = myCharacter ? operativeCard(myCharacter, 'own', '') : null;
+  const hasMyOperative = !!myOperativeCard;
+  // One player driving one sheet does not need a whole panel repeating what
+  // their own seat already shows - the seat opens it. The panel comes back the
+  // moment there is a choice to make (a sheet lent to them), when the table
+  // seated them in nothing yet (CRIAR OPERATIVO), or off-table, where there
+  // are no seats to read.
+  const seatShowsMyCharacter = !!(myCharacter && mySeat && mySeat.characterId === myCharacter.id);
+  const delegatedCards = seats
+    .filter(seat => seat.controlledByMe && !seat.isSelf)
+    .map(seat => {
+      const character = characterById(seat.characterId);
+      return character ? operativeCard(character, 'delegated', seat.username) : null;
+    })
+    .filter(Boolean);
   const conditionLocation = ['head', 'body'].includes(S.conditionLocation) ? S.conditionLocation : 'body';
   const conditionLocationOptions = ['head', 'body'].map(loc => ({ value: loc, label: loc === 'head' ? 'CABECA' : 'CORPO', selected: loc === conditionLocation, notSelected: loc !== conditionLocation }));
   const filteredInjuries = Object.values(CPRED_CRITICAL_INJURIES).filter(injury => injury.location === conditionLocation);
   const selectedInjuryId = filteredInjuries.some(injury => injury.id === S.conditionInjuryId) ? S.conditionInjuryId : (filteredInjuries[0] && filteredInjuries[0].id) || '';
   const conditionInjuryOptions = filteredInjuries.map(injury => ({ value: injury.id, label: injury.name_pt + ' // ' + injury.name_en, selected: injury.id === selectedInjuryId, notSelected: injury.id !== selectedInjuryId }));
-  const selectedStatusId = CPRED_STATUS_PRESETS.some(status => status.id === S.conditionStatusId) ? S.conditionStatusId : CPRED_STATUS_PRESETS[0].id;
-  const conditionStatusOptions = CPRED_STATUS_PRESETS.map(status => ({ value: status.id, label: status.label_pt, selected: status.id === selectedStatusId, notSelected: status.id !== selectedStatusId }));
+  // The campaign's own effects sit in the same picker as the book presets, so
+  // applying one is the same gesture — a "*" marks what this table authored.
+  const statusCatalog = effectPresetCatalog(CPRED_STATUS_PRESETS, S.customEffects);
+  const selectedStatusId = statusCatalog.some(status => status.id === S.conditionStatusId) ? S.conditionStatusId : statusCatalog[0].id;
+  const conditionStatusOptions = statusCatalog.map(status => ({ value: status.id, label: (status.custom ? '* ' : '') + status.label_pt, selected: status.id === selectedStatusId, notSelected: status.id !== selectedStatusId }));
   const durationLabel = (duration) => {
     if (!duration) return 'INDEFINIDO';
     const unit = duration.unit === 'hour' ? 'H' : duration.unit === 'min' ? 'MIN' : 'ROD';
@@ -362,6 +484,25 @@ export function sheetRenderVals(state = {}, deps = {}) {
       remove: () => deps.removeStatusEffect(entry.instanceId),
     };
   });
+  // One ledger of everything acting on this sheet, with the source of every
+  // number — the aggregate deltas below say "how much", this says "why".
+  const effects = characterEffectDigest({
+    character: activeCharacter,
+    derived,
+    installedCyberware: deps.installedCyberware ? deps.installedCyberware(activeCharacter) : [],
+  });
+  const effectRow = (row) => ({
+    ...row,
+    valueLabel: row.value > 0 ? '+' + row.value : row.value < 0 ? String(row.value) : '--',
+    valueColor: row.sign === 'positive' ? '#3fe0d0' : row.sign === 'negative' ? '#c0635b' : '#d6aa4e',
+    hasDetail: !!row.detail,
+    canRemove: !!row.removable && !!row.instanceId,
+    remove: () => deps.removeEffectRow(row),
+  });
+  const effectNegativeRows = effects.negatives.map(effectRow);
+  const effectPositiveRows = effects.positives.map(effectRow);
+  const effectNeutralRows = effects.neutral.map(effectRow);
+
   const conditionDeltas = [
     { label: 'SP CABECA', value: derived.currentHeadSp + '/' + derived.headSp, color: derived.currentHeadSp < derived.headSp ? '#c0635b' : '#3fe0d0' },
     { label: 'SP CORPO', value: derived.currentBodySp + '/' + derived.bodySp, color: derived.currentBodySp < derived.bodySp ? '#c0635b' : '#3fe0d0' },
@@ -550,7 +691,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     onRepairAmount: (e) => deps.setState({ shieldRepairAmount: e.target.value }),
   };
   return {
-    canEditSheet, notCanEditSheet: !canEditSheet, canSaveSheet, canPlayerCreateSheet,
+    canEditSheet, notCanEditSheet: !canEditSheet, canSaveSheet,
     isGmSheet: !!S.gm,
     activeIp, activeIpPct: deps.clampPct(activeIp / 1000 * 100),
     portraitUrl: activeCharacter.portraitUrl || '',
@@ -579,6 +720,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     sheetTabSkills: sheetTab === 'skills',
     sheetTabConditions: sheetTab === 'conditions',
     sheetTabIp: sheetTab === 'ip',
+    sheetTabAchievements: sheetTab === 'achievements',
     sheetTabChrome: sheetTab === 'chrome',
     sheetTabNotes: sheetTab === 'notes',
     sheetTabNotesExisting: sheetTab === 'notes' && !S.sheetCreating,
@@ -598,6 +740,14 @@ export function sheetRenderVals(state = {}, deps = {}) {
     netProgramModifierLabels,
     hasNetProgramModifierLabels: netProgramModifierLabels.length > 0,
     conditionLocationOptions, conditionInjuryOptions, conditionStatusOptions,
+    effectNegativeRows, effectPositiveRows, effectNeutralRows,
+    hasEffectNegatives: effectNegativeRows.length > 0,
+    hasEffectPositives: effectPositiveRows.length > 0,
+    hasEffectNeutral: effectNeutralRows.length > 0,
+    effectsClean: effects.clean,
+    effectsHeadline: effects.headline_pt,
+    effectNegativeCount: effectNegativeRows.length,
+    effectPositiveCount: effectPositiveRows.length,
     criticalInjuryRows, noCriticalInjuries: criticalInjuryRows.length === 0,
     statusEffectRows, noStatusEffects: statusEffectRows.length === 0,
     conditionDeltas, woundFlags, passiveStatusBadges, hasPassiveStatusBadges, healingBreakdown,
@@ -605,7 +755,9 @@ export function sheetRenderVals(state = {}, deps = {}) {
     onConditionInjury: (e) => deps.setState({ conditionInjuryId: e.target.value }),
     onConditionStatus: (e) => deps.setState({ conditionStatusId: e.target.value }),
     addSelectedInjury: () => deps.addCriticalInjury(conditionLocation, selectedInjuryId),
-    addSelectedStatus: () => deps.addStatusEffect(selectedStatusId),
+    // Pass the resolved preset, not just the id: a campaign effect does not
+    // exist in CPRED_STATUS_PRESETS, which is all addStatusEffect can look up.
+    addSelectedStatus: () => deps.addStatusEffect(statusCatalog.find(status => status.id === selectedStatusId) || selectedStatusId),
     applyNaturalHealingRest: () => deps.applyNaturalHealingRest(activeCharacter.id),
     advanceRound: () => deps.advanceConditionTime('round'),
     advanceMinute: () => deps.advanceConditionTime('min'),
@@ -622,10 +774,25 @@ export function sheetRenderVals(state = {}, deps = {}) {
     traumaLogoUrl: './assets/trauma-team-logo.png',
     traumaPlan, traumaPlanName, traumaPlanCode, traumaMemberName, traumaCardStyle, traumaPlanOptions,
     showRemoveTraumaPlan, showUseExecutiveBackup, onRemoveTraumaPlan, onUseExecutiveBackup,
-    sheetCharacterBtns, playerCharacterCards,
+    sheetCharacterBtns, showCharacterSwitcher, showNewSheetButton,
+    tableSeatCards, hasTableSeats: tableSeatCards.length > 0,
+    tableSeatCount: String(tableSeatCards.length),
+    tableName: cleanTableName(S.activeCampaignName),
+    myOperativeCard, hasMyOperative, missingMyOperative: !hasMyOperative,
+    showOwnSheetPanel: !(hasMyOperative && seatShowsMyCharacter && delegatedCards.length === 0),
+    delegatedCards, hasDelegatedCards: delegatedCards.length > 0,
+    delegatedCount: String(delegatedCards.length),
     sheetEditing: S.sheetEditing, notSheetEditing: !S.sheetEditing, sheetCreating: S.sheetCreating,
     editSheet: () => deps.editSheet(), createSheetCharacter: () => deps.createSheetCharacter(), createPlayerCharacter: () => deps.createPlayerCharacter(), cancelSheetEdit: () => deps.cancelSheetEdit(), saveSheetDraft: () => deps.saveSheetDraft(),
-    sheetName: sheetDraft.name, sheetRole: sheetDraft.role, sheetLevel: sheetDraft.level, sheetRoleAbilityRank: sheetDraft.roleAbilityRank, sheetCredits: sheetDraft.credits,
+    exportSheetPdf: () => deps.exportCharacterPdf(S.activeCharacterId), canExportSheetPdf: !!S.activeCharacterId,
+    sheetName: sheetDraft.name, sheetRole: sheetDraft.role, sheetLevel: sheetDraft.level,
+    // Only meat can be poisoned; a drone or Full Body Conversion is immune.
+    sheetBodyTypeOptions: TOXIN_BODY_TYPES.map(row => ({
+      value: row.id,
+      label: row.label_pt,
+      selected: (sheetDraft.bodyType || 'meat') === row.id,
+      notSelected: (sheetDraft.bodyType || 'meat') !== row.id,
+    })), sheetRoleAbilityRank: sheetDraft.roleAbilityRank, sheetCredits: sheetDraft.credits,
     sheetHealthCur: sheetDraft.healthCur, sheetRamUsed: sheetDraft.ramUsed, sheetHumanityLoss: sheetDraft.humanityLoss, sheetReputation: sheetDraft.reputation, sheetNotes: sheetDraft.notes,
     sheetAlliances: sheetDraft.alliances, sheetEnemies: sheetDraft.enemies, sheetPersonalTraits: sheetDraft.personalTraits, sheetHobbies: sheetDraft.hobbies,
     sheetNotesAutosaveLabel: S.sheetNotesAutosave === 'pending' ? tx.notesSaving : (S.sheetNotesAutosave === 'saved' ? tx.notesSaved : ''),
@@ -640,6 +807,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
     sheetSkillSpend, sheetSkillBudget: CPRED_SKILL_BUDGET, sheetSkillRemaining, sheetSkillBudgetColor,
     onSheetName: (e) => updateSheetField('name', e.target.value),
     onSheetRole: (e) => updateSheetField('role', e.target.value),
+    onSheetBodyType: (e) => updateSheetField('bodyType', e.target.value),
     onSheetLevel: (e) => updateSheetField('level', e.target.value),
     onSheetRoleAbilityRank: (e) => updateSheetField('roleAbilityRank', e.target.value),
     onSheetCredits: (e) => updateSheetField('credits', e.target.value),
@@ -671,6 +839,7 @@ export function sheetHandlers(component) {
       id: c.id || '',
       name: c.name || '',
       role: c.role || 'Solo',
+      bodyType: c.bodyType || 'meat',
       level: String(c.level || 1),
       roleAbilityRank: String(c.roleAbilityRank ?? 4),
       credits: String(c.credits ?? component.state.credits ?? 0),
@@ -708,7 +877,7 @@ export function sheetHandlers(component) {
     const base = { INT: '6', REF: '8', DEX: '6', TECH: '6', COOL: '6', WILL: '7', LUCK: '5', MOVE: '6', BODY: '8', EMP: '4' };
     const derived = component.derivedStats(component.normalizeStats(base), { base, armor: CPRED_DEFAULT_ARMOR });
     return {
-      id: '', name: '', role: 'Solo', level: '1', credits: '12000',
+      id: '', name: '', role: 'Solo', bodyType: 'meat', level: '1', credits: '12000',
       roleAbilityRank: '4', healthCur: String(derived.hpMax), ramUsed: '0', humanityLoss: '0', traumaPlan: 'silver', notes: CPRED_STORY_TEMPLATE,
       alliances: '', enemies: '', personalTraits: '', hobbies: '',
       armor: component.normalizeArmor(CPRED_DEFAULT_ARMOR),
@@ -746,14 +915,43 @@ export function sheetHandlers(component) {
     component.setState({ sheetEditing: true, sheetCreating: false, sheetDraft: sheetDraftFrom(component.activeCharacter()), sheetTab: 'core' });
   }
 
+  // Players never build a sheet inside the drawer: every new operative goes
+  // through the same guided wizard as the first access. Inside a campaign the
+  // wizard also joins with the new sheet, which replaces the player's seat.
   function createPlayerCharacter() {
     if (!component.state.authAuthenticated) {
       component.redirectToLogin();
       return;
     }
-    component.setState({ sheetOpen: true, sheetEditing: true, sheetCreating: true, sheetDraft: newSheetDraft(), gm: false, sheetTab: 'core' });
+    const api = component.api();
+    if (!api) return;
+    const store = component.store() || {};
+    return mountOnboardingWizard({
+      api,
+      mode: 'new',
+      svgCard: store.svgCard,
+      campaignId: component.state.activeCampaignId || '',
+      campaignName: component.state.activeCampaignName || '',
+      onDone: ({ skipped, character } = {}) => {
+        if (skipped || !character) return;
+        openCreatedCharacter(character);
+      },
+    });
   }
 
+  // Pull the fresh roster, then land on the sheet that was just created. A
+  // failed refresh falls back to a reload so the player never sees a stale list.
+  async function openCreatedCharacter(character) {
+    try {
+      if (typeof component.reloadRemoteData === 'function') await component.reloadRemoteData();
+      selectCharacter(character.id);
+      component.setState({ sheetOpen: true, sheetEditing: false, sheetCreating: false, sheetDraft: null, gm: false, sheetTab: 'core' });
+    } catch {
+      if (globalThis.location && typeof globalThis.location.reload === 'function') globalThis.location.reload();
+    }
+  }
+
+  // GMs keep the full drawer builder; players are routed to the wizard.
   function createSheetCharacter() {
     if (!component.state.gmAuthenticated) return createPlayerCharacter();
     component.setState({ sheetEditing: true, sheetCreating: true, sheetDraft: newSheetDraft(), sheetTab: 'core' });
@@ -787,7 +985,7 @@ export function sheetHandlers(component) {
     const humanityLoss = component.asNumber(d.humanityLoss, 0, 0, 100);
     const reputation = component.asNumber(d.reputation, 0, 0, 10);
     const equipped = component.normalizeEquipped(d.equipped || active.equipped);
-    const skills = component.normalizeSkills(d.skills, base).map(s => ({ id: s.id, name: s.name, stat: s.stat, level: s.level, bonus: s.bonus, difficult: !!s.difficult, total: s.total }));
+    const skills = component.normalizeSkills(d.skills, base).map(s => ({ id: s.id, name: s.name, stat: s.stat, level: s.level, bonus: s.bonus, difficult: !!s.difficult, total: s.total, ...(s.origin ? { origin: true } : {}) }));
     const skillSpend = component.skillSpend(skills);
     if (component.state.sheetCreating && skillSpend !== CPRED_SKILL_BUDGET) {
       component.flash('Distribua exatamente ' + CPRED_SKILL_BUDGET + ' pontos de pericia. Atual: ' + skillSpend + '.', 3200);
@@ -809,6 +1007,7 @@ export function sheetHandlers(component) {
       ...active,
       ...notesFields,
       id, name, role,
+      bodyType: d.bodyType || active.bodyType || 'meat',
       initials: (name.slice(0, 2) || 'OP'),
       level: component.asNumber(d.level, 1, 1, 99),
       roleAbilityRank: component.asNumber(d.roleAbilityRank, 4, 1, 10),
@@ -882,8 +1081,28 @@ export function sheetHandlers(component) {
       component.setState(s => ({
         characters: (s.characters || []).map(c => c.id === characterId ? { ...c, ...patch } : c),
       }));
-      await component.app().persistCharacter.patchNotes(characterId, patch);
-      component.setState({ sheetNotesAutosave: 'saved' });
+      const current = (component.state.characters || []).find(c => c.id === characterId);
+      try {
+        const savedRaw = await component.app().persistCharacter.patchNotes(
+          characterId, patch, current && current.revision,
+        );
+        const saved = component.normalizeCharacter(savedRaw);
+        component.setState(s => ({
+          characters: (s.characters || []).map(c => c.id === saved.id ? saved : c),
+          sheetNotesAutosave: 'saved',
+        }));
+      } catch (error) {
+        if (error && error.code === 'REVISION_CONFLICT') {
+          const latest = component.normalizeCharacter(await component.api().characters.get(characterId));
+          component.setState(s => ({
+            characters: (s.characters || []).map(c => c.id === latest.id ? latest : c),
+            notesDraft: component.sheetHandlers().notesFieldsFrom(latest),
+          }));
+          component.flash('As notas mudaram em outra sessão; a versão atual foi recarregada');
+        }
+        component.setState({ sheetNotesAutosave: 'error' });
+        return;
+      }
       clearTimeout(component._notesAutosaveClearTimer);
       component._notesAutosaveClearTimer = setTimeout(() => {
         component.setState(s => s.sheetNotesAutosave === 'saved' ? { sheetNotesAutosave: null } : null);
@@ -896,7 +1115,11 @@ export function sheetHandlers(component) {
     const active = component.activeCharacter();
     const asset = await component.uploadImage(file, 'character-portrait', active.id);
     if (asset && asset.url) {
-      component.updateActiveCharacter({ portraitUrl: asset.url });
+      // `applyCharacterPatch`, not `updateActiveCharacter`: the latter is the
+      // GM-gated writer, and a player setting their own portrait would be
+      // bounced to the login screen by it. The patch helper already picks the
+      // player endpoint when the session is not staff.
+      component.applyCharacterPatch(active.id, { portraitUrl: asset.url });
       component.setState({ gmStatus: 'Player portrait uploaded' });
     }
     e.target.value = '';

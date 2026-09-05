@@ -30,6 +30,9 @@ export interface BlackIceState {
   maxRez: number;
   revealed: boolean;
   derezzed: boolean;
+  // Going Quiet: a hidden Netrunner who beat the ICE's PER slipped past it;
+  // the ICE stays armed but never enters initiative for this run.
+  bypassed: boolean;
 }
 
 export interface BlackIceAttackResolution {
@@ -102,16 +105,20 @@ export function selectBlackIceForTier(tier: unknown, selection: unknown = 'auto'
 }
 
 export function normalizeBlackIceState(state: Partial<BlackIceState> | null | undefined, fallbackId?: unknown): BlackIceState | null {
-  const ice = blackIceById((state && state.id) || fallbackId);
+  // `null` and `undefined` must read the same: `null && x` is `null`, and
+  // Number(null) is 0, which used to turn a cleared state into a derezzed ICE.
+  const src: Partial<BlackIceState> = state || {};
+  const ice = blackIceById(src.id || fallbackId);
   if (!ice) return null;
   const maxRez = ice.rez;
-  const rez = clampNumber(state && state.rez, maxRez, 0, maxRez);
+  const rez = clampNumber(src.rez, maxRez, 0, maxRez);
   return {
     id: ice.id as BlackIceId,
     rez,
     maxRez,
-    revealed: !!(state && state.revealed),
-    derezzed: rez <= 0 || !!(state && state.derezzed),
+    revealed: !!src.revealed,
+    derezzed: rez <= 0 || !!src.derezzed,
+    bypassed: !!src.bypassed,
   };
 }
 

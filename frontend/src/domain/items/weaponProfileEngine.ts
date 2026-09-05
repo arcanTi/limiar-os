@@ -169,3 +169,22 @@ export function ignoresHalfSpBadge(item: LegacyCatalogItem | null | undefined): 
   // Melee Weapon and Martial Arts ignore half SP (rounded up). Brawling does not.
   return !!(item && item.ignoresHalfArmor && ['Melee Weapon', 'Martial Arts'].includes(skillCanonicalName(item.skill)));
 }
+
+/**
+ * Skills resolved hand to hand. Brawling is in here even though it does not
+ * ignore half SP: the question this answers is "does the operative have to be
+ * standing next to the target", not "does it beat armor".
+ */
+const MELEE_SKILLS = ['Melee Weapon', 'Martial Arts', 'Brawling'];
+
+/**
+ * True when the weapon is swung or thrown by hand rather than fired. The
+ * explicit `melee` flag wins; a row without one is classified by its skill, so
+ * catalog entries that never set the flag still land on the right side. Takes
+ * the minimal shape both a raw catalog row and a resolved profile satisfy.
+ */
+export function isMeleeWeapon(item: { melee?: unknown; skill?: unknown } | null | undefined): boolean {
+  if (!item) return false;
+  if (item.melee) return true;
+  return MELEE_SKILLS.includes(skillCanonicalName(item.skill));
+}

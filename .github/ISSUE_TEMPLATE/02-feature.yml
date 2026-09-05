@@ -1,0 +1,77 @@
+name: Propor uma melhoria
+description: Proponha uma capacidade nova ou uma evolução de domínio, arquitetura ou experiência.
+title: "[Feature]: "
+labels: []
+assignees: []
+body:
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verificações iniciais
+      options:
+        - label: Procurei issues e documentação existentes sobre esta proposta.
+          required: true
+        - label: A proposta descreve um problema ou resultado, não apenas uma tecnologia.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema ou oportunidade
+      description: Quem é afetado, em qual contexto e por que o comportamento atual é insuficiente?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Resultado proposto
+      description: Descreva o comportamento observável desejado sem antecipar detalhes desnecessários de implementação.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área principal
+      options:
+        - Campanhas e identidade
+        - Personagens e fichas
+        - Combate e condições
+        - Mapas e exploração
+        - Itens e catálogos
+        - Comunicação e eventos
+        - Arquitetura ou infraestrutura
+        - Documentação ou experiência de contribuição
+        - Outra
+    validations:
+      required: true
+  - type: textarea
+    id: domain
+    attributes:
+      label: Linguagem e regras do domínio
+      description: Informe termos, invariantes, atores, permissões e exemplos relevantes. Escreva “não se aplica” quando apropriado.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Critérios de aceitação
+      description: Liste exemplos verificáveis que demonstrariam a conclusão da proposta.
+      placeholder: |
+        - Dado que...
+        - Quando...
+        - Então...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas e impactos
+      description: Registre alternativas consideradas, migrações, compatibilidade ou riscos conhecidos.
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Disponibilidade para contribuir
+      options:
+        - Posso preparar uma implementação
+        - Posso ajudar com testes ou documentação
+        - Posso colaborar no desenho da solução
+        - Estou apenas propondo a ideia

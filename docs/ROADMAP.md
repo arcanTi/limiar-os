@@ -1,6 +1,6 @@
 # docs/ROADMAP.md — Plano unico do Limiar OS
 
-Atualizado em 2026-08-06. Este documento e a fonte unica para ordem de
+Atualizado em 2026-09-05. Este documento e a fonte unica para ordem de
 execucao, dependencias, criterios de aceite e status do produto.
 
 `docs/MAP-ENGINE.md` continua como auditoria do motor do mapa, bugs e evidencias
@@ -23,11 +23,9 @@ Escopo confirmado:
   devem apresentar somente esse sistema.
 - O produto usa FastAPI/PostgreSQL: o servidor Python e o container continuam suficientes
   para executar a mesa.
-- Login por usuario e senha local e o fluxo base e deve funcionar sem servicos
-  externos.
-- Google Login e opcional. O SDK e as chamadas externas so podem ser ativados
-  quando `GOOGLE_CLIENT_ID` estiver configurado; sua ausencia nunca pode impedir
-  o login local.
+- O login e um token de acesso de 6 caracteres emitido pelo mestre dentro do
+  app, e deve funcionar sem servicos externos. Senha e Google Login foram
+  removidos.
 - O canvas coleta contexto fisico; `systemAdapter` traduz; os modulos de dominio
   resolvem as regras; o usuario confirma a aplicacao.
 - Enforcement de mesa continua advisory: a UI avisa e registra, sem substituir
@@ -81,9 +79,29 @@ servida por HTTP, interacao visivel e leitura posterior do estado pela API.
 
 ## 3. Snapshot verificado
 
-Base de codigo analisada em 2026-07-21 no commit `ed443b6`.
+### 3.1 Medicao atual — 2026-09-05
 
-Validacao executada no snapshot:
+Branch `codex/feat/campaign-scope`. Numeros e evidencias completas em
+[`REPOSITORY-HEALTH.md`](./REPOSITORY-HEALTH.md).
+
+- backend: **194 testes aprovados** em PostgreSQL 18.4, zero skips
+  (`scripts/test-backend-postgres.sh`);
+- frontend: **88 arquivos / 1223 testes aprovados**;
+- cobertura: 65,02% linhas, 56,28% statements, 51,96% branches, 52,38% funcoes
+  (`domain/` 87,0%, `ui/` 52,4%, `pages/` 38,1%, `framework/` 11,0%);
+- TypeScript: `tsc --noEmit` aprovado;
+- build Vite: aprovado; chunk `index` em 503,43 KB (gzip 144,05) — acima do
+  aviso de 500 KB;
+- gates: `check-architecture.py`, `check-repository-hygiene.py`,
+  `ruff-baseline.py` (239 achados, estavel), `verify-domain-catalogs.sh`
+  (217 PASS) e `git diff --check` aprovados.
+
+### 3.2 Snapshot historico — 2026-07-21
+
+Base de codigo analisada em 2026-07-21 no commit `ed443b6`. Mantido como
+registro; a tabela e a lista de riscos abaixo foram atualizadas item a item.
+
+Validacao executada naquele snapshot:
 
 - backend: **86 testes aprovados**;
 - frontend: **62 arquivos / 695 testes aprovados**;
@@ -101,9 +119,9 @@ Estado funcional:
 | Mapa -> combate | ataque medido, foco, AoE e contexto situacional ligados | persistencia atomica do AoE |
 | Municao e LUCK | cockpit e HUD do mapa implementados | validar fluxo completo em sessao |
 | Sync | long-poll unificado implementado | remover poll redundante de 4s e testar reconexao |
-| Auth | senha local e Google implementados | tornar Google realmente opcional e migrar sessao para cookie |
-| Superficie de exposicao | estaticos por allowlist e API fechada por padrao (B1 e B2 entregues) | escopo de campanha e escrita concorrente |
-| Escopo de campanha | so mapa e roster; chat, combate, tarot e HQ sao globais | BLINDAGEM B3 |
+| Auth | token de acesso de 6 caracteres, emitido pelo GM; Google removido (9A CANCELADO) | migrar sessao para cookie |
+| Superficie de exposicao | B1-B4 entregues: allowlist de estaticos, API fechada por padrao, escopo de campanha e escrita concorrente | cota/magic bytes no upload |
+| Escopo de campanha | chat, combate, tarot, HQ, Nexus, efeitos e toxinas sob `campaign_id`; personagem pertence a uma campanha | journal por campanha |
 | Nexus Breach | funcional dentro do app | ligar pins e economia |
 | Documentacao | README de produto e plano unificado | manter sincronizados por entrega |
 
@@ -131,8 +149,10 @@ Riscos de codigo abertos e confirmados:
    selectors, sync, render, input handlers e comandos de cena/prop/token/
    luz/template para modulos dedicados (ARQUITETURA 4B, resolvido
    2026-07-21) e segue so como composition root.
-6. A pagina de login carrega recursos Google externamente mesmo quando a
-   integracao nao esta configurada.
+6. ~~A pagina de login carrega recursos Google externamente mesmo quando a~~
+   ~~integracao nao esta configurada.~~ Resolvido em 2026-09-02: o login virou
+   um token de acesso de 6 caracteres emitido pelo GM (migracao `0006`); nao ha
+   mais provedor externo nem script de terceiro na pagina.
 7. ~~Editar uma campanha existente enviando um `system` diferente no payload~~
    ~~sobrescrevia o sistema da campanha.~~ Resolvido 2026-07-21: `upsert_campaign`
    agora ignora o `system` do payload sempre que a campanha ja existe; o valor
@@ -203,7 +223,13 @@ Auditoria de superficie em 2026-07-28 (servidor real em `127.0.0.1:8791`,
     `README.md` descreve essa rota como "o jogador encerra o proprio turno";
     hoje ela encerra o turno de qualquer um.
 
-14. **Chat, combate, tarot e HQ sao globais, nao por campanha.** `combat-state`,
+14. ~~**Chat, combate, tarot e HQ sao globais, nao por campanha.**~~ Resolvido
+    em 2026-09-02 (BLINDAGEM B3, migracao `0004`): `chat_messages` ganhou
+    `campaign_id` e as chaves globais viraram `campaign_settings(campaign_id,
+    key)`. Toda rota de estado vive sob `/api/campaigns/{campaign_id}/...` e
+    `backend/tests/test_campaign_scope.py` prova que chat, estado e eventos de
+    uma campanha nao aparecem na outra. Descricao original do risco:
+    `combat-state`,
     `tarot-state`, `hqIp` e `nexusResult` sao chaves unicas na tabela
     `settings`, e `chat_messages` e uma tabela unica sem `campaign_id` — o
     proprio `campaign_sync.py` documenta isso ("chat_messages and combat-state
@@ -212,8 +238,14 @@ Auditoria de superficie em 2026-07-28 (servidor real em `127.0.0.1:8791`,
     e o mesmo estado de tarot. O modelo de campanhas do produto so existe de
     fato no mapa e no roster.
 
-15. **Persistencia de ficha e de combate e read-modify-write sem transacao nem
-    revision.** `_post_character_notes` faz `get_record` -> merge ->
+15. ~~**Persistencia de ficha e de combate e read-modify-write sem transacao~~
+    ~~nem revision.**~~ Resolvido em 2026-09-02 (BLINDAGEM B4, migracao
+    `0005`): `characters` e `campaign_settings` so gravam via compare-and-swap
+    com `expectedRevision` num UPDATE unico, e o conflito volta como 409
+    `REVISION_CONFLICT`. O cliente recarrega a versao atual e reaplica o patch
+    (`Component.js:1344`); coberto por `backend/tests/test_optimistic_revisions.py`
+    e `frontend/test/unit/api/revisions.test.ts`. Descricao original do risco:
+    `_post_character_notes` faz `get_record` -> merge ->
     `upsert_record` em duas conexoes separadas; `_post_combat_end_turn` faz
     `get_setting` -> calcula -> `set_setting` do mesmo jeito. O mapa tem
     `scene.revision` e `expectedRevision` (secao 7), mas ficha e combate nao tem
@@ -226,16 +258,21 @@ Auditoria de superficie em 2026-07-28 (servidor real em `127.0.0.1:8791`,
     o CSS junto dos tres HTML. `dist/` e o artefato aposentado
     `tailwind-sheet.css` ficam fora do Git e sao gerados no CI/container.
 
-17. **`http.ts` descarta o corpo de erro da API e nao trata 401.**
+17. ~~**`http.ts` descarta o corpo de erro da API e nao trata 401.**~~
+    Resolvido: `http.ts` desempacota o envelope num `ApiError` com `status`,
+    `code`, `message` e `details`, e o 401 redireciona para o login num ponto so
+    (`Component.js:349`). Descricao original do risco:
     `if (!res.ok) throw new Error('API ' + res.status + ' ' + path)` joga fora o
     envelope `{"error":{"code","message"}}` que o backend monta em
     `write_error`. Nenhum consumidor distingue 403 de 409 de 422 a nao ser
     parseando string, e uma sessao expirada (401) nao redireciona pro login —
     vira um erro generico no meio da mesa.
 
-18. **`ruff` acusa 333 erros e nao esta em nenhum gate.** O comentario do
-    `.github/workflows/ci.yml` fala em "233 pre-existing findings"; a contagem
-    real em 2026-07-28 e 333. O numero cresce sem freio porque nada o mede.
+18. ~~**`ruff` acusa 333 erros e nao esta em nenhum gate.**~~ Resolvido em
+    2026-08-06: `scripts/ruff-baseline.py` congela a contagem em
+    `scripts/ruff-baseline.json` e roda no CI. Em 2026-09-05 a baseline esta
+    estavel em **239 achados**; nada novo entra, mas a reducao incremental
+    ainda nao comecou.
 
 19. ~~**Higiene do repositorio.**~~ **Resolvido em 2026-08-06.** `dist/` nao e
     mais versionado, `graphify-out/` foi removido e ignorado, as screenshots
@@ -249,7 +286,12 @@ Auditoria de superficie em 2026-07-28 (servidor real em `127.0.0.1:8791`,
     imagem. Mitigacao existente: o CSP `sandbox; default-src 'none'` em
     `/uploads/` e a exclusao deliberada de SVG.
 
-21. **Limites de recurso do servidor.** `ThreadingHTTPServer` cria uma thread por
+21. **Limites de recurso do servidor** (parcialmente obsoleto: o transporte
+    virou FastAPI/uvicorn e o banco, um `ConnectionPool` psycopg de
+    `min_size=1`/`max_size=15` com `timeout=10`, entao a conexao por request
+    com `PRAGMA` a cada chamada nao existe mais; upload sem cota e rate limit
+    por IP unico continuam abertos). Descricao original do risco:
+    `ThreadingHTTPServer` cria uma thread por
     request sem teto (so os waiters de long-poll tem cap, 64 em
     `campaign_sync.py`). `handle_upload` faz `self.rfile.read(length)` com
     `_MAX_UPLOAD_BYTES` de 64 MB — 64 MB em memoria por thread concorrente. Os
@@ -449,9 +491,10 @@ pra chamar de "prova" uma sessao rodada nessas condicoes.
       2026-07-28 (2 sessoes `admin` apagadas, backup em
       `data/limiar.db.bak-*` antes da operacao, coberto pelo `.gitignore`);
       token vazado reconfirmado morto (401 em `/api/users`,
-      `authenticated:false` em `/api/session`). **Troca da senha do `mestre`
-      pendente do operador** — `LIMIAR_GM_PASSWORD` so semeia o admin em banco
-      novo, entao use `python3 scripts/rotate-credentials.py`.
+      `authenticated:false` em `/api/session`). **Troca da credencial do `mestre`
+      pendente do operador** — `LIMIAR_MASTER_TOKEN` so semeia o admin em banco
+      novo, entao use `python3 scripts/rotate-credentials.py` (hoje reemite o
+      token de acesso; na epoca desta auditoria era uma senha).
 - [x] Mudar o default de `HOST` para `127.0.0.1` e exigir opt-in explicito para
       escutar em `0.0.0.0`.
 
@@ -486,25 +529,37 @@ pra chamar de "prova" uma sessao rodada nessas condicoes.
 
 #### B3. Escopo de campanha no estado compartilhado
 
-- [ ] Adicionar `campaign_id` a `chat_messages` com migracao
-      (`ALTER TABLE ADD COLUMN`, default para a campanha existente).
-- [ ] Trocar as chaves globais `combat-state`, `tarot-state`, `hqIp` e
-      `nexusResult` por chaves com escopo de campanha.
-- [ ] Filtrar `/api/chat`, `/api/combat-state`, `/api/tarot-state` e `/api/hq`
-      pela campanha da requisicao.
-- [ ] Trocar `campaign_sync.bump_all` por `bump_campaign` nesses quatro topicos.
-- [ ] Testar duas campanhas simultaneas: chat, combate e tarot de uma nao
-      aparecem na outra.
+Entregue em 2026-09-02 pela migracao `0004`.
+
+- [x] Adicionar `campaign_id` a `chat_messages` com migracao.
+- [x] Trocar as chaves globais `combat-state`, `tarot-state`, `hqIp` e
+      `nexusResult` por `campaign_settings(campaign_id, key)`; `effects` e
+      `toxins` nasceram ja escopadas.
+- [x] Filtrar chat, combate, tarot e HQ pela campanha da requisicao — as rotas
+      passaram a viver sob `/api/campaigns/{campaign_id}/...`
+      (`backend/routers/state.py`, `backend/routers/chat.py`).
+- [x] Trocar `campaign_sync.bump_all` por `bump_campaign` nesses topicos.
+- [x] Testar duas campanhas simultaneas:
+      `test_campaign_scope.py::test_chat_state_and_events_do_not_cross_campaigns`.
+
+Complemento entregue em 2026-09-02 (migracao `0007`): o personagem tambem
+pertence a uma campanha, entao um GM so enxerga as fichas das mesas que ele
+conduz; fichas sem campanha ficam num escopo proprio, nao num curinga.
 
 #### B4. Escrita concorrente
 
-- [ ] Fazer `_post_combat_end_turn` ler e gravar dentro de uma unica transacao.
-- [ ] Adotar `expectedRevision` em personagem, no mesmo formato ja usado pela
-      cena, e responder 409 em conflito.
-- [ ] Fazer o cliente tratar 409 de ficha com recarga e reaplicacao, sem
-      sobrescrever.
-- [ ] Testar duas escritas concorrentes na mesma ficha e dois `end-turn`
-      simultaneos.
+Entregue em 2026-09-02 pela migracao `0005`.
+
+- [x] Fazer o `end-turn` ler e gravar sem perder escrita concorrente: o UPDATE
+      de `campaign_settings` e um compare-and-swap sobre `revision`, entao a
+      segunda escrita da mesma versao falha em vez de sobrescrever.
+- [x] Adotar `expectedRevision` em personagem, no mesmo formato ja usado pela
+      cena, e responder 409 `REVISION_CONFLICT` em conflito
+      (`backend/repositories/records.py`).
+- [x] Fazer o cliente tratar 409 de ficha com recarga e reaplicacao, sem
+      sobrescrever (`Component.js:1344`; avisa a mesa quando recarrega).
+- [x] Testar escritas concorrentes: `backend/tests/test_optimistic_revisions.py`
+      e `frontend/test/unit/api/revisions.test.ts`.
 
 Aceite: um cliente sem token nao le nem escreve nada de mesa; nenhum arquivo
 fora da allowlist e servido; duas campanhas no mesmo servidor nao se enxergam;
@@ -766,14 +821,13 @@ da campanha.
 
 Objetivo: completar seguranca, portabilidade e operacao prolongada.
 
-#### 9A. Google Login opcional e local-first
+#### 9A. Google Login opcional e local-first — CANCELADO
+
+Superado pelo login por token de acesso: nao ha mais SDK Google, `/api/meta/config`,
+senha nem `password_reset_requests`. O unico item que sobrevive e servir a fonte
+localmente no login.
 
 - [ ] Servir fonte local ou usar stack de fontes do sistema no login.
-- [ ] Consultar `/api/meta/config` antes de carregar o SDK Google.
-- [ ] Injetar o SDK somente quando `GOOGLE_CLIENT_ID` existir.
-- [ ] Ocultar divisor e botao Google quando a integracao estiver desligada.
-- [ ] Manter usuario/senha funcional com internet bloqueada.
-- [ ] Testar configurado, nao configurado, timeout e token invalido.
 
 #### 9B. Cookie de sessao e CSRF
 
@@ -836,8 +890,9 @@ erro de API chega ao cliente com codigo utilizavel.
 - O mapa nao importa regras de combate diretamente; usa `systemAdapter` CPR.
 - Logica nova nasce em `domain/`, `application/` ou handlers especializados;
   pages e `Component` orquestram.
-- Migracoes seguem `CREATE TABLE IF NOT EXISTS`, introspeccao por
-  `PRAGMA table_info` e `ALTER TABLE ADD COLUMN`.
+- Migracoes sao revisoes Alembic em `backend/migrations/versions/`; o boot roda
+  `upgrade head` antes de semear e `backend/sql/postgres.sql` e o baseline que a
+  revisao `0001` aplica. A introspeccao por `PRAGMA` morreu com o SQLite.
 - Documentos de cena usam ID estavel, `scene.revision` e `expectedRevision`.
 - `map_state()` projeta a audiencia no servidor; segredos do GM nao chegam ao
   player.
@@ -1001,6 +1056,56 @@ YYYY-MM-DD | Fase/item | commit | testes | evidencia live/API
   falha parcial sem dano duplicado no retry, resolucao de template —
   tudo via clique real nos botoes do mapa/cockpit
 
+- 2026-09-03 | Onboarding: usabilidade do wizard de primeira ficha |
+  working tree | backend 160, frontend 883, typecheck/build/diff-check verdes |
+  live em servidor FastAPI + PostgreSQL de teste (`compose.test.yaml`): toggle
+  "Distribuir 62 pontos" / "Rolar 1d10 por atributo" (1 rerolado, sem teto de
+  8; rola tudo de uma vez ou um atributo por vez, `creation.statRolls` conta os
+  dados e `creation.statRerolls` as rerolagens por atributo, exigido
+  `statRolls >= 10`); grid dos atributos em `grid-cols-fit-stat` (210px) porque
+  o card estourava a celula de 150px e cortava o `+`; dica explicando por
+  que o `+` nao subiu (teto 8, minimo 2, orcamento zerado); faixa "Tudo certo"
+  removida e mensagem de orcamento unificada na barra; espacamento `gap-3` /
+  `px-6` e spinner nativo escondido; `validate_character_creation` no backend
+  recusa na criacao de ficha de player STAT fora de 2-8 (2-10 rolado), soma
+  > 62 por pontos, pericia > 10 ou gasto > 60 — `POST /api/player-characters`
+  com todos os STATs em 10 devolveu 400 `VALIDATION_ERROR`; atualizacao de
+  ficha existente nao e revalidada.
+- 2026-09-03 | Onboarding: fechamento RAW da criacao (CPR p.42/45/78/88/90) |
+  working tree | backend 169, frontend 897, typecheck/build/diff-check verdes |
+  LUCK cai para o teto 8 na criacao (era 10); pericia 2-6 na criacao (teto 6,
+  treinada nunca fica em 1: 0 -> 2 -> 0); orcamento mostrado como 86 com 26 ja
+  nas 13 basicas (interno segue 60 livres, `skillBudgetView`); campo "Idioma de
+  origem" na identidade grava `Language (X)` 4 gratis com flag `origin` —
+  `normalizeSkills` passa a preservar pericias `Language (...)` fora do
+  catalogo e `sheet.js` mantem a flag ao salvar; backend valida tudo isso so na
+  criacao (`creation.originLanguage` tem que bater com a pericia marcada);
+  rolagem 1d10 rotulada REGRA DA CASA (nao e o Edgerunner do livro: faltam as
+  tabelas de Role p.74-76; Streetrat tambem ausente).
+
+- 2026-09-03 | RAW: EMP, Mortally Wounded e Death Save acumulado (CPR p.80 e
+  wound states) | working tree | frontend 901, typecheck/build/diff-check
+  verdes | `deriveEffectiveEmp` passa de ceil para floor (44 -> 4, 39 -> 3;
+  teste antigo pinnava o ceil errado); `deriveStats` ganha `woundState`:
+  HP < 1 = Mortally Wounded com -4 em acoes e MOVE -6 (minimo 1), antes o
+  estado sumia abaixo de 1 HP e zerava a penalidade; `effectiveMoveStat` (mapa)
+  aplica o mesmo; `deathSavesPassed` no registro soma +1 ao Death Save a cada
+  save passado (gravado por `recordDeathSavePassed` no cliente de quem rolou),
+  zera ao estabilizar ou ao voltar a HP >= 1; painel de efeitos lista as tres
+  linhas. Foco (DLC investigacao) segue fora.
+
+- 2026-09-05 | ALINHAMENTO 1B: remedicao completa e sincronizacao de
+  README/ROADMAP/REPOSITORY-HEALTH | working tree sobre `49f14b0` | backend
+  194 (PostgreSQL 18.4, zero skips), frontend 1223 em 88 arquivos,
+  typecheck/build/diff-check verdes | cobertura 65,02% linhas (era 57,54),
+  56,28% statements, 51,96% branches, 52,38% funcoes; `check-architecture.py`,
+  `check-repository-hygiene.py`, `ruff-baseline.py` (239, estavel) e
+  `verify-domain-catalogs.sh` (217 PASS) aprovados; chunk `index` em 503,43 KB
+  (gzip 144,05) acima do aviso de 500 KB. Documentacao: os riscos 6, 14, 15, 17
+  e 18 da secao 3 foram fechados com evidencia, B3 e B4 marcados como
+  entregues, e o README passou a documentar console de mesa, gerador de NPC,
+  conquistas, export em PDF, delegacao, movimento e as revisoes Alembic.
+
 ## 10. Backlog vivo de friccao
 
 Cada entrada precisa de data, reproducao, impacto, fase e criterio de aceite.
@@ -1039,17 +1144,34 @@ Cada entrada precisa de data, reproducao, impacto, fase e criterio de aceite.
   `NOT_YOUR_COMBATANT` para combatente alheio, staff segue podendo encerrar
   qualquer um.
 - 2026-07-28 | chat, combat-state, tarot-state e hqIp sao globais; duas
-  campanhas dividem o mesmo estado | BLINDAGEM B3 | aceite: escopo por campanha
-  com migracao e teste de duas campanhas.
+  campanhas dividem o mesmo estado | BLINDAGEM B3 | **resolvido em 2026-09-02**:
+  migracao `0004` moveu tudo para `chat_messages.campaign_id` e
+  `campaign_settings(campaign_id, key)`; rotas sob
+  `/api/campaigns/{campaign_id}/...` e teste de duas campanhas em
+  `test_campaign_scope.py`.
 - 2026-07-28 | ficha e combate fazem read-modify-write sem transacao nem
-  revision | BLINDAGEM B4 | aceite: transacao unica + `expectedRevision` em
-  personagem, 409 tratado no cliente.
+  revision | BLINDAGEM B4 | **resolvido em 2026-09-02**: migracao `0005`;
+  compare-and-swap sobre `revision` em `characters` e `campaign_settings`, 409
+  `REVISION_CONFLICT` recarregado e reaplicado pelo cliente.
 - 2026-07-28 | `tailwind-sheet.css` gerado e sem versionar, referenciado pelo
   HTML; `tailwind.css`/`tailwind.config.js` tambem fora do git; gate de CI so
   cobre `dist/` | ALINHAMENTO 1B | aceite: fontes versionadas e gate estendido,
   ou CSS gerado no boot.
 - 2026-07-28 | `http.ts` descarta o envelope de erro da API e nao trata 401 |
-  AUTH E ROBUSTEZ 9D | aceite: `code` exposto ao chamador e 401 tratado num
-  ponto so.
+  AUTH E ROBUSTEZ 9D | **resolvido**: `ApiError` carrega `status`, `code`,
+  `message` e `details`, e o 401 redireciona para o login num ponto so
+  (`Component.js:349`).
 - 2026-07-28 | `ruff` acusa 333 erros e nao esta em nenhum gate (CI diz 233) |
-  ALINHAMENTO 1B | aceite: `ruff check backend` no CI com baseline congelada.
+  ALINHAMENTO 1B | **resolvido em 2026-08-06**: `scripts/ruff-baseline.py` no
+  CI com a contagem congelada em `scripts/ruff-baseline.json`; 239 achados em
+  2026-09-05, reducao incremental ainda pendente.
+- 2026-09-05 | os pisos de cobertura do `vite.config.js` sao os valores de
+  2026-07-28 (lines 57 / statements 47 / branches 46 / functions 44) e a
+  medicao real ja esta em 65,02 / 56,28 / 51,96 / 52,38: uma regressao de oito
+  pontos passa no CI | ALINHAMENTO 1B | aceite: pisos elevados para o valor
+  medido arredondado para baixo, sem teste artificial.
+- 2026-09-05 | `backend/api/` e `backend/services/` sobraram como pacotes
+  vazios (so `__init__.py`) depois que os servicos foram para
+  `backend/application/` e o verificador de identidade externo saiu com o login
+  por token | ALINHAMENTO 1B | aceite: diretorios removidos com suite,
+  `check-architecture.py` e higiene verdes.

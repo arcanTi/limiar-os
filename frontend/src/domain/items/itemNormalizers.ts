@@ -14,6 +14,23 @@ const asNumberOrNull = (value: unknown): number | null => {
 const asBooleanOrNull = (value: unknown): boolean | null => typeof value === 'boolean' ? value : null;
 const list = (value: unknown): string[] => Array.isArray(value) ? value.filter(Boolean).map(String) : (value ? [String(value)] : []);
 
+/**
+ * Whether a catalog row is merchandise at all.
+ *
+ * Some rows exist only so the rules engine can look them up — the
+ * `BRAWLING-BODY-*` entries are the damage table that turns an attacker's BODY
+ * into dice, not fists someone buys. The catalog already says so
+ * (`purchasable: false`, `specialRules: ["not purchasable"]`); every shop
+ * surface must honor it, or those rows show up as free weapons.
+ */
+export function isPurchasableProduct(item: LegacyCatalogItem | null | undefined): boolean {
+  if (!item) return false;
+  if ((item as { purchasable?: unknown }).purchasable === false) return false;
+  const rules = (item as { specialRules?: string[] | string }).specialRules;
+  const list = Array.isArray(rules) ? rules : (rules ? [rules] : []);
+  return !list.some((rule) => String(rule || '').trim().toLowerCase() === 'not purchasable');
+}
+
 export function canonicalSeedCode(entry: { code?: unknown; id?: unknown; name?: unknown } | null | undefined): string {
   return asText(entry && (entry.code || entry.id || entry.name)).toUpperCase();
 }

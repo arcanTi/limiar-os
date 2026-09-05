@@ -18,8 +18,11 @@ ApiError = ApplicationError
 
 
 def problem_response(problem: ApplicationError) -> JSONResponse:
+    error: dict[str, object] = {"code": problem.code, "message": problem.message}
+    if problem.details:
+        error["details"] = problem.details
     return JSONResponse(
-        {"error": {"code": problem.code, "message": problem.message}},
+        {"error": error},
         status_code=problem.status,
     )
 

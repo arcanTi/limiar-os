@@ -5,6 +5,8 @@ import { campaignsHandlers } from '../../../src/ui/views/campaigns.js';
 function fakeComponent(state = {}) {
   const component = {
     state: { draft: { id: '', name: '', description: '', visibility: 'public', status: 'active', bannerUrl: '' }, ...state },
+    // Mirrors the overlay controller: it merges plain objects and has no
+    // updater-function form, so a handler that passes one must fail here.
     setState: vi.fn((next) => { component.state = { ...component.state, ...next }; }),
   };
   return component;
@@ -19,6 +21,8 @@ function fakeApi(overrides = {}) {
       create: vi.fn().mockResolvedValue({ id: 'campaign-1', name: 'Mesa' }),
       cancelInvite: vi.fn().mockResolvedValue({ cancelled: true }),
       removeMember: vi.fn().mockResolvedValue({ removed: true }),
+      grantControl: vi.fn().mockResolvedValue({ characterId: 'leu-1', username: 'bari' }),
+      revokeControl: vi.fn().mockResolvedValue({ revoked: true }),
       ...overrides.campaigns,
     },
     characters: { list: vi.fn().mockResolvedValue([]) },
@@ -68,5 +72,62 @@ describe('ui/views/campaigns campaignsHandlers', () => {
     expect(api.campaigns.cancelInvite).toHaveBeenCalledWith('campaign-1', 'player1');
     await handlers.removeMember('campaign-1', 'player1');
     expect(api.campaigns.removeMember).toHaveBeenCalledWith('campaign-1', 'player1');
+  });
+});
+
+// --- Ceder a ficha de um jogador ausente ---
+// O mestre escolhe quem cobre e cede; devolver e um clique. O select guarda a
+// escolha por ficha, senao duas linhas dividiriam o mesmo nome.
+
+describe('cessao de controle pelo mestre', () => {
+  it('guarda a escolha do substituto por ficha', () => {
+    const component = fakeComponent();
+    const handlers = campaignsHandlers(component, fakeApi());
+
+    handlers.chooseSubstitute('leu-1', 'bari');
+    handlers.chooseSubstitute('carol-1', 'dex');
+
+    expect(component.state.substituteByCharacter).toEqual({ 'leu-1': 'bari', 'carol-1': 'dex' });
+  });
+
+  it('cede o controle para quem foi escolhido', async () => {
+    const api = fakeApi();
+    const component = fakeComponent({ substituteByCharacter: { 'leu-1': 'bari' } });
+    const handlers = campaignsHandlers(component, api);
+
+    await handlers.grantControl('mesa-1', 'leu-1');
+
+    expect(api.campaigns.grantControl).toHaveBeenCalledWith('mesa-1', 'leu-1', 'bari');
+    expect(component.state.status).toContain('bari');
+  });
+
+  it('sem substituto escolhido nao chama a API', async () => {
+    const api = fakeApi();
+    const handlers = campaignsHandlers(fakeComponent(), api);
+
+    await handlers.grantControl('mesa-1', 'leu-1');
+
+    expect(api.campaigns.grantControl).not.toHaveBeenCalled();
+  });
+
+  it('reporta falha da API em vez de mentir que cedeu', async () => {
+    const api = fakeApi({ campaigns: { grantControl: vi.fn().mockRejectedValue(new Error('API 403')) } });
+    const component = fakeComponent({ substituteByCharacter: { 'leu-1': 'bari' } });
+    const handlers = campaignsHandlers(component, api);
+
+    await handlers.grantControl('mesa-1', 'leu-1');
+
+    expect(component.state.status).toBe('Nao foi possivel ceder o controle');
+  });
+
+  it('devolve o controle ao dono', async () => {
+    const api = fakeApi();
+    const component = fakeComponent();
+    const handlers = campaignsHandlers(component, api);
+
+    await handlers.revokeControl('mesa-1', 'leu-1');
+
+    expect(api.campaigns.revokeControl).toHaveBeenCalledWith('mesa-1', 'leu-1');
+    expect(component.state.status).toBe('Controle devolvido ao dono');
   });
 });

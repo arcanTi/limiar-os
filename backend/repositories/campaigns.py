@@ -1,6 +1,7 @@
 """Campaign persistence and visibility rules."""
 
 import secrets
+from collections.abc import Iterable
 
 from ..db import db
 from ..util import slug
@@ -11,14 +12,112 @@ def row_dict(row) -> dict[str, object]:
     return dict(row) if row else {}
 
 
-def _roster_entry(username: str, role: str, character_id: str | None) -> dict[str, object]:
+def _roster_entry(
+    username: str,
+    role: str,
+    character_id: str | None,
+    controlled_by: str | None = None,
+) -> dict[str, object]:
     character = get_record("characters", character_id) if character_id else None
     return {
         "username": username,
         "role": role,
         "characterId": character_id,
         "portraitUrl": (character or {}).get("portraitUrl") or None,
+        "characterName": (character or {}).get("name") or None,
+        # Class and level travel with the seat so a player reads the table as
+        # characters ("NOMAD LVL 1"), not as a list of accounts. Still nothing
+        # from the sheet itself - `/api/characters` stays owner-scoped.
+        "characterRole": (character or {}).get("role") or None,
+        "characterLevel": (character or {}).get("level") or None,
+        # Set while another player is standing in for this seat. Everyone who
+        # can see the roster sees who is holding the sheet.
+        "controlledBy": controlled_by,
     }
+
+
+def list_members(campaign_id: str) -> list[dict[str, object]]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT campaign_id, username, character_id, role, joined_at "
+            "FROM campaign_members WHERE campaign_id = %s ORDER BY username",
+            (campaign_id,),
+        ).fetchall()
+    return [row_dict(row) for row in rows]
+
+
+DELEGATION_COLUMNS = (
+    "SELECT campaign_id, character_id, username, granted_by, granted_at "
+    "FROM campaign_delegations WHERE campaign_id = %s ORDER BY character_id"
+)
+
+
+def _delegation_dicts(rows: Iterable[object]) -> list[dict[str, object]]:
+    return [
+        {
+            "campaignId": row["campaign_id"],
+            "characterId": row["character_id"],
+            "username": row["username"],
+            "grantedBy": row["granted_by"],
+            "grantedAt": row["granted_at"],
+        }
+        for row in map(row_dict, rows)
+    ]
+
+
+def list_delegations(campaign_id: str) -> list[dict[str, object]]:
+    """Sheets in this campaign currently driven by a stand-in."""
+    with db() as conn:
+        return _delegation_dicts(conn.execute(DELEGATION_COLUMNS, (campaign_id,)).fetchall())
+
+
+def delegated_character_ids(username: str) -> list[str]:
+    """Every character this user was handed control of, across all tables."""
+    if not username:
+        return []
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT character_id FROM campaign_delegations WHERE username = %s",
+            (username,),
+        ).fetchall()
+    return [str(row_dict(row)["character_id"]) for row in rows]
+
+
+def grant_delegation(
+    campaign_id: str,
+    character_id: str,
+    username: str,
+    granted_by: str,
+) -> dict[str, object]:
+    """Hand one seat's sheet to another player until the GM revokes it.
+
+    One stand-in per character: granting again replaces the previous holder
+    rather than stacking two people on the same sheet.
+    """
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO campaign_delegations(campaign_id, character_id, username, granted_by) "
+            "VALUES (%s, %s, %s, %s) "
+            "ON CONFLICT (campaign_id, character_id) DO UPDATE SET "
+            "username = EXCLUDED.username, granted_by = EXCLUDED.granted_by, "
+            "granted_at = CURRENT_TIMESTAMP",
+            (campaign_id, character_id, username, granted_by),
+        )
+    return {
+        "campaignId": campaign_id,
+        "characterId": character_id,
+        "username": username,
+        "grantedBy": granted_by,
+    }
+
+
+def revoke_delegation(campaign_id: str, character_id: str) -> bool:
+    with db() as conn:
+        cur = conn.execute(
+            "DELETE FROM campaign_delegations WHERE campaign_id = %s AND character_id = %s",
+            (campaign_id, character_id),
+        )
+    return cur.rowcount > 0
 
 
 def list_campaigns_for(session: dict[str, str]) -> list[dict[str, object]]:
@@ -57,11 +156,27 @@ def list_campaigns_for(session: dict[str, str]) -> list[dict[str, object]]:
             # Public-facing roster (username/role/portrait only, no invite or
             # join-date detail) so any viewer who can see the card at all can
             # see who's running/playing it - not gated to staff like `members`.
-            roster = [_roster_entry(m["username"], m["role"], m["character_id"]) for m in members]
+            # Reuse the open connection: this loop runs once per campaign, and
+            # acquiring a second pooled connection inside it would double the
+            # pool pressure of a single listing request.
+            delegations = _delegation_dicts(
+                conn.execute(DELEGATION_COLUMNS, (campaign["id"],)).fetchall()
+            )
+            held_by = {str(d["characterId"]): str(d["username"]) for d in delegations}
+            roster = [
+                _roster_entry(
+                    m["username"],
+                    m["role"],
+                    m["character_id"],
+                    held_by.get(str(m["character_id"])),
+                )
+                for m in members
+            ]
             gm_username = campaign.get("created_by")
             if gm_username and not any(r["username"] == gm_username for r in roster):
                 roster.insert(0, _roster_entry(gm_username, "gm", None))
             campaign["roster"] = roster
+            campaign["delegations"] = delegations
             campaign["participantCount"] = len(roster)
             out.append(campaign)
     return out
@@ -113,6 +228,21 @@ def cancel_invite(campaign_id: str, username: str) -> bool:
 
 def remove_member(campaign_id: str, username: str) -> bool:
     with db() as conn:
+        row = conn.execute(
+            "SELECT character_id FROM campaign_members WHERE campaign_id = %s AND username = %s",
+            (campaign_id, username),
+        ).fetchone()
+        # Both directions: the sheet they left behind stops being controllable,
+        # and any sheet they were standing in for goes back to its owner.
+        if row is not None:
+            conn.execute(
+                "DELETE FROM campaign_delegations WHERE campaign_id = %s AND character_id = %s",
+                (campaign_id, row_dict(row)["character_id"]),
+            )
+        conn.execute(
+            "DELETE FROM campaign_delegations WHERE campaign_id = %s AND username = %s",
+            (campaign_id, username),
+        )
         cur = conn.execute(
             "DELETE FROM campaign_members WHERE campaign_id = %s AND username = %s",
             (campaign_id, username),

@@ -21,15 +21,13 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 CREATE TABLE IF NOT EXISTS users (
   username TEXT PRIMARY KEY,
-  password_hash TEXT NOT NULL,
+  access_token TEXT NOT NULL,
   role TEXT NOT NULL,
-  google_sub TEXT,
   email TEXT,
   avatar_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub
-  ON users(google_sub) WHERE google_sub IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_access_token ON users(access_token);
 CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
   username TEXT NOT NULL REFERENCES users(username),
@@ -40,19 +38,18 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_username ON sessions(username);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-CREATE TABLE IF NOT EXISTS password_reset_requests (
-  username TEXT PRIMARY KEY REFERENCES users(username),
-  requested_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
 CREATE TABLE IF NOT EXISTS characters (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL DEFAULT '',
   role TEXT,
   level INTEGER,
+  campaignid TEXT,
   extra TEXT NOT NULL DEFAULT '{}',
+  revision INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_characters_campaignid ON characters(campaignid);
 CREATE TABLE IF NOT EXISTS items (
   id TEXT PRIMARY KEY,
   code TEXT,
@@ -86,6 +83,7 @@ CREATE TABLE IF NOT EXISTS assets (
 );
 CREATE TABLE IF NOT EXISTS chat_messages (
   id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL,
   kind TEXT NOT NULL DEFAULT 'text',
   role TEXT NOT NULL DEFAULT 'player',
   sender TEXT,
@@ -96,6 +94,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at, id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_campaign_created ON chat_messages(campaign_id, created_at, id);
 CREATE TABLE IF NOT EXISTS campaigns (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -107,6 +106,15 @@ CREATE TABLE IF NOT EXISTS campaigns (
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS campaign_settings (
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  data JSONB,
+  revision INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (campaign_id, key)
 );
 CREATE TABLE IF NOT EXISTS campaign_members (
   campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,

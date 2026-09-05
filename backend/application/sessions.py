@@ -1,5 +1,6 @@
 """Session resolution and throttled sliding-expiration use cases."""
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from .ports import SessionRepository
@@ -14,11 +15,14 @@ class SessionService:
         session_ttl_seconds: int,
         remember_session_ttl_seconds: int,
         touch_interval_seconds: int,
+        *,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._repository = repository
         self._session_ttl_seconds = session_ttl_seconds
         self._remember_session_ttl_seconds = remember_session_ttl_seconds
         self._touch_interval_seconds = touch_interval_seconds
+        self._clock = clock or _utc_now
 
     @staticmethod
     def _as_utc(value: object) -> datetime | None:
@@ -45,7 +49,7 @@ class SessionService:
         token = token.strip()
         if not token:
             return None
-        resolved_at = now or datetime.now(UTC)
+        resolved_at = now or self._clock()
         with self._repository.transaction() as identity:
             row = identity.session_by_token(token)
             if not row:
@@ -74,3 +78,7 @@ class SessionService:
             "role": str(row["role"]),
             "avatarUrl": row["avatar_url"],
         }
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)

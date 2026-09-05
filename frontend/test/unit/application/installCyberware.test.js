@@ -100,6 +100,37 @@ describe('application/InstallCyberware', () => {
     expect(result).toEqual({ ok: false, error: null });
   });
 
+  it('preview explains a missing requirement by name, before any money moves', () => {
+    const api = fakeApi();
+    const useCase = new InstallCyberware({ api });
+
+    const preview = useCase.preview({ character: character([]), catalog, product: GORILLA_ARMS, credits: 5000 });
+
+    expect(preview.ok).toBe(false);
+    expect(preview.reason).toBe('requirements');
+    expect(preview.label).toBe('REQUISITO NAO CUMPRIDO');
+    expect(preview.message).toContain('Cyberarm');
+    expect(preview.message).not.toContain('Required cyberware');
+    expect(api.characters.upsert).not.toHaveBeenCalled();
+  });
+
+  it('preview names the cheap blocks too, and clears once nothing is in the way', () => {
+    const useCase = new InstallCyberware({ api: fakeApi() });
+    const base = { character: character([]), catalog, credits: 5000 };
+
+    expect(useCase.preview({ ...base, product: BIG_KNUCKS })).toMatchObject({ ok: true, reason: null, message: '' });
+    expect(useCase.preview({ ...base, product: BIG_KNUCKS, credits: 0 })).toMatchObject({ ok: false, reason: 'funds' });
+    expect(useCase.preview({ ...base, product: { ...BIG_KNUCKS, stock: 'SOLD OUT' } })).toMatchObject({ ok: false, reason: 'soldout' });
+    expect(useCase.preview({ ...base, character: character([BIG_KNUCKS]), product: BIG_KNUCKS })).toMatchObject({ ok: false, reason: 'equipped' });
+  });
+
+  it('the buy error reads like the preview, not like the engine', () => {
+    const useCase = new InstallCyberware({ api: fakeApi() });
+    const result = useCase.execute({ character: character([]), catalog, product: GORILLA_ARMS, credits: 5000 });
+    expect(result.error).toContain('Cyberarm');
+    expect(result.error).not.toContain('Required cyberware');
+  });
+
   it('resolves the installed item through the injected resolveInstallPayload callback', () => {
     const useCase = new InstallCyberware({ api: fakeApi() });
     const resolveInstallPayload = vi.fn((product) => ({ ...product, resolved: true }));

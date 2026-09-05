@@ -48,6 +48,16 @@ export default class ToggleCyberwareEnhancement {
     if (!enhancement || !Array.isArray(enhancement.attachesTo) || !enhancement.attachesTo.includes(parentCode)) {
       return { ok: false, error: 'Enhancement incompatível' };
     }
+    // RAW (Mission Kit DLC #2): a piece of cyberware carries one enhancement at
+    // a time. Detaching stays free; attaching over an occupied piece does not.
+    const parent = equipped.find(it => it.code === parentCode);
+    const occupied = normalizeEnhancementCodes(parent && parent.enhancements)
+      .filter(code => code !== enhancementCode);
+    if (occupied.length) {
+      const holder = equipped.find(it => it.code === occupied[0]);
+      const holderName = (holder && (holder.name || holder.code)) || occupied[0];
+      return { ok: false, error: `${parentCode} já usa ${holderName}: cada peça aceita um aprimoramento por vez.` };
+    }
     let attached = false;
     const nextEquipped = equipped.map(it => {
       if (!it || !it.code || it.code === enhancementCode) return it;

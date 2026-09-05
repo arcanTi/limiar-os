@@ -78,6 +78,48 @@ describe('application/ToggleCyberwareEnhancement', () => {
     expect(result).toEqual({ ok: false, error: 'Enhancement incompatível' });
   });
 
+  it('refuses a second enhancement on a piece that already carries one', () => {
+    // RAW (Mission Kit DLC #2): one enhancement per piece of cyberware.
+    const api = fakeApi();
+    const occupiedParent = { ...GORILLA_ARMS, enhancements: ['ENH-TUNG-REIN'] };
+    const hydraulic = { code: 'ENH-HYD-RAM', name: 'Hydraulic Ram', attachesTo: ['GORILLA-ARMS'] };
+    const useCase = new ToggleCyberwareEnhancement({ api });
+
+    const result = useCase.execute({
+      character: character([occupiedParent, TUNGSTEN, hydraulic]),
+      parentCode: 'GORILLA-ARMS',
+      enhancementCode: 'ENH-HYD-RAM',
+      normalizeEquipped,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Tungsten Reinforcement');
+    expect(api.characters.upsert).not.toHaveBeenCalled();
+  });
+
+  it('lets the occupying enhancement be swapped: detach first, then attach the other', () => {
+    const useCase = new ToggleCyberwareEnhancement({ api: fakeApi() });
+    const hydraulic = { code: 'ENH-HYD-RAM', name: 'Hydraulic Ram', attachesTo: ['GORILLA-ARMS'] };
+    const occupiedParent = { ...GORILLA_ARMS, enhancements: ['ENH-TUNG-REIN'] };
+
+    const detached = useCase.execute({
+      character: character([occupiedParent, TUNGSTEN, hydraulic]),
+      parentCode: 'GORILLA-ARMS',
+      enhancementCode: 'ENH-TUNG-REIN',
+      normalizeEquipped,
+    });
+    const attached = useCase.execute({
+      character: character(detached.characterPatch.equipped),
+      parentCode: 'GORILLA-ARMS',
+      enhancementCode: 'ENH-HYD-RAM',
+      normalizeEquipped,
+    });
+
+    expect(attached.ok).toBe(true);
+    expect(attached.characterPatch.equipped.find((it) => it.code === 'GORILLA-ARMS').enhancements)
+      .toEqual(['ENH-HYD-RAM']);
+  });
+
   it('strips the enhancement code from any other item that referenced it before re-attaching', () => {
     // Mirrors the original handler's behavior: every equipped item's
     // enhancements list is scrubbed of enhancementCode first, then re-added

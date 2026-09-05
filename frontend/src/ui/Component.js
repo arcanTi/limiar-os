@@ -32,6 +32,8 @@ import {
   applyHumanityRecovery as charApplyHumanityRecovery,
 } from '../domain/character/index.ts';
 import { deriveStats as charDeriveStats } from '../domain/character/derivedStatsEngine.ts';
+import { buildCharacterSheetPdf, characterSheetFileName } from '../domain/character/characterSheetPdf.ts';
+import { normalizeBodyType as toxinNormalizeBodyType, toxinAmmunitionFor, toxinFromAmmunition } from '../domain/toxins/index.ts';
 import {
   CPRED_STATUS_PRESETS,
   normalizeConditionDuration as condNormalizeConditionDuration,
@@ -77,9 +79,10 @@ import {
   weaponRuntimeAttackMod as itemsWeaponRuntimeAttackMod,
   weaponRuntimeQuality as itemsWeaponRuntimeQuality,
   ignoresHalfSpBadge as itemsIgnoresHalfSpBadge,
+  isMeleeWeapon as itemsIsMeleeWeapon,
 } from '../domain/items/weaponProfileEngine.ts';
 import { LIMIAR_TRAUMA_PLANS, setTraumaPlans, traumaPlanKey as charTraumaPlanKey, traumaPlanByKey as charTraumaPlanByKey } from '../domain/character/traumaPlans.ts';
-import { isAdmin as authIsAdmin, isPlayerUser as authIsPlayerUser, canManageOwnSheet as authCanManageOwnSheet } from '../domain/auth/policies.ts';
+import { isAdmin as authIsAdmin, isPlayerUser as authIsPlayerUser, canManageOwnSheet as authCanManageOwnSheet, canUploadImage as authCanUploadImage } from '../domain/auth/policies.ts';
 import {
   chatText as chatRollText,
   chatRollTitle as chatRollTitleText,
@@ -98,6 +101,12 @@ import {
   trackingToneFromLabel as viewTrackingToneFromLabel,
 } from './view/constants.js';
 import { hqHandlers, hqRenderVals } from './views/hq.js';
+import { toxinsHandlers, toxinsRenderVals } from './views/toxins.js';
+import { gmEffectsHandlers, gmEffectsRenderVals } from './views/gmEffects.js';
+import { rosterHandlers, rosterRenderVals } from './views/roster.js';
+import { achievementsHandlers, achievementsRenderVals } from './views/achievements.js';
+import { normalizeAchievementList } from '../domain/progression/index.ts';
+import { effectPresetCatalog } from '../domain/effects/customEffects.ts';
 import { chatHandlers, chatRenderVals } from './views/chat.js';
 import { mapHandlers, mapRenderVals } from './views/map.js';
 import { nexusHandlers, nexusRenderVals } from './views/nexus.js';
@@ -110,6 +119,7 @@ import { clearMapAoeIntent, loadMapAoeIntent } from '../domain/map/mapAoeIntent.
 import { computeSituationalChips } from '../domain/map/situationalMods.ts';
 import { propsToWalls } from '../domain/map/visionEngine.ts';
 import { desktopHandlers, desktopRenderVals } from './views/desktop.js';
+import { activeCharacterIdFor, controlledCharacterIds, seatCharacterId } from '../domain/campaigns/tableSeats.ts';
 import {
   chipStyle as viewChipStyle,
   dieStyle as viewDieStyle,
@@ -152,7 +162,7 @@ const LimiarSeed = {
 
 class Component extends DCLogic {
   state = {
-    view: 'desktop', sheetOpen: false, sheetExpanded: false, railOpen: (typeof window !== 'undefined' && window.innerWidth >= 1100), gm: false, gmAuthenticated: false, authAuthenticated: false, authUser: null, activeCampaignId: this.props.activeCampaignId || '', activeCampaignName: '', playerReady: false, lang: 'en',
+    view: 'desktop', sheetOpen: false, sheetExpanded: false, railOpen: (typeof window !== 'undefined' && window.innerWidth >= 1100), gm: false, gmAuthenticated: false, authAuthenticated: false, authUser: null, activeCampaignId: this.props.activeCampaignId || '', activeCampaignName: '', activeCampaign: null, playerReady: false, lang: 'en',
     now: new Date(),
     characters: [],
     activeCharacterId: LimiarSeed.activeCharacterId,
@@ -194,6 +204,10 @@ class Component extends DCLogic {
     tarotState: null,
     tarotCurrent: null,
     tarotPhase: 'idle',
+    // Client-local: the drawnThisSession entry this client took off the table.
+    // The session lock stays server-side, so without this the next sync would
+    // deal the discarded card straight back.
+    tarotDismissed: null,
     tarotHistory: [],
     tarotTargetId: null,
     tarotAttackerId: null,
@@ -229,6 +243,13 @@ class Component extends DCLogic {
     toast: null,
     scanOn: null, auraOn: null,
     gmCharacterDraft: { name: '', role: '', portraitUrl: '' },
+    // GM roster (SYS.01/MESA): filters over the table's sheets plus the
+    // quick console's shared amount and pickers. Transient view state.
+    rosterOpen: true, rosterQuery: '', rosterFilter: 'all', rosterAmount: '1',
+    rosterInjuryId: '', rosterStatusId: '', rosterGrantId: '',
+    rosterTab: 'vitals', rosterCustomName: '', rosterCustomType: 'GEAR', rosterCustomQty: '1', rosterCustomNotes: '',
+    rosterNetAbility: 'backdoor', rosterNetDv: '', rosterNetLabel: '', rosterNetAll: false,
+    achievementDraft: null,
     sheetEditing: false,
     sheetCreating: false,
     sheetDraft: null,
@@ -244,8 +265,14 @@ class Component extends DCLogic {
     gmItemDraft: { code: '', name: '', cat: 'NEURAL', price: '', desc: '', imageUrl: '' },
     gmMapDraft: { name: '', threat: 'MED', imageUrl: '' },
     users: [],
-    passwordResetRequests: [],
-    userDraft: { username: '', password: '', role: 'player', email: '' },
+    toxins: [],
+    customEffects: [],
+    effectDraft: null,
+    effectApply: { effectId: '', targetIds: [] },
+    toxinDraft: null,
+    toxinApply: { toxinId: '', targetIds: [], modifier: '' },
+    userDraft: { username: '', role: 'player', email: '', inviteToCampaign: true },
+    issuedAccessToken: null,
     gmStatus: 'Backend aguardando conexao',
   };
 
@@ -288,7 +315,7 @@ class Component extends DCLogic {
   // Long-poll `/campaigns/:id/updates` while there is an active campaign,
   // refetching only the topics (chat/combat/roster) the server reports dirty.
   // No active campaign yet -> idle-wait and recheck, so switching into one
-  // later (e.g. after loadActiveCampaignName resolves) picks the loop up.
+  // later (e.g. after loadActiveCampaign resolves) picks the loop up.
   async startCampaignSync() {
     if (this._syncRunning) return;
     this._syncRunning = true;
@@ -341,6 +368,11 @@ class Component extends DCLogic {
   async applyCampaignSyncTopics(topics) {
     if (topics.includes('chat')) await this.refreshChat();
     if (topics.includes('roster') || topics.includes('combat')) await this.refreshRoster();
+    // A seat change (someone joined, the GM re-seated a player, or control of a
+    // sheet was handed over) only shows up in the campaign row, which
+    // refreshRoster does not fetch.
+    if (topics.includes('roster')) await this.loadActiveCampaign();
+    if (topics.some(topic => ['tarot', 'hq', 'nexus'].includes(topic))) await this.reloadRemoteData();
   }
 
   get products() {
@@ -374,20 +406,47 @@ class Component extends DCLogic {
       const user = this.state.authUser;
       if (user && ['admin', 'gm'].includes(user.role)) {
         await this.loadUsers();
-        await this.loadPasswordResetRequests();
       }
-      if (this.state.activeCampaignId) await this.loadActiveCampaignName();
+      if (this.state.activeCampaignId) await this.loadActiveCampaign();
+      if (this.state.activeCampaignId) await this.loadToxins();
+      if (this.state.activeCampaignId) await this.loadCustomEffects();
     }
   }
 
-  async loadActiveCampaignName() {
+  // The whole campaign row, not just its name: `roster` is what the desktop
+  // uses to show who else is at the table, and the seat it holds for this
+  // account decides which sheet the player drives.
+  async loadActiveCampaign() {
     const api = this.api();
     if (!api?.campaigns?.list) return;
     try {
       const campaigns = await api.campaigns.list();
       const campaign = (Array.isArray(campaigns) ? campaigns : []).find((entry) => entry && entry.id === this.state.activeCampaignId);
-      if (campaign) this.setState({ activeCampaignName: campaign.name || '' });
-    } catch (_) { /* keep whatever name we had, non-critical */ }
+      if (!campaign) return;
+      this.setState({ activeCampaign: campaign, activeCampaignName: campaign.name || '' });
+      this.applyCampaignSeat(campaign);
+    } catch (_) { /* keep whatever campaign we had, non-critical */ }
+  }
+
+  // Seat the player in the character the table registered for them. Selecting
+  // through the sheet handler keeps the derived state (credits, gear, health)
+  // in step with the document, exactly as the old picker did.
+  //
+  // A sheet delegated to this player counts as sanctioned, so covering for an
+  // absent player survives the next roster refresh instead of snapping back.
+  applyCampaignSeat(campaign) {
+    const username = (this.state.authUser && this.state.authUser.username) || '';
+    if (!username) return;
+    const row = campaign || this.state.activeCampaign;
+    const seatId = seatCharacterId(row, username);
+    const nextId = activeCharacterIdFor(
+      seatId,
+      this.state.characters,
+      this.state.activeCharacterId || '',
+      controlledCharacterIds(row, username),
+    );
+    if (!nextId || nextId === this.state.activeCharacterId) return;
+    this.sheetHandlers().selectCharacter(nextId);
   }
 
   redirectToLogin() {
@@ -441,30 +500,23 @@ class Component extends DCLogic {
     } catch (_) {}
   }
 
-  async loadPasswordResetRequests() {
-    if (!(this.api() && this.api().users && this.state.gmAuthenticated)) return;
-    try {
-      const requests = await this.api().users.passwordResetRequests();
-      this.setState({ passwordResetRequests: Array.isArray(requests) ? requests : [] });
-    } catch (_) {}
-  }
-
   async reloadRemoteData() {
     if (!this.api()) return;
+    const hasCampaign = Boolean(this.state.activeCampaignId);
     try {
       const [characters, products, mapLocations, nexusChallenge, nexusResult, hqIp, tarotStateRaw, combatStateRaw] = await Promise.all([
         this.api().characters.list(),
         this.api().items.list(),
         this.api().map.list(),
-        this.api().nexus ? this.api().nexus.get() : Promise.resolve(null),
-        this.api().nexus ? this.api().nexus.getResult() : Promise.resolve(null),
-        this.api().hq ? this.api().hq.get() : Promise.resolve(null),
-        this.api().tarot && this.api().tarot.state ? this.api().tarot.state.get() : Promise.resolve(null),
-        this.api().combat && this.api().combat.state ? this.api().combat.state.get() : Promise.resolve(null),
+        hasCampaign && this.api().nexus ? this.api().nexus.get() : Promise.resolve(null),
+        hasCampaign && this.api().nexus ? this.api().nexus.getResult() : Promise.resolve(null),
+        hasCampaign && this.api().hq ? this.api().hq.get() : Promise.resolve(null),
+        hasCampaign && this.api().tarot && this.api().tarot.state ? this.api().tarot.state.get() : Promise.resolve(null),
+        hasCampaign && this.api().combat && this.api().combat.state ? this.api().combat.state.get() : Promise.resolve(null),
       ]);
       this._catalogProducts = products || [];
       const tarotState = await this.tarotHandlers().ensureTarotState(tarotStateRaw);
-      const tarotCurrent = this.tarotHandlers().tarotCardFromEntry(tarotState.drawnThisSession);
+      const tarotSync = this.tarotHandlers().tarotSyncPatch(tarotState);
       const normalizedCharacters = this.normalizeCharacterList(characters || []);
       const combatState = await this.combatHandlers().ensureCombatState(combatStateRaw, normalizedCharacters);
       const activeStillExists = normalizedCharacters.some(c => c.id === this.state.activeCharacterId);
@@ -482,8 +534,7 @@ class Component extends DCLogic {
         tarotDeck: tarotState.order,
         tarotHistory: this.tarotHandlers().tarotHistoryRows(tarotState.history),
         combatState,
-        tarotCurrent: tarotCurrent || this.state.tarotCurrent,
-        tarotPhase: tarotCurrent ? 'shown' : this.state.tarotPhase,
+        ...tarotSync,
         activeCharacterId: activeId || this.state.activeCharacterId,
         notesDraft: this.sheetHandlers().notesFieldsFrom(active),
         credits: active.credits ?? this.state.credits,
@@ -495,6 +546,9 @@ class Component extends DCLogic {
         gearItems: active.gear || this.state.gearItems,
         gmStatus: this.state.gmAuthenticated ? this.state.gmStatus : 'Backend conectado',
       });
+      // A card can land here from anyone's draw; this client only sees the FX
+      // if it (re)starts it itself.
+      this.tarotHandlers().ensureTarotFx();
       await this.consumeMapAttackIntent();
       await this.consumeMapFocusIntent();
       await this.consumeMapAoeIntent();
@@ -561,6 +615,9 @@ class Component extends DCLogic {
   ignoresHalfSpBadge(item) {
     return itemsIgnoresHalfSpBadge(item);
   }
+  isMeleeWeapon(item) {
+    return itemsIsMeleeWeapon(item);
+  }
   normalizeGearItem(item, idx = 0) {
     const src = item || {};
     const profile = this.weaponProfile(src);
@@ -581,6 +638,9 @@ class Component extends DCLogic {
       rarity: src.rarity || LIMIAR_TIER_COLORS[profile.tier] || (profile.sides ? '#c0635b' : type.includes('CONSUMABLE') ? '#3fe0d0' : '#d6aa4e'),
       notes: String(src.notes || src.desc || '').trim(),
       lastUsedAt: src.lastUsedAt || '',
+      // Poor-quality malfunction (CPR RAW): a natural 1 on the attack jams
+      // the weapon; clearing it costs a full Action (combat.js unjamWeapon).
+      jammed: !!src.jammed,
     };
     normalized.dmg = src.dmg || this.gearDamageText(normalized);
     // Ammo tracking only applies to gear with a numeric magazine (catalog
@@ -731,6 +791,178 @@ class Component extends DCLogic {
   derivedStats(stats, character) {
     return charDeriveStats({ stats, character, installedCyberware: this.installedCyberware(character) });
   }
+  /**
+   * Export one sheet as a fillable PDF the player can keep offline.
+   *
+   * Built from the already-normalized character, so the exported numbers are
+   * the ones the app derived (HP max, humanity, SP after ablation) rather than
+   * the raw stored document.
+   */
+  gmEffectsHandlers() {
+    if (!this._gmEffectsHandlers) this._gmEffectsHandlers = gmEffectsHandlers(this);
+    return this._gmEffectsHandlers;
+  }
+  async loadCustomEffects() {
+    if (!(this.api() && this.api().effects && this.state.activeCampaignId)) return;
+    try {
+      const stored = await this.api().effects.list();
+      const rows = stored && Array.isArray(stored.effects) ? stored.effects : [];
+      this.setState({ customEffects: rows });
+    } catch (_) { /* campaign without authored effects yet */ }
+  }
+  async saveCustomEffects(effects, statusText) {
+    const rows = Array.isArray(effects) ? effects : [];
+    this.setState({ customEffects: rows, gmStatus: statusText || 'Efeitos salvos' });
+    if (!(this.api() && this.api().effects && this.state.activeCampaignId)) return;
+    try {
+      await this.api().effects.save(rows);
+    } catch (err) {
+      this.setState({ gmStatus: 'Falha ao salvar efeitos: ' + (err.message || '') });
+    }
+  }
+  /**
+   * Hand an effect to the selected characters.
+   *
+   * Goes through addStatusEffect, so a GM-authored effect becomes the exact
+   * same status instance a book preset produces — which is what makes it obey
+   * every existing rule (aggregation, duration, charges, the effects panel)
+   * without a second code path.
+   */
+  applyEffectToTargets() {
+    if (!this.ensureGm('Login do mestre necessario para aplicar efeitos')) return;
+    const apply = this.state.effectApply || {};
+    const catalog = effectPresetCatalog(CPRED_STATUS_PRESETS, this.state.customEffects);
+    const preset = catalog.find(row => row.id === apply.effectId) || catalog[0];
+    if (!preset) return this.flash('Nenhum efeito para aplicar');
+    const targetIds = Array.isArray(apply.targetIds) ? apply.targetIds : [];
+    if (!targetIds.length) return this.flash('Selecione ao menos um alvo');
+    const names = [];
+    targetIds.forEach(targetId => {
+      const target = (this.state.characters || []).find(c => c && c.id === targetId);
+      if (!target) return;
+      this.addStatusEffect(preset, { targetId, source: 'gm-effect-bench' });
+      names.push((target.name || targetId).toUpperCase());
+    });
+    this.postChat({
+      kind: 'text',
+      sender: 'SISTEMA',
+      text: 'EFEITO :: ' + preset.label_pt.toUpperCase() + ' :: aplicado em ' + names.join(', '),
+    });
+    this.setState(s => ({ effectApply: { ...(s.effectApply || {}), targetIds: [] } }));
+  }
+  toxinsHandlers() {
+    if (!this._toxinsHandlers) this._toxinsHandlers = toxinsHandlers(this);
+    return this._toxinsHandlers;
+  }
+  async loadToxins() {
+    if (!(this.api() && this.api().toxins && this.state.activeCampaignId)) return;
+    try {
+      const stored = await this.api().toxins.list();
+      const rows = stored && Array.isArray(stored.toxins) ? stored.toxins : [];
+      this.setState({ toxins: rows });
+    } catch (_) { /* campaign without a toxin bench yet */ }
+  }
+  async saveToxins(toxins, statusText) {
+    const rows = Array.isArray(toxins) ? toxins : [];
+    this.setState({ toxins: rows, gmStatus: statusText || 'Toxinas salvas' });
+    if (!(this.api() && this.api().toxins && this.state.activeCampaignId)) return;
+    try {
+      await this.api().toxins.save(rows);
+    } catch (err) {
+      this.setState({ gmStatus: 'Falha ao salvar toxinas: ' + (err.message || '') });
+    }
+  }
+  /**
+   * Resolve a toxin against the selected targets and write the result back.
+   *
+   * HP loss lands directly on health.cur and armor is never consulted — the
+   * defining rule of CPR poisons, and the reason this does not reuse the
+   * combat damage path.
+   */
+  applyToxinExposure(options) {
+    const opts = options || {};
+    if (!this.ensureGm('Login do mestre necessario para aplicar toxinas')) return null;
+    const apply = this.state.toxinApply || {};
+    const toxin = opts.toxin || apply.toxinId;
+    const targetIds = opts.targetIds || apply.targetIds || [];
+    // Cyberware is stored under `equipped`; the toxin rules read it as
+    // `installedCyberware` (Nasal Filters, Toxin Binders), so resolve it here
+    // rather than teaching the domain about this app's storage shape.
+    const targets = targetIds
+      .map(id => (this.state.characters || []).find(c => c && c.id === id))
+      .filter(Boolean)
+      .map(character => {
+        const normalized = this.normalizeCharacter(character);
+        return { ...normalized, installedCyberware: this.installedCyberware(normalized) };
+      });
+    const result = this.app().applyToxinExposure.execute({
+      toxin,
+      customToxins: this.state.toxins,
+      targets,
+      situationalModifier: Number(opts.modifier ?? apply.modifier) || 0,
+      inflictedInjury: opts.inflictedInjury || null,
+      source: opts.source || 'gm-toxin-bench',
+    });
+    if (result.error) { this.flash(result.error); return result; }
+    const patches = new Map();
+    result.outcomes.forEach(outcome => {
+      if (outcome.characterPatch) patches.set(outcome.targetId, outcome.characterPatch);
+    });
+    if (patches.size) {
+      this._charactersTouched = true;
+      this.setState(s => ({
+        characters: (s.characters || []).map(c => (patches.has(c.id)
+          ? this.normalizeCharacter({ ...c, ...patches.get(c.id) })
+          : c)),
+      }));
+      patches.forEach((patch, id) => {
+        const next = (this.state.characters || []).find(c => c && c.id === id);
+        if (next && this.api()) this.api().characters.upsert({ ...next, ...patch });
+      });
+    }
+    this.postChat({ kind: 'text', sender: 'SISTEMA', text: result.chatText });
+    this.setState(s => ({ toxinApply: { ...(s.toxinApply || {}), targetIds: [] } }));
+    return result;
+  }
+  /**
+   * Toxin rounds replace the weapon's damage entirely, so a hit hands the
+   * target straight to the resist check instead of the damage engine.
+   */
+  maybeApplyToxinAmmo(weapon, targetId) {
+    const code = weapon && (weapon.loadedAmmoCode || weapon.ammoCode || weapon.ammoType);
+    const ammo = toxinAmmunitionFor(code);
+    if (!ammo || !targetId) return null;
+    const toxin = toxinFromAmmunition(ammo, this.state.toxins);
+    return this.applyToxinExposure({
+      toxin,
+      targetIds: [targetId],
+      inflictedInjury: ammo.inflictedInjury || null,
+      source: 'municao:' + ammo.code,
+    });
+  }
+  exportCharacterPdf(characterId) {
+    const character = characterId ? this.characterById(characterId) : this.activeCharacter();
+    if (!character || !character.id) {
+      this.flash('Nenhum personagem para exportar.');
+      return;
+    }
+    try {
+      const bytes = buildCharacterSheetPdf({
+        character,
+        owner: (this.state.authUser && this.state.authUser.username) || character.ownerUsername || '',
+        campaign: this.state.activeCampaignName || this.state.activeCampaignId || '',
+        generatedAt: new Date().toLocaleString('pt-BR'),
+      });
+      // Handing bytes to the browser is a platform capability, not UI logic:
+      // it arrives from the composition root like api/app/store do.
+      const download = this.props.downloadFile;
+      if (!download) throw new Error('download indisponivel');
+      download(bytes, characterSheetFileName(character), 'application/pdf');
+      this.flash('Ficha exportada: ' + characterSheetFileName(character));
+    } catch (err) {
+      this.flash('Falha ao exportar ficha: ' + (err.message || ''));
+    }
+  }
   normalizeCharacter(character) {
     const c = character || {};
     const base = this.normalizeStats(c.base);
@@ -750,6 +982,8 @@ class Component extends DCLogic {
       name: c.name || 'OPERATIVE',
       role: c.role || 'EDGERUNNER',
       level: c.level || 1,
+      // Only meat can be poisoned; drones and Full Body Conversions are immune.
+      bodyType: toxinNormalizeBodyType(c.bodyType),
       base,
       armor,
       health: { cur: healthCur, max: healthMax },
@@ -761,6 +995,7 @@ class Component extends DCLogic {
       reputation: this.asNumber(c.reputation, 0, 0, 10),
       ip: this.asNumber(c.ip, 0, 0, 999999),
       ipLog: Array.isArray(c.ipLog) ? c.ipLog : [],
+      achievements: normalizeAchievementList(c.achievements),
       roleAbilityRank: this.asNumber(c.roleAbilityRank, 4, 1, 10),
       equipped,
       shield,
@@ -777,14 +1012,13 @@ class Component extends DCLogic {
   normalizeCharacterList(characters) {
     return (characters || []).map(c => this.normalizeCharacter(c));
   }
+  // The attribute values the sheet rolls against: cyberware mods, armor and
+  // condition penalties, and the EMP that Humanity loss leaves behind. It is
+  // deriveStats' own `effectiveStats` so the sheet and combat cannot drift
+  // apart — the untouched spread stays on `character.base`.
   effAttrs(character) {
     const target = character || this.activeCharacter();
-    const b = this.applyCyberwareStatMods(target.base || this.state.base, target);
-    const penalty = this.armorPenalty(target);
-    CPRED_ARMOR_PENALTY_STATS.forEach(k => { b[k] = Math.max(0, (b[k] || 0) - penalty); });
-    const aggregate = condAggregateConditions(target);
-    Object.keys(aggregate.statPenalties).forEach(k => { b[k] = Math.max(0, (b[k] || 0) - aggregate.statPenalties[k]); });
-    return b;
+    return { ...this.derivedStats(target.base || this.state.base, target).effectiveStats };
   }
   armorTotal(character) {
     const target = character || this.activeCharacter();
@@ -817,6 +1051,7 @@ class Component extends DCLogic {
       patch.gameTab = 'tarot';
     }
     this.setState(patch);
+    if (v === 'games') this.tarotHandlers().ensureTarotFx();
   }
 
   async openCampaignMap() {
@@ -966,7 +1201,7 @@ class Component extends DCLogic {
 
   async logoutGm() {
     if (this.api() && this.api().auth) await this.api().auth.logout();
-    this.setState({ authAuthenticated: false, authUser: null, gmAuthenticated: false, gm: false, sheetEditing: false, sheetCreating: false, sheetDraft: null, characters: [], activeCharacterId: null, users: [], passwordResetRequests: [], gmStatus: 'Sessao encerrada' });
+    this.setState({ authAuthenticated: false, authUser: null, gmAuthenticated: false, gm: false, sheetEditing: false, sheetCreating: false, sheetDraft: null, characters: [], activeCharacterId: null, users: [], issuedAccessToken: null, gmStatus: 'Sessao encerrada' });
     this.redirectToLogin();
   }
 
@@ -1044,6 +1279,14 @@ class Component extends DCLogic {
     if (!this._desktopHandlers) this._desktopHandlers = desktopHandlers(this);
     return this._desktopHandlers;
   }
+  rosterHandlers() {
+    if (!this._rosterHandlers) this._rosterHandlers = rosterHandlers(this);
+    return this._rosterHandlers;
+  }
+  achievementsHandlers() {
+    if (!this._achievementsHandlers) this._achievementsHandlers = achievementsHandlers(this);
+    return this._achievementsHandlers;
+  }
   asNumber(value, fallback, min, max) { return numAsNumber(value, fallback, min, max); }
   traumaPlanKey(character) {
     return charTraumaPlanKey(character);
@@ -1060,7 +1303,27 @@ class Component extends DCLogic {
   // Everything else goes through updateCharacterById, which gates on GM auth.
   applyCharacterPatch(characterId, patch) {
     const current = (this.state.characters || []).find(c => c.id === characterId) || this.activeCharacter();
+    // Leaving Mortally Wounded (HP back to 1+) by any route resets the Death
+    // Save streak, so a later collapse starts clean.
+    if (patch && patch.health && patch.health.cur != null && Number(patch.health.cur) >= 1) {
+      if (patch.deathSavesPassed == null && Number(current && current.deathSavesPassed)) patch = { ...patch, deathSavesPassed: 0 };
+      if (patch.deathSaveWoundPenalty == null && Number(current && current.deathSaveWoundPenalty)) patch = { ...patch, deathSaveWoundPenalty: 0 };
+    }
     const next = this.normalizeCharacter({ ...current, ...patch });
+    const applySaved = (savedRaw) => {
+      const saved = this.normalizeCharacter(savedRaw);
+      this.setState(s => ({
+        characters: (s.characters || []).map(c => c.id === saved.id ? saved : c),
+        credits: saved.id === s.activeCharacterId ? (saved.credits ?? s.credits) : s.credits,
+        base: saved.id === s.activeCharacterId ? (saved.base || s.base) : s.base,
+        equipped: saved.id === s.activeCharacterId ? this.normalizeEquipped(saved.equipped || s.equipped) : s.equipped,
+        owned: saved.id === s.activeCharacterId ? this.equippedCodes(saved.equipped || s.equipped) : s.owned,
+        health: saved.id === s.activeCharacterId ? (saved.health || s.health) : s.health,
+        ramUsed: saved.id === s.activeCharacterId ? (saved.ramUsed ?? s.ramUsed) : s.ramUsed,
+        gearItems: saved.id === s.activeCharacterId ? (saved.gear || s.gearItems) : s.gearItems,
+      }));
+      return saved;
+    };
     this._charactersTouched = true;
     this.setState(s => ({
       characters: (s.characters || []).map(c => c.id === next.id ? next : c),
@@ -1076,7 +1339,20 @@ class Component extends DCLogic {
       const writer = this.state.gmAuthenticated
         ? this.api().characters.upsert
         : (this.api().characters.createPlayer || this.api().characters.upsert);
-      return writer(next);
+      const persist = async (candidate) => applySaved(await writer(candidate));
+      return persist(next).catch(async (error) => {
+        if (!error || error.code !== 'REVISION_CONFLICT') throw error;
+        const latest = this.normalizeCharacter(await this.api().characters.get(characterId));
+        try {
+          const retried = await persist(this.normalizeCharacter({ ...latest, ...patch }));
+          this.flash('Ficha atualizada após mudança remota');
+          return retried;
+        } catch (retryError) {
+          applySaved(latest);
+          this.flash('A ficha mudou em outra sessão; recarregamos a versão atual');
+          throw retryError;
+        }
+      });
     }
     return Promise.resolve(next);
   }
@@ -1152,7 +1428,19 @@ class Component extends DCLogic {
     this.updateCharacterById(target.id, {
       health: { cur: 1, max: hpMax },
       statusEffects: [...(target.statusEffects || []), entry],
+      deathSavesPassed: 0,
+      deathSaveWoundPenalty: 0,
     });
+  }
+  // Death Save streak: +1 per save passed while Mortally Wounded. Players
+  // roll their own saves, so this goes through applyCharacterPatch (owner
+  // write), not the GM-only updateCharacterById.
+  recordDeathSavePassed(characterId) {
+    const target = (this.state.characters || []).find(c => c.id === characterId) || this.activeCharacter();
+    if (!target || !target.id) return;
+    const cur = target.health && target.health.cur != null ? Number(target.health.cur) : 1;
+    if (cur >= 1) return;
+    this.applyCharacterPatch(target.id, { deathSavesPassed: (Number(target.deathSavesPassed) || 0) + 1 });
   }
   adjustSpDamage(targetId, location, amount) {
     const target = this.normalizeCharacter((this.state.characters || []).find(c => c.id === targetId) || this.activeCharacter());
@@ -1160,9 +1448,16 @@ class Component extends DCLogic {
     const current = this.normalizeSpDamage(target.spDamage);
     this.updateCharacterById(target.id, { spDamage: { ...current, [slot]: Math.max(0, (current[slot] || 0) + (Number(amount) || 0)) } });
   }
+  /**
+   * Uploads are a GM tool everywhere except a player's own portrait. The GM
+   * gate used to cover that case too, and since it redirects to the login
+   * screen it threw the player out to campaign selection the first time they
+   * picked a photo for the sheet they had just created.
+   */
   async uploadImage(file, scope, ownerId) {
     if (!file) return null;
-    if (!this.ensureGm('Login do mestre necessario para upload')) return null;
+    const allowed = authCanUploadImage(this.authSession(), { staff: this.state.gmAuthenticated, scope, ownerId });
+    if (!allowed && !this.ensureGm('Login do mestre necessario para upload')) return null;
     if (this.api()) return this.api().uploads.image(file, { scope, ownerId });
     return { url: URL.createObjectURL(file) };
   }
@@ -1365,11 +1660,15 @@ class Component extends DCLogic {
       outcome = ok ? 'DEATH SAVE OK' : 'DEATH SAVE FALHOU';
       color = ok ? '#3fe0d0' : '#c0635b';
       detail = detail + ' < ' + opts.deathSaveTarget;
+      // RAW: every Death Save passed raises the next one's penalty by 1 until
+      // the character is stabilized. Recorded on the sheet so the GM sees it.
+      if (ok && !opts.skipDeathSaveStreak) this.recordDeathSavePassed(opts.combatantId || opts.actorId);
     }
     else if (crit) { outcome = tx.critical; color = '#3fe0d0'; }
     else if (fumble) { outcome = tx.fumble; color = '#c0635b'; }
     else if (opts.check && opts.dv != null) {
-      const ok = total >= Number(opts.dv);
+      // CPR RAW: a check must beat the DV; a tie is a failure.
+      const ok = total > Number(opts.dv);
       success = ok;
       outcome = ok ? tx.success : tx.checkRolled;
       color = ok ? '#3fe0d0' : '#d6aa4e';
@@ -1443,6 +1742,7 @@ class Component extends DCLogic {
   }
   async postChat(message) {
     if (!(this.api() && this.api().chat)) return;
+    if (!this.state.activeCampaignId) return;
     const active = this.activeCharacter();
     const payload = {
       sender: this.state.gm ? 'MESTRE' : (active.name || 'OPERATIVO'),
@@ -1455,6 +1755,7 @@ class Component extends DCLogic {
   }
   async refreshChat() {
     if (!(this.api() && this.api().chat)) return;
+    if (!this.state.activeCampaignId) return;
     try {
       const list = await this.api().chat.list();
       if (!Array.isArray(list)) return;
@@ -1482,7 +1783,9 @@ class Component extends DCLogic {
     try {
       const [characters, combatStateRaw] = await Promise.all([
         this.api().characters.list(),
-        this.api().combat && this.api().combat.state ? this.api().combat.state.get() : Promise.resolve(null),
+        this.state.activeCampaignId && this.api().combat && this.api().combat.state
+          ? this.api().combat.state.get()
+          : Promise.resolve(null),
       ]);
       if (!Array.isArray(characters)) return;
       const normalizedCharacters = this.normalizeCharacterList(characters);
@@ -1578,6 +1881,7 @@ class Component extends DCLogic {
       createPlayerCharacter: () => this.sheetHandlers().createPlayerCharacter(),
       cancelSheetEdit: () => this.sheetHandlers().cancelSheetEdit(),
       saveSheetDraft: () => this.sheetHandlers().saveSheetDraft(),
+      exportCharacterPdf: (characterId) => this.exportCharacterPdf(characterId),
       updateNotesField: (key, value) => this.sheetHandlers().updateNotesField(key, value),
       onPlayerPortraitUpload: (e) => this.sheetHandlers().onPlayerPortraitUpload(e),
       removeTraumaPlan: () => this.sheetHandlers().removeTraumaPlan(),
@@ -1591,6 +1895,12 @@ class Component extends DCLogic {
       removeCriticalInjury: (instanceId) => this.sheetHandlers().removeCriticalInjury(instanceId),
       useStatusCharge: (instanceId) => this.sheetHandlers().useStatusCharge(instanceId),
       removeStatusEffect: (instanceId) => this.sheetHandlers().removeStatusEffect(instanceId),
+      // One button on the effects ledger, routed by what the row actually is.
+      removeEffectRow: (row) => {
+        if (!row || !row.instanceId) return;
+        if (row.sourceKind === 'injury') this.sheetHandlers().removeCriticalInjury(row.instanceId);
+        else if (row.sourceKind === 'status') this.sheetHandlers().removeStatusEffect(row.instanceId);
+      },
       advanceConditionTime: (unit) => this.sheetHandlers().advanceConditionTime(unit),
       applyNaturalHealingRest: (targetId) => this.sheetHandlers().applyNaturalHealingRest(targetId),
       applyHumanityTherapy: (amount) => this.sheetHandlers().applyHumanityTherapy(amount),
@@ -1669,6 +1979,17 @@ class Component extends DCLogic {
     const map = mapRenderVals(S, this.mapHandlers());
     const nexus = nexusRenderVals(S, this.nexusHandlers());
     const hq = hqRenderVals(S, this.hqHandlers());
+    const roster = rosterRenderVals(S, {
+      ...this.rosterHandlers(),
+      selectCharacter: (id) => this.sheetHandlers().selectCharacter(id),
+      normalizeGearList: (gear) => this.normalizeGearList(gear),
+      playerRoleTone: (role) => this.playerRoleTone(role),
+      clampPct: (value) => this.clampPct(value),
+      setState: (patch) => this.setState(patch),
+    });
+    const achievements = achievementsRenderVals(S, this.achievementsHandlers());
+    const toxins = toxinsRenderVals(S, this.toxinsHandlers());
+    const gmEffects = gmEffectsRenderVals(S, this.gmEffectsHandlers());
 
     const desktop = desktopRenderVals(S, {
       tx,
@@ -1690,6 +2011,7 @@ class Component extends DCLogic {
       products: this.products,
       gearList: this.gearList,
       clockText: (now) => this.clockText(now),
+      playerRoleTone: (role) => this.playerRoleTone(role),
       scanlinesDefault: this.props.scanlines,
       auraDefault: this.props.aura,
       setState: (fn) => this.setState(fn),
@@ -1700,6 +2022,7 @@ class Component extends DCLogic {
       hasDamageProfile: (item) => this.hasDamageProfile(item),
       gearDamageText: (item) => this.gearDamageText(item),
       ignoresHalfSpBadge: (item) => this.ignoresHalfSpBadge(item),
+      isMeleeWeapon: (item) => this.isMeleeWeapon(item),
       effectMap: (map) => this.effectMap(map),
       weaponProfile: (item) => this.weaponProfile(item),
       normalizeEquipped: (equipped) => this.normalizeEquipped(equipped),
@@ -1728,6 +2051,13 @@ class Component extends DCLogic {
       deleteInventoryGear: (id) => this.desktopHandlers().deleteInventoryGear(id),
       useInventoryGear: (id) => this.desktopHandlers().useInventoryGear(id),
       buy: (p) => this.desktopHandlers().buy(p),
+      previewInstall: (product) => this.app().installCyberware.preview({
+        character: this.activeCharacter(),
+        catalog: this.state.products,
+        product,
+        credits: this.state.credits,
+        resolveInstallPayload: (item) => this.installPayload(item),
+      }),
       createGmCharacter: () => this.desktopHandlers().createGmCharacter(),
       upsertGmItem: () => this.desktopHandlers().upsertGmItem(),
       deleteGmItem: () => this.desktopHandlers().deleteGmItem(),
@@ -1744,6 +2074,10 @@ class Component extends DCLogic {
       authAuthenticated: S.authAuthenticated,
       authUserLabel: S.authAuthenticated && S.authUser ? (String(S.authUser.username || '').toUpperCase() + ' // ' + String(S.authUser.role || '').toUpperCase()) : 'LOGIN NECESSARIO',
       ...hq,
+      ...toxins,
+      ...gmEffects,
+      ...roster,
+      ...achievements,
       ...sheet,
       derived,
       rollDeathSave: () => derived.skipDeathSave ? this.flash('Death Save ignorado por condicao ativa') : this.roll({ label: 'DEATH SAVE', sides: 10, count: 1, mod: 0, deathSaveTarget: derived.deathSave }),

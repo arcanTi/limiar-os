@@ -14,6 +14,8 @@ import ResolveTarotDraw from './ResolveTarotDraw.ts';
 import type { ResolveTarotDrawApi } from './ResolveTarotDraw.ts';
 import ApplyAreaAttack from './ApplyAreaAttack.ts';
 import type { ApplyAreaAttackApi } from './ApplyAreaAttack.ts';
+import ApplyToxinExposure from './ApplyToxinExposure.ts';
+import type { ApplyToxinExposureApi } from './ApplyToxinExposure.ts';
 import PersistCharacter from './PersistCharacter.ts';
 import type { CharacterPersistenceApi } from './PersistCharacter.ts';
 import PersistCombatState from './PersistCombatState.ts';
@@ -30,6 +32,7 @@ export type ApplicationApi =
   & EndTurnApi
   & ResolveTarotDrawApi
   & ApplyAreaAttackApi
+  & ApplyToxinExposureApi
   & CharacterPersistenceApi
   & CombatStatePersistenceApi
   & CampaignMapApi;
@@ -43,6 +46,7 @@ export interface Application {
   endTurn: EndTurn;
   resolveTarotDraw: ResolveTarotDraw;
   applyAreaAttack: ApplyAreaAttack;
+  applyToxinExposure: ApplyToxinExposure;
   persistCharacter: PersistCharacter;
   persistCombatState: PersistCombatState;
   campaignMap: CampaignMapQueries;
@@ -61,6 +65,7 @@ export function createApplication({ api, rng = Math.random, clock = () => new Da
     endTurn: new EndTurn({ api, clock }),
     resolveTarotDraw: new ResolveTarotDraw({ api, rng, clock }),
     applyAreaAttack: new ApplyAreaAttack({ api, rng }),
+    applyToxinExposure: new ApplyToxinExposure({ api, rng, clock }),
     persistCharacter: new PersistCharacter(api),
     persistCombatState: new PersistCombatState(api),
     campaignMap: new CampaignMapQueries(api),

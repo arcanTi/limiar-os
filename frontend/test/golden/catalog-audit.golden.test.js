@@ -11,6 +11,11 @@ const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 const GOLDEN_DIR = path.resolve(__dirname, '../fixtures/golden');
 
+// Items added to the seed after the 2026-07-02 snapshot, each registered in
+// the canonical rules package so the audit still reports zero issues:
+//   +12 (2026-09-02) poison/drug doses and the three toxin ammunition rounds.
+const ADDED_ITEMS_SINCE_SNAPSHOT = 12;
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
@@ -51,7 +56,11 @@ describe('catalog audit golden masters', () => {
     expect(actual.source).toBe(snapshot.source);
     expect(actual.canonicalRules).toBe(snapshot.canonicalRules);
     expect(actual.report).toBe(snapshot.report);
-    expect(actual.totals.collections).toEqual(snapshot.totals.collections);
+    // Item count drifts as the catalog grows; everything else about the
+    // collections must still match the snapshot exactly.
+    expect({ ...actual.totals.collections, items: undefined })
+      .toEqual({ ...snapshot.totals.collections, items: undefined });
+    expect(actual.totals.collections.items).toBe(snapshot.totals.collections.items + ADDED_ITEMS_SINCE_SNAPSHOT);
     expect(engineReferencesWithoutCanonicalCodes(actual)).toEqual(engineReferencesWithoutCanonicalCodes(snapshot));
 
     // Accepted catalog evolution after the 2026-07-02 snapshot:

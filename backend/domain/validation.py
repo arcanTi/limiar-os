@@ -2,6 +2,8 @@
 
 import re
 
+from ..security import ACCESS_TOKEN_LENGTH, is_access_token, normalize_access_token
+
 # C0/C1 control characters except \n and \t. The template engine already
 # writes text via textContent/setAttribute (safe against markup injection),
 # but free-form fields that skip per-key validation (gear notes, character
@@ -73,28 +75,22 @@ def _val_int(payload: dict[str, object], key: str, *, required: bool = False) ->
     return val
 
 
-def validate_login(payload: dict[str, object]) -> tuple[str, str]:
-    username = _val_str(payload, "username", required=True, max_len=100)
-    # Don't strip passwords — spaces are valid password characters.
-    password = payload.get("password")
-    if not isinstance(password, str) or not password:
-        raise ValidationError(["'password' is required"])
-    return username, password  # type: ignore[return-value]
+def validate_login(payload: dict[str, object]) -> str:
+    """Return the normalized access token carried by a login request."""
+    token = normalize_access_token(payload.get("token"))
+    if not is_access_token(token):
+        raise ValidationError(
+            [f"'token' must be {ACCESS_TOKEN_LENGTH} letters or digits"]
+        )
+    return token
 
 
-def validate_user(payload: dict[str, object], *, password_optional: bool = False) -> tuple[str, str | None, str]:
+def validate_user(payload: dict[str, object]) -> tuple[str, str]:
     username = _val_str(payload, "username", required=True, max_len=100)
     role = _val_str(payload, "role", required=True, max_len=20) or "player"
     if role not in ("admin", "gm", "player"):
         raise ValidationError(["'role' must be 'admin', 'gm', or 'player'"])
-    password = payload.get("password")
-    if password is None or password == "":
-        if not password_optional:
-            raise ValidationError(["'password' is required"])
-        return username, None, role
-    if not isinstance(password, str) or len(password) < 8:
-        raise ValidationError(["'password' must be at least 8 characters"])
-    return username, password, role
+    return username, role  # type: ignore[return-value]
 
 
 def validate_email(payload: dict[str, object], *, required: bool = False) -> str | None:
@@ -111,6 +107,234 @@ def validate_email(payload: dict[str, object], *, required: bool = False) -> str
 def validate_character(payload: dict[str, object]) -> None:
     _val_str(payload, "name", required=True, max_len=120)
     _val_int(payload, "level")
+
+
+# --- Cyberpunk RED character creation -------------------------------------
+# Mirrors frontend/src/domain/character/constants.ts. The wizard already
+# enforces these numbers client-side; this is the server-side guard so a
+# hand-crafted payload cannot open a sheet with 10 in every STAT.
+
+CPRED_STAT_ORDER = ("INT", "REF", "DEX", "TECH", "COOL", "WILL", "LUCK", "MOVE", "BODY", "EMP")
+CPRED_STAT_BUDGET = 62
+CPRED_STAT_MIN = 2
+CPRED_STAT_MAX = 8  # every STAT, LUCK included (CPR p.42/78)
+CPRED_STAT_ROLL_MAX = 10  # house-rule raw 1d10; the RAW Edgerunner tables cap at 8
+CPRED_SKILL_BUDGET = 60  # 86 RAW minus the 26 locked in the 13 basic skills
+CPRED_SKILL_LEVEL_MAX = 6  # creation cap (p.42/90); 10 is reached with IP later
+CPRED_SKILL_TRAINED_MIN = 2  # a trained skill never starts at 1 (p.88)
+CPRED_DEFAULT_SKILL_LEVEL = 2
+CPRED_ORIGIN_LANGUAGE_LEVEL = 4  # free Cultural Origin language (p.41/45)
+CPRED_CREATION_CASH = 2550  # gear + cyberware budget; the rest is starting cash (p.104)
+CPRED_DEFAULT_SKILL_NAMES = frozenset(
+    {
+        "Athletics",
+        "Brawling",
+        "Concentration",
+        "Conversation",
+        "Education",
+        "Evasion",
+        "First Aid",
+        "Human Perception",
+        "Language (Streetslang)",
+        "Local Expert (Your Home)",
+        "Perception",
+        "Persuasion",
+        "Stealth",
+    }
+)
+CPRED_STAT_METHODS = ("points", "roll")
+
+
+def _stat_max(_key: str, method: str) -> int:
+    return CPRED_STAT_ROLL_MAX if method == "roll" else CPRED_STAT_MAX
+
+
+def _creation_method(payload: dict[str, object]) -> str:
+    creation = payload.get("creation")
+    if creation is None:
+        return "points"
+    if not isinstance(creation, dict):
+        raise ValidationError(["'creation' must be an object"])
+    method = creation.get("method", "points")
+    if method not in CPRED_STAT_METHODS:
+        raise ValidationError([f"'creation.method' must be one of {', '.join(CPRED_STAT_METHODS)}"])
+    for field in ("statRolls", "statRerolls"):
+        count = creation.get(field, 0)
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise ValidationError([f"'creation.{field}' must be a non-negative integer"])
+    if method == "roll" and creation.get("statRolls", 0) < len(CPRED_STAT_ORDER):
+        raise ValidationError(
+            [f"'creation.statRolls' must be at least {len(CPRED_STAT_ORDER)} when STATs are rolled"]
+        )
+    origin = creation.get("originLanguage", "")
+    if origin is not None and not isinstance(origin, str):
+        raise ValidationError(["'creation.originLanguage' must be a string"])
+    return str(method)
+
+
+def _origin_language(payload: dict[str, object]) -> str:
+    creation = payload.get("creation")
+    if not isinstance(creation, dict):
+        return ""
+    return str(creation.get("originLanguage") or "").strip()
+
+
+def _validate_creation_stats(base: object, method: str, errors: list[str]) -> None:
+    if not isinstance(base, dict):
+        errors.append("'base' must be an object")
+        return
+    total = 0
+    for key in CPRED_STAT_ORDER:
+        value = base.get(key)
+        if isinstance(value, bool) or not isinstance(value, int):
+            errors.append(f"'base.{key}' must be an integer")
+            continue
+        maximum = _stat_max(key, method)
+        if value < CPRED_STAT_MIN or value > maximum:
+            errors.append(f"'base.{key}' must be between {CPRED_STAT_MIN} and {maximum}")
+        total += value
+    if method == "points" and total > CPRED_STAT_BUDGET:
+        errors.append(f"'base' spends {total} points; the limit is {CPRED_STAT_BUDGET}")
+
+
+def _validate_creation_skills(skills: object, origin_language: str, errors: list[str]) -> None:
+    if not isinstance(skills, list):
+        errors.append("'skills' must be a list")
+        return
+    origin_name = f"Language ({origin_language})" if origin_language else ""
+    spent = 0
+    for index, skill in enumerate(skills):
+        if not isinstance(skill, dict):
+            errors.append(f"'skills[{index}]' must be an object")
+            continue
+        level = skill.get("level", 0)
+        if isinstance(level, bool) or not isinstance(level, int):
+            errors.append(f"'skills[{index}].level' must be an integer")
+            continue
+        if level < 0 or level > CPRED_SKILL_LEVEL_MAX:
+            errors.append(f"'skills[{index}].level' must be between 0 and {CPRED_SKILL_LEVEL_MAX}")
+            continue
+        name = str(skill.get("name") or "")
+        if skill.get("origin"):
+            if not origin_name or name != origin_name:
+                errors.append(
+                    f"'skills[{index}]' claims the origin language; "
+                    f"creation.originLanguage is {origin_language!r}"
+                )
+                continue
+            floor = CPRED_ORIGIN_LANGUAGE_LEVEL
+        else:
+            floor = CPRED_DEFAULT_SKILL_LEVEL if name in CPRED_DEFAULT_SKILL_NAMES else 0
+        if level < floor:
+            errors.append(f"'skills[{index}].level' must be at least {floor}")
+            continue
+        if floor < CPRED_SKILL_TRAINED_MIN and 0 < level < CPRED_SKILL_TRAINED_MIN:
+            errors.append(
+                f"'skills[{index}].level' must be 0 or at least {CPRED_SKILL_TRAINED_MIN}"
+            )
+            continue
+        cost = 2 if skill.get("difficult") else 1
+        spent += max(0, level - floor) * cost
+    if spent > CPRED_SKILL_BUDGET:
+        errors.append(f"'skills' spend {spent} points; the limit is {CPRED_SKILL_BUDGET}")
+
+
+def _row_spend(rows: object, *, with_quantity: bool = False) -> int:
+    """Sum the prices a payload claims for a list of bought rows."""
+    total = 0
+    if not isinstance(rows, list):
+        return total
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        price = row.get("price")
+        if isinstance(price, bool) or not isinstance(price, int) or price <= 0:
+            continue
+        qty = 1
+        if with_quantity:
+            raw_qty = row.get("qty", 1)
+            if isinstance(raw_qty, bool) or not isinstance(raw_qty, int) or raw_qty < 0:
+                raw_qty = 1
+            qty = raw_qty
+        total += price * qty
+    return total
+
+
+def _validate_creation_cash(payload: dict[str, object], errors: list[str]) -> None:
+    """Starting money never exceeds the Complete Package budget (p.104).
+
+    Chrome, arsenal and the cash left over share one 2.550eb pool. Prices come
+    from the payload, so this is a guard against the obvious hand-crafted
+    sheet, not an audit of the catalog.
+    """
+    credits = payload.get("credits")
+    if credits is None:
+        return
+    if isinstance(credits, bool) or not isinstance(credits, int) or credits < 0:
+        errors.append("'credits' must be a non-negative integer")
+        return
+    spent = _row_spend(payload.get("equipped")) + _row_spend(payload.get("gear"), with_quantity=True)
+    if credits + spent > CPRED_CREATION_CASH:
+        errors.append(
+            f"'credits' plus installed gear total {credits + spent}eb; "
+            f"the creation budget is {CPRED_CREATION_CASH}eb"
+        )
+
+
+def _validate_creation_lifestyle(payload: dict[str, object], errors: list[str]) -> None:
+    """Housing and its monthly bill (p.105) are a small, well-formed record."""
+    lifestyle = payload.get("lifestyle")
+    if lifestyle is None:
+        return
+    if not isinstance(lifestyle, dict):
+        errors.append("'lifestyle' must be an object")
+        return
+    for field in ("monthlyCost", "graceMonths"):
+        value = lifestyle.get(field, 0)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            errors.append(f"'lifestyle.{field}' must be a non-negative integer")
+    for field in ("housing", "food", "note", "id"):
+        value = lifestyle.get(field, "")
+        if value is not None and not isinstance(value, str):
+            errors.append(f"'lifestyle.{field}' must be a string")
+
+
+def _validate_creation_enhancements(payload: dict[str, object], errors: list[str]) -> None:
+    """One Cyberware Enhancement per piece of cyberware (Mission Kit DLC #2)."""
+    equipped = payload.get("equipped")
+    if not isinstance(equipped, list):
+        return
+    for row in equipped:
+        if not isinstance(row, dict):
+            continue
+        attached = row.get("enhancements")
+        if isinstance(attached, list) and len(attached) > 1:
+            code = row.get("code") or "cyberware"
+            errors.append(
+                f"'{code}' carries {len(attached)} enhancements; a piece takes one at a time"
+            )
+
+
+def validate_character_creation(payload: dict[str, object]) -> None:
+    """Guard a brand-new player sheet against an illegal starting spread.
+
+    Only fields that are present are checked: a payload without `base` or
+    `skills` is a minimal sheet the GM fills in later, not a cheat. Existing
+    sheets are never re-validated here because play (IP, cyberware) moves
+    them past creation limits legitimately.
+    """
+
+    method = _creation_method(payload)
+    errors: list[str] = []
+    if "base" in payload:
+        _validate_creation_stats(payload.get("base"), method, errors)
+    if "skills" in payload:
+        _validate_creation_skills(payload.get("skills"), _origin_language(payload), errors)
+    _validate_creation_cash(payload, errors)
+    _validate_creation_enhancements(payload, errors)
+    _validate_creation_lifestyle(payload, errors)
+    if errors:
+        raise ValidationError(errors)
 
 
 def validate_item(payload: dict[str, object]) -> None:

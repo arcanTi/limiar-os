@@ -31,7 +31,7 @@ from .repositories.adapters import (
 )
 from .repositories.identity import PostgresIdentityRepository
 from .repositories.meta import PostgresMetadataRepository
-from .security import password_hash, verify_password
+from .security import generate_access_token
 
 
 @lru_cache
@@ -46,7 +46,7 @@ def settings() -> PostgresSettingRepository:
 
 @lru_cache
 def characters() -> CharacterService:
-    return CharacterService(records())
+    return CharacterService(records(), campaign_repository)
 
 
 @lru_cache
@@ -56,12 +56,12 @@ def catalog() -> CatalogService:
 
 @lru_cache
 def chat() -> ChatService:
-    return ChatService(PostgresChatRepository())
+    return ChatService(PostgresChatRepository(), campaign_repository)
 
 
 @lru_cache
 def game_state() -> GameStateService:
-    return GameStateService(settings(), records())
+    return GameStateService(settings(), records(), campaign_repository)
 
 
 @lru_cache
@@ -83,8 +83,7 @@ def identity_repository() -> PostgresIdentityRepository:
 def identity() -> IdentityService:
     return IdentityService(
         identity_repository(),
-        password_hash,
-        verify_password,
+        generate_access_token,
         SESSION_TTL_SECONDS,
         REMEMBER_SESSION_TTL_SECONDS,
     )

@@ -6,11 +6,11 @@ from fastapi.testclient import TestClient
 
 from backend import db as db_module
 from backend.asgi import create_app
-from backend.security import password_hash
+from backend.security import generate_access_token
 
 # Accounts referenced by literal session fixtures. They must exist in `users`
-# because campaign membership, invitations, and password resets all reference
-# users(username), both in production and in the PostgreSQL test database.
+# because campaign membership and invitations reference users(username), both
+# in production and in the PostgreSQL test database.
 SESSION_USERNAMES = (
     "admin",
     "alice",
@@ -55,7 +55,6 @@ def db_path(monkeypatch):
     if not database_name.endswith("_test"):
         pytest.fail("LIMIAR_TEST_DATABASE_URL must name a database ending in '_test'")
     monkeypatch.setenv("LIMIAR_DATABASE_URL", test_url)
-    monkeypatch.setenv("LIMIAR_GM_PASSWORD", "test-only-admin-password")
     db_module.dispose_engine()
     monkeypatch.setattr(db_module, "load_seed_file", lambda: dict(db_module.EMPTY_SEED))
     db_module.init_db()
@@ -88,9 +87,9 @@ def seed_session_users(usernames=SESSION_USERNAMES) -> None:
     """Create accounts referenced by literal test sessions."""
     with db_module.db() as conn, conn.cursor() as cursor:
         cursor.executemany(
-            "INSERT INTO users(username, password_hash, role) "
-            "VALUES (%s, '', 'player') ON CONFLICT DO NOTHING",
-            [(name,) for name in usernames],
+            "INSERT INTO users(username, access_token, role) "
+            "VALUES (%s, %s, 'player') ON CONFLICT DO NOTHING",
+            [(name, generate_access_token()) for name in usernames],
         )
 
 
@@ -113,15 +112,16 @@ def db_conn(db_path):
 
 @pytest.fixture()
 def make_user(db_path):
-    def _make_user(username, password="password-123", role="player"):
+    def _make_user(username, access_token=None, role="player"):
+        access_token = access_token or generate_access_token()
         with db_module.db() as conn:
             conn.execute(
-                "INSERT INTO users(username, password_hash, role) VALUES (%s, %s, %s) "
+                "INSERT INTO users(username, access_token, role) VALUES (%s, %s, %s) "
                 "ON CONFLICT(username) DO UPDATE SET "
-                "password_hash = excluded.password_hash, role = excluded.role",
-                (username, password_hash(password), role),
+                "access_token = excluded.access_token, role = excluded.role",
+                (username, access_token, role),
             )
-        return {"username": username, "password": password, "role": role}
+        return {"username": username, "accessToken": access_token, "role": role}
 
     return _make_user
 
@@ -132,10 +132,10 @@ def make_session(make_user):
         username,
         role="player",
         token=None,
-        password="password-123",
+        access_token=None,
         expires_at=None,
     ):
-        user = make_user(username, password=password, role=role)
+        user = make_user(username, access_token=access_token, role=role)
         token_value = token or f"tok-{username}"
         with db_module.db() as conn:
             conn.execute(
@@ -178,9 +178,6 @@ class NativeAuthProbe:
     def _post_login(self):
         self._request("POST", "/api/login")
 
-    def _post_register(self):
-        self._request("POST", "/api/register")
-
     def _post_logout(self):
         self._request("POST", "/api/logout")
 
@@ -190,8 +187,8 @@ class NativeAuthProbe:
     def _delete_user(self, username: str):
         self._request("DELETE", f"/api/users/{username}")
 
-    def _post_google_login(self):
-        self._request("POST", "/api/auth/google")
+    def _post_regenerate_access_token(self, username: str):
+        self._request("POST", f"/api/users/{username}/access-token")
 
     def _post_users_me(self, _session):
         self._request("POST", "/api/users/me")

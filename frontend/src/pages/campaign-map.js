@@ -29,10 +29,10 @@ import { createMapDataRuntime } from './campaignMapDataRuntime.js';
 import * as selectors from './campaignMapSelectors.js';
 
 "use strict";
-const limiarApi = createLimiarAPI();
 const params = new URLSearchParams(location.search);
 const campaignId = params.get("campaign") || "";
-const state = { session:null, canEdit:false, scene:null, scenes:[], tokens:[], fogAreas:[], reveals:[], templates:[], walls:[], props:[], lights:[], drawings:[], pins:[], mapVersion:0, selected:null, selectedIds:[], hoverTokenId:null, selectedTemplateId:null, selectedPropId:null, templateDraft:null, wallDraft:null, propDraft:null, lightDraft:null, drawingDraft:null, tool:"select", showGrid:true, snap:false, runMode:false, camera:{x:0,y:0,zoom:1}, mapImage:null, tokenImages:new Map(), measure:null, fogDraft:null, difficultCells:new Set(), characterMoveCache:new Map(), selectedMoveCells:null, pingAnims:new Map(), combat:{active:false,roundNumber:0,turnCharacterId:null} };
+const limiarApi = createLimiarAPI({ campaignId });
+const state = { session:null, canEdit:false, scene:null, scenes:[], tokens:[], fogAreas:[], reveals:[], templates:[], walls:[], props:[], lights:[], drawings:[], pins:[], mapVersion:0, selected:null, selectedIds:[], hoverTokenId:null, selectedTemplateId:null, selectedPropId:null, templateDraft:null, wallDraft:null, propDraft:null, lightDraft:null, drawingDraft:null, tool:"select", showGrid:true, snap:false, runMode:false, camera:{x:0,y:0,zoom:1}, mapImage:null, tokenImages:new Map(), measure:null, fogDraft:null, difficultCells:new Set(), characterMoveCache:new Map(), selectedMoveCells:null, moveSpent:new Map(), pingAnims:new Map(), combat:{active:false,roundNumber:0,turnCharacterId:null} };
 const PING_ANIM_MS = 3000, PING_KEEP_MS = 20000;
 const canvas = byId("canvas"), ctx = canvas.getContext("2d");
 // Fog and shadow use a dedicated offscreen buffer. destination-out must punch holes in a
@@ -171,10 +171,10 @@ const canvasRenderer = createCanvasRenderer({
     objects: ({ g }) => { drawWalls(); drawProps(g); drawPins(); },
     overlays: ({ g }) => { drawMeasure(g); drawTemplates(g); drawPings(); },
   },
-  afterFrame: ({ g }) => { positionTokenHud(); const moveCells = state.selectedMoveCells, moveEff = moveCells != null ? moveRangeCells(moveCells, { run: state.runMode }) : null; const moveLabel = moveEff != null ? ` | MOVE ${moveCells}q${state.runMode ? " (RUN x2)" : ""} = ${cellsToMeters(moveEff).toFixed(0)}m` : ""; const focusToken = state.tokens.find(x => x.id === (state.hoverTokenId || state.selected)); const attack = state.measure && state.measure.attackReady ? ` <button class="btn primary" id="mapAttackBtn">USAR NO ATAQUE</button>` : ""; const combatLabel = state.combat && state.combat.active ? ` | COMBATE ROUND ${state.combat.roundNumber}` : ""; ui.hud.innerHTML = `Zoom ${Math.round(state.camera.zoom * 100)}% | Grid ${g}px (${GRID_METERS_PER_CELL}m) | ${esc(state.tool)}${state.selectedIds.length > 1 ? ` | ${state.selectedIds.length} selecionados` : ""}${combatLabel}${moveLabel}${esc(conditionSummary(focusToken))}${attack}`; const attackBtn = byId("mapAttackBtn"); if (attackBtn) attackBtn.onclick = runAction(useMapAttack); },
+  afterFrame: ({ g }) => { positionTokenHud(); const moveCells = state.selectedMoveCells, moveEff = moveCells != null ? moveRangeCells(moveCells, { run: state.runMode }) : null; const moveSpentToken = state.tokens.find(x => x.id === state.selected); const moveSpentCells = moveSpentToken ? moveSpentFor(moveSpentToken) : 0; const moveLabel = moveEff != null ? ` | MOVE ${moveCells}q${state.runMode ? " (RUN x2)" : ""} = ${cellsToMeters(moveEff).toFixed(0)}m${state.combat && state.combat.active ? ` | usado ${moveSpentCells}q, resta ${Math.max(0, moveEff - moveSpentCells)}q` : ""}` : ""; const focusToken = state.tokens.find(x => x.id === (state.hoverTokenId || state.selected)); const attack = state.measure && state.measure.attackReady ? ` <button class="btn primary" id="mapAttackBtn">USAR NO ATAQUE</button>` : ""; const combatLabel = state.combat && state.combat.active ? ` | COMBATE ROUND ${state.combat.roundNumber}` : ""; ui.hud.innerHTML = `Zoom ${Math.round(state.camera.zoom * 100)}% | Grid ${g}px (${GRID_METERS_PER_CELL}m) | ${esc(state.tool)}${state.selectedIds.length > 1 ? ` | ${state.selectedIds.length} selecionados` : ""}${combatLabel}${moveLabel}${esc(conditionSummary(focusToken))}${attack}`; const attackBtn = byId("mapAttackBtn"); if (attackBtn) attackBtn.onclick = runAction(useMapAttack); },
 });
 const pointerHandlers = createPointerHandlers({
-  canvas, state, pointer, ui, screenToWorld, tokenAt, snap, renderTokens, syncTokenForm, renderTokenHud, updateSelectedMove, drawOnce, canMove, templateAt, canEditTemplate, syncTemplateForm, renderTemplateList, wallAt, toggleDoor, openPromptModal, savePin, toggleTerrainAtWorld, pixelsToMeters, sceneSize, moveTokenGroup, saveTemplatePlacement, saveWall, saveProp, saveLight, saveDrawing, saveFog, buildAttackMeasure, prepareMapAttack, status,
+  canvas, state, pointer, ui, screenToWorld, tokenAt, snap, renderTokens, syncTokenForm, renderTokenHud, updateSelectedMove, drawOnce, canMove, templateAt, canEditTemplate, syncTemplateForm, renderTemplateList, wallAt, toggleDoor, openPromptModal, savePin, toggleTerrainAtWorld, pixelsToMeters, sceneSize, moveTokenGroup, saveTemplatePlacement, saveWall, saveProp, saveLight, saveDrawing, saveFog, buildAttackMeasure, prepareMapAttack, status, recordMoveSpent,
 });
 const onMapKeyDown = createMapKeyboardHandler({ state, closeTokenMenu, renderTokens, renderTokenHud, updateSelectedMove, drawOnce, setTool, sceneSize, snap, canMove, moveTokenGroup, status });
 const dataRuntime = createMapDataRuntime({
@@ -220,7 +220,7 @@ function draw(){canvasRenderer.draw()}
 function drawDifficultTerrain(g){if(!state.difficultCells.size)return;ctx.save();ctx.fillStyle="rgba(192,99,91,.24)";ctx.strokeStyle="rgba(192,99,91,.55)";ctx.lineWidth=1/state.camera.zoom;state.difficultCells.forEach(key=>{const [gx,gy]=key.split(",").map(Number);ctx.fillRect(gx*g,gy*g,g,g);ctx.strokeRect(gx*g,gy*g,g,g)});ctx.restore()}
 // Advisory movement-range overlay (CPR RAW: MOVE x 2m; Run doubles it). It
 // never blocks token dragging; the GM remains the arbiter.
-function drawMoveRange(g){if(state.selectedMoveCells==null)return;const t=state.tokens.find(x=>x.id===state.selected);if(!t)return;const radius=moveRangePixels(state.selectedMoveCells,g,{run:state.runMode});if(!radius)return;ctx.save();ctx.strokeStyle="rgba(63,224,208,.5)";ctx.setLineDash([6/state.camera.zoom,5/state.camera.zoom]);ctx.lineWidth=2/state.camera.zoom;ctx.beginPath();ctx.arc(t.x,t.y,radius,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
+function drawMoveRange(g){if(state.selectedMoveCells==null)return;const t=state.tokens.find(x=>x.id===state.selected);if(!t)return;const radius=Math.max(0,moveRangeCells(state.selectedMoveCells,{run:state.runMode})-moveSpentFor(t))*g;if(!radius)return;ctx.save();ctx.strokeStyle="rgba(63,224,208,.5)";ctx.setLineDash([6/state.camera.zoom,5/state.camera.zoom]);ctx.lineWidth=2/state.camera.zoom;ctx.beginPath();ctx.arc(t.x,t.y,radius,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
 // Adaptive contrast keeps grid lines readable over
 // a dark map at low zoom; adaptiveGridStyle (domain/map/gridRender) lifts
 // alpha/line-width for darker scenes and zoomed-out views.
@@ -283,6 +283,13 @@ async function patchToken(t,partial){if(!canMove(t))return;try{const payload={id
 async function dismissBadge(t,badge){if(!t.characterId||!canMove(t))return;try{const character=await limiarApi.characters.get(t.characterId);const patch=cprDismissBadge(character,badge);if(!patch)return;const next={...character,...patch};const writer=state.canEdit?limiarApi.characters.upsert:limiarApi.characters.createPlayer;await writer(next);await loadSoft();status("atualizado","ok")}catch(e){status(e.message||"acao indisponivel","err")}}
 // A token's gold turn ring lights up only when combat is
 // actually active and this token is linked to whoever's turn it is.
+// Movement already spent this combat round by a token (CPR RAW: a turn's
+// movement can be split around attacks in any order, but the total stays
+// one MOVE action; Run doubles it). Advisory: the ring shrinks and the HUD
+// counts, nothing blocks a drag. Resets on its own when the round changes
+// or combat ends.
+function moveSpentFor(t){if(!t||!state.combat||!state.combat.active)return 0;const entry=state.moveSpent.get(t.id);return entry&&entry.round===state.combat.roundNumber?entry.cells:0}
+function recordMoveSpent(t,cells){if(!t||!state.combat||!state.combat.active||!(cells>0))return;state.moveSpent.set(t.id,{round:state.combat.roundNumber,cells:moveSpentFor(t)+cells})}
 function isCombatTurn(t){return !!(t&&t.characterId&&state.combat&&state.combat.active&&state.combat.turnCharacterId&&t.characterId===state.combat.turnCharacterId)}
 const EXPLORED_MAX_ALPHA=.5;
 // `individual` exploration mode means current vision is not pooled across the

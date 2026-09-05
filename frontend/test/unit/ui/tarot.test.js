@@ -281,3 +281,206 @@ describe('ui/views/tarot tarotHandlers', () => {
     expect(component.state.tarotResolution).toBeNull();
   });
 });
+
+// --- FX canvas rig -----------------------------------------------------------
+// vitest runs in the `node` environment (vite.config.js), so the tarot canvas
+// pipeline needs its DOM stubbed by hand. decodeTarotCard() awaits an Image
+// load, so the stub must fire onload (or set `complete`) or every draw hangs.
+function fxRig() {
+  const ctx = {
+    setTransform: vi.fn(), clearRect: vi.fn(), beginPath: vi.fn(), arc: vi.fn(),
+    fill: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(),
+    fillStyle: '', shadowBlur: 0, shadowColor: '', strokeStyle: '', lineWidth: 0,
+    globalCompositeOperation: '',
+  };
+  const canvas = {
+    width: 0, height: 0,
+    getContext: vi.fn(() => ctx),
+    getBoundingClientRect: () => ({ width: 420, height: 590 }),
+    parentElement: { getBoundingClientRect: () => ({ width: 420, height: 590 }) },
+  };
+  const frames = [];
+  const listeners = {};
+  const doc = {
+    hidden: false,
+    canvasMounted: true,
+    getElementById: (id) => (id === 'limiar-tarot-fx' && doc.canvasMounted ? canvas : null),
+    addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+    removeEventListener: (type, fn) => { listeners[type] = (listeners[type] || []).filter(f => f !== fn); },
+  };
+  vi.stubGlobal('document', doc);
+  vi.stubGlobal('window', { devicePixelRatio: 2, matchMedia: () => ({ matches: false }) });
+  vi.stubGlobal('performance', { now: () => 0 });
+  vi.stubGlobal('requestAnimationFrame', (cb) => { frames.push(cb); return frames.length; });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.stubGlobal('Image', class {
+    constructor() { this.complete = false; this.onload = null; this.onerror = null; }
+    set src(_v) { this.complete = true; if (this.onload) this.onload(); }
+    get src() { return ''; }
+    decode() { return Promise.resolve(); }
+  });
+  return {
+    ctx, canvas, frames, doc,
+    pump: (t = 16) => { const cb = frames.pop(); if (cb) cb(t); },
+    setHidden: (hidden) => { doc.hidden = hidden; (listeners.visibilitychange || []).forEach(fn => fn()); },
+  };
+}
+
+function drawComponent(card, tarotState = {}) {
+  const execute = vi.fn(async () => ({ ok: true, card, tarotState: { order: [0], history: [], ...tarotState } }));
+  return fakeComponent({ state: { tarotPhase: 'idle', tarotState: {}, tarotCurrent: null }, app: () => ({ resolveTarotDraw: { execute } }) });
+}
+
+describe('ui/views/tarot FX + sync', () => {
+  let rig;
+  beforeEach(() => { vi.useFakeTimers(); rig = fxRig(); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it('runs deal (720ms) -> shown -> FX (+30ms) and paints on the canvas', async () => {
+    const card = LIMIAR_TAROT_CARDS.find(c => c.fx === 'world') || LIMIAR_TAROT_CARDS[0];
+    const component = drawComponent(card);
+    await tarotHandlers(component).drawTarot();
+
+    expect(component.state.tarotPhase).toBe('dealing');
+    vi.advanceTimersByTime(719);
+    expect(component.state.tarotPhase).toBe('dealing');
+    vi.advanceTimersByTime(1);
+    expect(component.state.tarotPhase).toBe('shown');
+    expect(rig.canvas.getContext).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(30);
+    expect(rig.canvas.getContext).toHaveBeenCalledTimes(1);
+    // devicePixelRatio 2 is clamped to 1.65 so heavy cards stay cheap.
+    expect(rig.canvas.width).toBe(Math.floor(420 * 1.65));
+
+    rig.pump();
+    expect(rig.ctx.arc).toHaveBeenCalled();
+    expect(rig.frames.length).toBe(1);
+  });
+
+  it('parks the FX loop while the tab is hidden and resumes it on visibilitychange', async () => {
+    const component = drawComponent(LIMIAR_TAROT_CARDS[0]);
+    await tarotHandlers(component).drawTarot();
+    vi.advanceTimersByTime(750);
+    expect(rig.frames.length).toBe(1);
+
+    rig.doc.hidden = true;
+    rig.pump();
+    expect(rig.frames.length).toBe(0);
+
+    rig.setHidden(false);
+    expect(rig.frames.length).toBe(1);
+    rig.pump();
+    expect(rig.frames.length).toBe(1);
+  });
+
+  it('stopTarotFx unsubscribes the visibility listener', async () => {
+    const component = drawComponent(LIMIAR_TAROT_CARDS[0]);
+    const tarot = tarotHandlers(component);
+    await tarot.drawTarot();
+    vi.advanceTimersByTime(750);
+    tarot.stopTarotFx();
+    rig.frames.length = 0;
+    rig.setHidden(false);
+    expect(rig.frames.length).toBe(0);
+  });
+
+  it('ensureTarotFx starts the FX for a card that arrived from sync', () => {
+    const card = LIMIAR_TAROT_CARDS[0];
+    const component = fakeComponent({ state: { tarotPhase: 'shown', tarotCurrent: card } });
+    const tarot = tarotHandlers(component);
+    expect(tarot.ensureTarotFx()).toBe(true);
+    expect(rig.canvas.getContext).toHaveBeenCalledTimes(1);
+    // Already running: a second sync tick must not stack a second loop.
+    expect(tarot.ensureTarotFx()).toBe(false);
+    expect(rig.canvas.getContext).toHaveBeenCalledTimes(1);
+  });
+
+  it('ensureTarotFx is a no-op without a shown card or without the canvas', () => {
+    const card = LIMIAR_TAROT_CARDS[0];
+    expect(tarotHandlers(fakeComponent({ state: { tarotPhase: 'dealing', tarotCurrent: card } })).ensureTarotFx()).toBe(false);
+    expect(tarotHandlers(fakeComponent({ state: { tarotPhase: 'shown', tarotCurrent: null } })).ensureTarotFx()).toBe(false);
+    rig.doc.canvasMounted = false;
+    expect(tarotHandlers(fakeComponent({ state: { tarotPhase: 'shown', tarotCurrent: card } })).ensureTarotFx()).toBe(false);
+  });
+
+  it('tarotSyncPatch shows a card drawn on another client', () => {
+    const card = LIMIAR_TAROT_CARDS[2];
+    const component = fakeComponent({ state: { tarotPhase: 'idle', tarotCurrent: null } });
+    const patch = tarotHandlers(component).tarotSyncPatch({ drawnThisSession: { n: card.n, name: card.name, ts: 't1' } });
+    expect(patch).toEqual({ tarotCurrent: card, tarotPhase: 'shown', tarotDismissed: null });
+  });
+
+  it('tarotSyncPatch never interrupts a running deal/discard/shuffle', () => {
+    const card = LIMIAR_TAROT_CARDS[2];
+    const entry = { drawnThisSession: { n: card.n, name: card.name, ts: 't1' } };
+    for (const phase of ['dealing', 'discarding', 'shuffling']) {
+      const component = fakeComponent({ state: { tarotPhase: phase, tarotCurrent: card } });
+      expect(tarotHandlers(component).tarotSyncPatch(entry).tarotPhase).toBe(phase);
+    }
+  });
+
+  it('discardTarot remembers the dismissal so sync does not deal the card back', () => {
+    const card = LIMIAR_TAROT_CARDS[3];
+    const drawnThisSession = { n: card.n, name: card.name, ts: 't7' };
+    const component = fakeComponent({ state: { tarotPhase: 'shown', tarotCurrent: card, tarotState: { drawnThisSession } } });
+    const tarot = tarotHandlers(component);
+
+    tarot.discardTarot();
+    vi.advanceTimersByTime(900);
+    expect(component.state.tarotCurrent).toBeNull();
+    expect(component.state.tarotDismissed).toEqual({ n: card.n, ts: 't7' });
+
+    // The session lock itself is untouched - discard is not a free redraw.
+    expect(tarot.tarotSessionLocked()).toBe(true);
+    const patch = tarot.tarotSyncPatch({ drawnThisSession });
+    expect(patch.tarotCurrent).toBeNull();
+    expect(patch.tarotPhase).toBe('idle');
+  });
+
+  it('a newer draw of the same card clears the dismissal and deals again', () => {
+    const card = LIMIAR_TAROT_CARDS[3];
+    const component = fakeComponent({ state: { tarotPhase: 'idle', tarotCurrent: null, tarotDismissed: { n: card.n, ts: 't7' } } });
+    const patch = tarotHandlers(component).tarotSyncPatch({ drawnThisSession: { n: card.n, name: card.name, ts: 't9' } });
+    expect(patch.tarotCurrent).toBe(card);
+    expect(patch.tarotPhase).toBe('shown');
+    expect(patch.tarotDismissed).toBeNull();
+  });
+
+  it('replaceTarotCard holds the dismissal across the empty-table gap', async () => {
+    const card = LIMIAR_TAROT_CARDS[5];
+    const next = LIMIAR_TAROT_CARDS[6];
+    const execute = vi.fn(async () => ({ ok: true, card: next, tarotState: { order: [0], history: [] } }));
+    const component = fakeComponent({
+      state: { tarotPhase: 'shown', tarotCurrent: card, tarotState: { drawnThisSession: { n: card.n, name: card.name, ts: 't3' } } },
+      app: () => ({ resolveTarotDraw: { execute } }),
+    });
+    const tarot = tarotHandlers(component);
+
+    tarot.replaceTarotCard();
+    vi.advanceTimersByTime(900);
+    expect(component.state.tarotCurrent).toBeNull();
+    expect(component.state.tarotDismissed).toEqual({ n: card.n, ts: 't3' });
+
+    await vi.advanceTimersByTimeAsync(40);
+    expect(component.state.tarotCurrent).toBe(next);
+    expect(component.state.tarotDismissed).toBeNull();
+  });
+
+  it('drawTarotNext clears any previous dismissal', async () => {
+    const card = LIMIAR_TAROT_CARDS[0];
+    const component = drawComponent(card);
+    component.state.tarotDismissed = { n: 'XXI', ts: 't1' };
+    await tarotHandlers(component).drawTarot();
+    expect(component.state.tarotDismissed).toBeNull();
+  });
+
+  it('reduced motion only thins the canvas - the deal window is unchanged', async () => {
+    globalThis.window.matchMedia = () => ({ matches: true });
+    const component = drawComponent(LIMIAR_TAROT_CARDS[0]);
+    await tarotHandlers(component).drawTarot();
+    expect(component.state.tarotPhase).toBe('dealing');
+    vi.advanceTimersByTime(750);
+    expect(rig.canvas.width).toBe(Math.floor(420 * 1.1));
+  });
+});

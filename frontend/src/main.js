@@ -6,6 +6,7 @@ import './styles/main.css';
 // view. Loading it asynchronously keeps the player-sheet startup chunk lean.
 void import('../games/nexus/index.js');
 import { createLimiarAPI, LimiarStore } from './infrastructure/store.ts';
+import { downloadBytes } from './infrastructure/download.ts';
 import { mountComponent } from './framework/index.js';
 import Component from './ui/Component.js';
 import { mountCampaignsOverlay } from './ui/views/campaigns.js';
@@ -13,11 +14,11 @@ import { mountOnboardingWizard } from './ui/views/onboarding.js';
 import { createApplication } from './application/createApplication.ts';
 
 // Defaults previously declared via the script tag's data-props attribute.
-const api = createLimiarAPI();
-const app = createApplication({ api });
 const params = new URLSearchParams(location.search);
 const activeCampaignId = params.get('campaign') || '';
 const wantsToJoin = params.get('join') === '1';
+const api = createLimiarAPI({ campaignId: activeCampaignId });
+const app = createApplication({ api });
 
 mountComponent(Component, {
   scanlines: true,
@@ -25,6 +26,7 @@ mountComponent(Component, {
   api,
   app,
   store: LimiarStore,
+  downloadFile: downloadBytes,
   activeCampaignId,
 });
 

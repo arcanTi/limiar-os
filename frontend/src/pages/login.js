@@ -1,6 +1,6 @@
 import '../styles/login.css';
 import { createLimiarAPI } from '../infrastructure/api/index.ts';
-import { getToken, setToken } from '../infrastructure/session.ts';
+import { getToken } from '../infrastructure/session.ts';
 import { implementationLabel, systemMeta } from '../domain/campaigns/systems.ts';
 
 "use strict";
@@ -11,25 +11,11 @@ function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ 
 
 const els = {
   stageArt: byId('stageArt'),
-  googleFallback: byId('googleFallback'),
   stepCredentials: byId('stepCredentials'),
   stepCampaign: byId('stepCampaign'),
-  googleButton: byId('googleButton'),
-  googleDivider: byId('googleDivider'),
-  formSwap: byId('formSwap'),
   loginForm: byId('loginForm'),
-  registerForm: byId('registerForm'),
-  loginUsername: byId('loginUsername'),
-  loginPassword: byId('loginPassword'),
+  loginToken: byId('loginToken'),
   loginRemember: byId('loginRemember'),
-  forgotPasswordLink: byId('forgotPasswordLink'),
-  resetRequestForm: byId('resetRequestForm'),
-  resetUsername: byId('resetUsername'),
-  resetCancel: byId('resetCancel'),
-  registerUsername: byId('registerUsername'),
-  registerPassword: byId('registerPassword'),
-  registerConfirm: byId('registerConfirm'),
-  toggleMode: byId('toggleMode'),
   credentialsStatus: byId('credentialsStatus'),
   campaignList: byId('campaignList'),
   campaignEmpty: byId('campaignEmpty'),
@@ -215,23 +201,6 @@ function setButtonLoading(form, loading) {
   btn.classList.toggle('is-loading', loading);
   btn.querySelector('.btn-spinner').hidden = !loading;
 }
-
-function setMode(mode) {
-  const registering = mode === 'register';
-  const resetting = mode === 'reset';
-  els.loginForm.hidden = registering || resetting;
-  els.registerForm.hidden = !registering;
-  els.resetRequestForm.hidden = !resetting;
-  els.toggleMode.hidden = resetting;
-  els.toggleMode.textContent = registering ? 'Ja tenho uma conta' : 'Criar uma conta';
-  els.googleDivider.hidden = resetting;
-  els.googleFallback.closest('.google-row').hidden = resetting;
-  showStatus(els.credentialsStatus, '', '');
-}
-setMode('login');
-els.toggleMode.onclick = () => setMode(els.registerForm.hidden ? 'register' : 'login');
-els.forgotPasswordLink.onclick = () => setMode('reset');
-els.resetCancel.onclick = () => setMode('login');
 
 function goToApp(campaignId, options = {}) {
   const params = new URLSearchParams();
@@ -425,117 +394,47 @@ els.newCampaignForm.addEventListener('submit', async (event) => {
   }
 });
 
+// The token is the whole credential, so the field is normalised as it is
+// typed: uppercase, no separators, capped at the token length. This makes a
+// pasted "a7k2-qf" or a token read aloud land on the same six characters the
+// backend stored. The cap lives here rather than in a `maxlength`, which would
+// count the separators the user is allowed to type and swallow real characters.
+function normalizeToken(value) {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+
+els.loginToken.addEventListener('input', () => {
+  const normalized = normalizeToken(els.loginToken.value);
+  if (els.loginToken.value !== normalized) els.loginToken.value = normalized;
+});
+
 els.loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  const accessToken = normalizeToken(els.loginToken.value);
+  if (accessToken.length !== 6) {
+    showStatus(els.credentialsStatus, 'O token tem 6 caracteres.', 'err');
+    return;
+  }
   showStatus(els.credentialsStatus, '', '');
   setButtonLoading(els.loginForm, true);
   try {
-    const session = await api.auth.login(els.loginUsername.value.trim(), els.loginPassword.value, els.loginRemember.checked);
-    if (!session || !session.token) throw new Error('Credenciais inválidas');
+    const session = await api.auth.login(accessToken, els.loginRemember.checked);
+    if (!session || !session.token) throw new Error('Token inválido');
     await showCampaignPicker(session.user);
   } catch (_e) {
-    showStatus(els.credentialsStatus, 'Credenciais inválidas', 'err');
+    showStatus(els.credentialsStatus, 'Token inválido ou expirado', 'err');
   } finally {
     setButtonLoading(els.loginForm, false);
   }
 });
 
-els.resetRequestForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const username = els.resetUsername.value.trim();
-  if (!username) return;
-  setButtonLoading(els.resetRequestForm, true);
-  try {
-    await api.auth.requestPasswordReset(username);
-  } catch (_e) {
-    // still show the generic message below - the request is fire-and-forget
-    // from the user's point of view either way (see backend: no enumeration).
-  } finally {
-    setButtonLoading(els.resetRequestForm, false);
-    els.resetRequestForm.reset();
-    showStatus(els.credentialsStatus, 'Se o usuário existir, um mestre ou administrador vai liberar uma nova senha em breve.', '');
-    window.setTimeout(() => setMode('login'), 2600);
-  }
-});
-
-els.registerForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (els.registerPassword.value.length < 8) {
-    showStatus(els.credentialsStatus, 'Senha deve ter ao menos 8 caracteres', 'err');
-    return;
-  }
-  if (els.registerPassword.value !== els.registerConfirm.value) {
-    showStatus(els.credentialsStatus, 'Senhas nao conferem', 'err');
-    return;
-  }
-  showStatus(els.credentialsStatus, '', '');
-  setButtonLoading(els.registerForm, true);
-  try {
-    const session = await api.auth.register(els.registerUsername.value.trim(), els.registerPassword.value);
-    if (!session || !session.token) throw new Error('Não foi possível criar a conta');
-    await showCampaignPicker(session.user);
-  } catch (e) {
-    showStatus(els.credentialsStatus, e.message || 'Não foi possível criar a conta', 'err');
-  } finally {
-    setButtonLoading(els.registerForm, false);
-  }
-});
-
-async function handleGoogleCredential(response) {
-  showStatus(els.credentialsStatus, 'Entrando com Google...', '');
-  try {
-    const session = await api.request('/auth/google', { method: 'POST', body: JSON.stringify({ idToken: response.credential }) });
-    if (!session || !session.token) throw new Error('Falha no login com Google');
-    setToken(session.token);
-    await showCampaignPicker(session.user);
-  } catch (e) {
-    showStatus(els.credentialsStatus, e.message || 'Falha no login com Google', 'err');
-  }
-}
-
-function waitForGoogleSdk(retries = 20) {
-  return new Promise((resolve) => {
-    const check = (n) => {
-      if (window.google && window.google.accounts && window.google.accounts.id) return resolve(window.google);
-      if (n <= 0) return resolve(null);
-      setTimeout(() => check(n - 1), 150);
-    };
-    check(retries);
-  });
-}
-
-async function initGoogleButton() {
-  // The fallback button is always visible; when the server has a client id
-  // and the SDK loads, the official Google button replaces it.
-  els.googleFallback.onclick = () => {
-    showStatus(els.credentialsStatus, 'Login com Google indisponivel: servidor sem GOOGLE_CLIENT_ID configurado.', 'err');
-  };
-  try {
-    const config = await api.request('/meta/config');
-    const clientId = config && config.googleClientId;
-    if (!clientId) return;
-    const google = await waitForGoogleSdk();
-    if (!google) return;
-    google.accounts.id.initialize({ client_id: clientId, callback: handleGoogleCredential });
-    google.accounts.id.renderButton(els.googleButton, { type: 'standard', shape: 'pill', size: 'large', width: 330, locale: 'pt-BR' });
-    els.googleFallback.hidden = true;
-  } catch (_e) {
-    // Google login stays on the fallback button when config/SDK are missing.
-  }
-}
-
 async function boot() {
-  if (getToken()) {
-    try {
-      const data = await api.auth.session();
-      if (data && data.authenticated && data.user) {
-        await showCampaignPicker(data.user);
-        return;
-      }
-    } catch (_e) {
-      // fall through to the credentials step
-    }
+  if (!getToken()) return;
+  try {
+    const data = await api.auth.session();
+    if (data && data.authenticated && data.user) await showCampaignPicker(data.user);
+  } catch (_e) {
+    // fall through to the token step
   }
-  initGoogleButton();
 }
 boot();

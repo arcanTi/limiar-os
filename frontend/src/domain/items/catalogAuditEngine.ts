@@ -103,6 +103,17 @@ function collectCanonicalRefs() {
     codes.add(String(code).trim().toUpperCase());
     if (entry && entry.name) names.add(String(entry.name).trim().toUpperCase());
   });
+  // Poison/drug rules register their ammunition and dose items by code, so the
+  // toxin catalog is traceable to the canon the same way weapons and armor are.
+  const poisonRules = canonicalRules.corePoisonAndDrugRules || {};
+  [poisonRules.ammunition, poisonRules.doses].forEach(group => {
+    Object.entries(group || {}).forEach(([code, entry]) => {
+      codes.add(String(code).trim().toUpperCase());
+      if (entry && (entry as { name?: string }).name) {
+        names.add(String((entry as { name?: string }).name).trim().toUpperCase());
+      }
+    });
+  });
   (canonicalRules.homebrewLimiarReservedItems || []).forEach(code => codes.add(String(code).trim().toUpperCase()));
   (canonicalRules.unvalidatedItems || []).forEach(code => codes.add(String(code).trim().toUpperCase()));
   return { codes, names };

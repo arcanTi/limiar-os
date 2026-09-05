@@ -277,6 +277,30 @@ export function tarotHandlers(component) {
     if (saved) component.flash('Nova sessao de taro iniciada');
   }
 
+  function dismissedKey(entry) {
+    if (!entry || !entry.n) return null;
+    return { n: entry.n, ts: entry.ts || '' };
+  }
+
+  function sameDismissed(a, b) {
+    return !!a && !!b && a.n === b.n && (a.ts || '') === (b.ts || '');
+  }
+
+  // Campaign sync brings the table's card to every client. It must not step on
+  // an animation already running here: the deal/discard timelines own the phase
+  // until their timer fires, and a card this client dismissed stays dismissed.
+  function tarotSyncPatch(tarotState) {
+    const state = normalizeTarotState(tarotState);
+    const entry = state.drawnThisSession;
+    const card = tarotCardEntry(entry);
+    const dismissed = component.state.tarotDismissed || null;
+    const phase = component.state.tarotPhase;
+    if (!card) return { tarotCurrent: component.state.tarotCurrent, tarotPhase: phase, tarotDismissed: null };
+    if (sameDismissed(dismissed, dismissedKey(entry))) return { tarotCurrent: component.state.tarotCurrent, tarotPhase: phase, tarotDismissed: dismissed };
+    if (phase === 'dealing' || phase === 'discarding' || phase === 'shuffling') return { tarotCurrent: component.state.tarotCurrent, tarotPhase: phase, tarotDismissed: dismissed };
+    return { tarotCurrent: card, tarotPhase: 'shown', tarotDismissed: null };
+  }
+
   function preloadTarotAssets() {
     if (component._tarotPreloaded) return;
     component._tarotPreloaded = true;
@@ -292,8 +316,22 @@ export function tarotHandlers(component) {
     if (!component._tarotFx) return;
     component._tarotFx.active = false;
     cancelAnimationFrame(component._tarotFx.raf);
+    if (component._tarotFx.onVisibility) document.removeEventListener('visibilitychange', component._tarotFx.onVisibility);
     if (component._tarotFx.ctx) component._tarotFx.ctx.clearRect(0, 0, component._tarotFx.w, component._tarotFx.h);
     component._tarotFx = null;
+  }
+
+  // The canvas only exists while the tarot tab is mounted, and only the client
+  // that drew the card runs the deal timeline. Every other way a card reaches
+  // the table (campaign sync, a reload, switching back to the tab) goes through
+  // here so the FX is not a privilege of whoever pressed SACAR.
+  function ensureTarotFx() {
+    if (component._tarotFx) return false;
+    const card = component.state.tarotCurrent;
+    if (!card || component.state.tarotPhase !== 'shown') return false;
+    if (!document.getElementById('limiar-tarot-fx')) return false;
+    startTarotFx(card);
+    return !!component._tarotFx;
   }
 
   function startTarotFx(card) {
@@ -324,7 +362,7 @@ export function tarotHandlers(component) {
       seed: Math.random() * 8,
       i,
     }));
-    const fx = { active: true, raf: 0, last: performance.now(), t: 0, canvas, ctx, w, h, rgb, mode: card.fx, particles };
+    const fx = { active: true, paused: false, raf: 0, last: performance.now(), t: 0, canvas, ctx, w, h, rgb, mode: card.fx, particles };
     const reset = (p) => {
       p.x = Math.random() * w;
       p.y = card.fx === 'hellfire' || card.fx === 'solar' ? h + Math.random() * 40 : Math.random() * h;
@@ -380,8 +418,18 @@ export function tarotHandlers(component) {
       }
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
-      if (!document.hidden) fx.raf = requestAnimationFrame(loop);
+      // A hidden tab gets no rAF callbacks anyway; park the loop explicitly so
+      // the visibilitychange handler below knows it has to restart it.
+      if (document.hidden) { fx.paused = true; return; }
+      fx.raf = requestAnimationFrame(loop);
     };
+    fx.onVisibility = () => {
+      if (!fx.active || !fx.paused || document.hidden) return;
+      fx.paused = false;
+      fx.last = performance.now();
+      fx.raf = requestAnimationFrame(loop);
+    };
+    document.addEventListener('visibilitychange', fx.onVisibility);
     component._tarotFx = fx;
     fx.raf = requestAnimationFrame(loop);
   }
@@ -402,6 +450,7 @@ export function tarotHandlers(component) {
       tarotPhase: 'dealing',
       tarotResolution: null,
       tarotApplySnapshot: null,
+      tarotDismissed: null,
       tarotHistory: tarotRows(savedState.history),
     });
     clearTimeout(component._tarotPhaseTimer);
@@ -429,22 +478,31 @@ export function tarotHandlers(component) {
   function replaceTarotCard(force = false) {
     if (component.state.tarotPhase !== 'shown' || !component.state.tarotCurrent) return;
     const current = component.state.tarotCurrent;
+    // The table is empty for the 35ms between the discard landing and the new
+    // draw; hold the dismissal over that gap so a sync tick cannot deal the
+    // outgoing card back in. drawTarotNext clears it.
+    const dismissed = dismissedKey(normalizeTarotState(component.state.tarotState).drawnThisSession);
     component.setState({ tarotPhase: 'discarding' });
     clearTimeout(component._tarotPhaseTimer);
     component._tarotPhaseTimer = setTimeout(() => {
       stopTarotFx();
-      component.setState({ tarotCurrent: null, tarotPhase: 'idle', tarotResolution: null, tarotApplySnapshot: null });
+      component.setState({ tarotCurrent: null, tarotPhase: 'idle', tarotResolution: null, tarotApplySnapshot: null, tarotDismissed: dismissed });
       setTimeout(() => drawTarotNext(force), 35);
     }, current.discard === 'sentence-cut' ? 820 : 660);
   }
 
+  // Discarding takes the card off this client's table; it deliberately does NOT
+  // clear drawnThisSession, because that entry is the one-card-per-session lock
+  // and dropping it server-side would hand everyone a free redraw. Remembering
+  // the dismissed entry is what stops the next sync from dealing it back.
   function discardTarot() {
     if (component.state.tarotPhase !== 'shown' || !component.state.tarotCurrent) return;
+    const dismissed = dismissedKey(normalizeTarotState(component.state.tarotState).drawnThisSession);
     component.setState({ tarotPhase: 'discarding' });
     clearTimeout(component._tarotPhaseTimer);
     component._tarotPhaseTimer = setTimeout(() => {
       stopTarotFx();
-      component.setState({ tarotCurrent: null, tarotPhase: 'idle', tarotResolution: null, tarotApplySnapshot: null });
+      component.setState({ tarotCurrent: null, tarotPhase: 'idle', tarotResolution: null, tarotApplySnapshot: null, tarotDismissed: dismissed });
     }, component.state.tarotCurrent.discard === 'sentence-cut' ? 820 : 660);
   }
 
@@ -590,7 +648,7 @@ export function tarotHandlers(component) {
     if (atom.type === 'deathSave') {
       const victim = tarotVictim();
       const target = (victim.derived && victim.derived.deathSave || 0) + (Number(atom.modifier) || 0);
-      component.roll({ label: 'TARO DEATH SAVE', sides: 10, count: 1, mod: 0, deathSaveTarget: target, skipActionPenalty: true, onResolved: (result) => {
+      component.roll({ label: 'TARO DEATH SAVE', sides: 10, count: 1, mod: 0, deathSaveTarget: target, skipActionPenalty: true, skipDeathSaveStreak: true, onResolved: (result) => {
         if (result.deathSavePassed) {
           updateTarotRow(rowId, { status: 'rolled', rolledTotal: result.total, note: row.note + ' // sucesso' });
           return;
@@ -678,6 +736,8 @@ export function tarotHandlers(component) {
     preloadTarotAssets,
     stopTarotFx,
     startTarotFx,
+    ensureTarotFx,
+    tarotSyncPatch,
     drawTarot,
     drawTarotNext,
     replaceTarotCard,

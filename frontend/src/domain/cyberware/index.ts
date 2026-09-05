@@ -19,6 +19,51 @@ export interface InstalledCyberwareItem {
   flags?: Record<string, unknown>;
   attachesTo?: string[];
   enhancements?: unknown;
+  /** Catalog effects carried by the installed instance (e.g. setEffectiveStat). */
+  effects?: { type?: string; value?: unknown; appliesTo?: string[] }[];
+  enabled?: boolean;
+  /** 'disabled' (EMP, sabotage) or 'destroyed' switch the item's effects off. */
+  damageState?: string;
+}
+
+export interface LinearFrameBody {
+  /** Highest BODY any installed frame sets, whether or not it is running. */
+  installed: number;
+  /** Same, counting only frames that are enabled and not disabled/destroyed. */
+  active: number;
+  sources: string[];
+}
+
+export function cyberwareIsRunning(item: InstalledCyberwareItem | null | undefined): boolean {
+  if (!item) return false;
+  if (item.enabled === false) return false;
+  const state = String(item.damageState || 'normal');
+  return state !== 'disabled' && state !== 'destroyed';
+}
+
+// Implanted Linear Frames (Sigma BODY 12 / Beta BODY 14) set an effective
+// BODY via a `setEffectiveStat` effect. CPR RAW (EMP FAQ): when the frame is
+// knocked out by an EMP, BODY and the Death Save drop back to the organic
+// value immediately, but the HP maximum the frame granted stays — so
+// deriveStats needs both the "installed" and the "active" number.
+export function linearFrameBody(installed: InstalledCyberwareItem[] | null | undefined): LinearFrameBody {
+  const out: LinearFrameBody = { installed: 0, active: 0, sources: [] };
+  (installed || []).forEach(item => {
+    if (!item) return;
+    const effects = Array.isArray(item.effects) ? item.effects : [];
+    effects.forEach(effect => {
+      if (!effect || effect.type !== 'setEffectiveStat') return;
+      const value = (effect.value || {}) as { stat?: string; value?: unknown };
+      const stat = String(value.stat || (effect.appliesTo || [])[0] || '').toUpperCase();
+      if (stat !== 'BODY') return;
+      const body = Number(value.value) || 0;
+      if (body <= 0) return;
+      out.installed = Math.max(out.installed, body);
+      if (cyberwareIsRunning(item)) out.active = Math.max(out.active, body);
+      out.sources.push(String(item.name || item.code || 'frame'));
+    });
+  });
+  return out;
 }
 
 export interface NormalizedCyberBonus {

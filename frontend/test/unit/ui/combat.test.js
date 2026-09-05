@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { combatHandlers, combatRenderVals } from '../../../src/ui/views/combat.js';
+import { generateNpc, npcDraftFromGenerated } from '../../../src/domain/combat/npcGenerator.ts';
 import PersistCharacter from '../../../src/application/PersistCharacter.ts';
 import PersistCombatState from '../../../src/application/PersistCombatState.ts';
 import CampaignMapQueries from '../../../src/application/CampaignMapQueries.ts';
@@ -846,5 +847,317 @@ describe('ui/views/combat combatHandlers', () => {
 
     const deathSaveCalls = component.postChat.mock.calls.filter(([payload]) => payload && payload.request && payload.request.label === 'DEATH SAVE');
     expect(deathSaveCalls.length).toBe(1);
+  });
+});
+
+describe('ui/views/combat random NPC generator', () => {
+  it('render vals expose archetype/tier chips, faction and the rolled summary', () => {
+    const draft = npcDraftFromGenerated(generateNpc({ archetype: 'corpsec', tier: 'elite', seed: 'ui' }));
+    const deps = renderDeps({ setNpcGenOption: vi.fn() });
+    const vals = combatRenderVals({
+      gm: true,
+      characters: [mira],
+      combatState: { ...baseCombatState(), active: false },
+      combatNpcDraft: draft,
+      combatNpcGen: { archetype: 'corpsec', tier: 'misto', faction: 'Arasaka' },
+    }, deps);
+    expect(vals.npcGenArchetypeChips.map(c => c.id)).toEqual(['civil', 'guarda', 'ganger', 'policial', 'corpsec', 'solo', 'drone']);
+    expect(vals.npcGenArchetypeChips.find(c => c.id === 'corpsec').active).toBe(true);
+    expect(vals.npcGenTierChips.map(c => c.id)).toEqual(['base', 'veterano', 'elite', 'chefe', 'misto']);
+    expect(vals.npcGenTierChips.find(c => c.id === 'misto').active).toBe(true);
+    expect(vals.npcGenFaction).toBe('Arasaka');
+    expect(vals.hasCombatNpcGenerated).toBe(true);
+    expect(vals.combatNpcTags.map(t => t.label)).toEqual(expect.arrayContaining(['ELITE', 'CORPSEC']));
+    expect(vals.combatNpcStatLine).toContain('REF ' + draft.generated.stats.REF);
+    expect(vals.combatNpcArmorLabel).toBe(draft.generated.armor.body.name);
+    vals.npcGenArchetypeChips.find(c => c.id === 'solo').apply();
+    expect(deps.setNpcGenOption).toHaveBeenCalledWith({ archetype: 'solo' });
+    vals.npcGenTierChips.find(c => c.id === 'chefe').apply();
+    expect(deps.setNpcGenOption).toHaveBeenCalledWith({ tier: 'chefe' });
+  });
+
+  it('defaults the generator to guarda/base and hides the summary for a hand-built draft', () => {
+    const vals = combatRenderVals({ gm: true, characters: [mira], combatState: { ...baseCombatState(), active: false }, combatNpcDraft: { name: 'X', attackRows: [] } }, renderDeps());
+    expect(vals.npcGenArchetypeChips.find(c => c.active).id).toBe('guarda');
+    expect(vals.npcGenTierChips.find(c => c.active).id).toBe('base');
+    expect(vals.npcGenArchetypeHint).toContain('Seguranca privada');
+    expect(vals.npcGenTierHint).toContain('Mook padrao');
+    expect(vals.hasCombatNpcGenerated).toBe(false);
+    expect(vals.combatNpcTags).toEqual([]);
+    expect(vals.combatNpcStatLine).toBe('');
+  });
+
+  it('shows NPC tags on the rail pill and focus dock, none for PCs', () => {
+    const goon = { ...rook, id: 'goon', name: 'GUARDA HOLT', kind: 'npc', tags: ['elite', 'guarda'] };
+    const combatState = { ...baseCombatState(), order: ['mira', 'goon'], combatants: { mira: baseCombatState().combatants.mira, goon: { side: 'enemy', initiative: 5, acted: false, defeated: false } } };
+    const vals = combatRenderVals({ gm: true, characters: [mira, goon], combatState, combatFocusId: 'goon' }, renderDeps());
+    const pill = vals.combatRailRows.find(r => r.id === 'goon');
+    expect(pill.hasTags).toBe(true);
+    expect(pill.tagsLabel).toBe('ELITE · GUARDA');
+    expect(vals.combatRailRows.find(r => r.id === 'mira').hasTags).toBe(false);
+    expect(vals.combatFocusCard.id).toBe('goon');
+    expect(vals.combatFocusCard.tagChips).toEqual([{ label: 'ELITE' }, { label: 'GUARDA' }]);
+  });
+
+  it('setNpcGenOption/rollRandomNpcDraft fill the builder draft with a generated NPC and keep QTD', () => {
+    const component = fakeComponent({ state: { combatNpcDraft: { qty: '4', attackRows: [] } } });
+    const h = combatHandlers(component);
+    h.setNpcGenOption({ archetype: 'solo', tier: 'misto' });
+    h.setNpcGenOption({ faction: 'Militech' });
+    expect(component.state.combatNpcGen).toEqual({ archetype: 'solo', tier: 'misto', faction: 'Militech' });
+    h.rollRandomNpcDraft();
+    const draft = component.state.combatNpcDraft;
+    expect(draft.name).toContain('SOLO');
+    expect(draft.qty).toBe('4');
+    expect(draft.templateId).toBe('');
+    expect(draft.generated).toMatchObject({ archetype: 'solo', tier: 'base', faction: 'MILITECH' });
+    expect(draft.generated.tags).toContain('militech');
+    expect(draft.attackRows.length).toBeGreaterThan(0);
+    expect(Number(draft.hpMax)).toBeGreaterThan(0);
+  });
+
+  it('spawnRandomNpcs rolls QTD distinct NPCs with stats, skills, armor and tags on the record', async () => {
+    const set = vi.fn(async (s) => s);
+    const component = fakeComponent({
+      api: () => ({ combat: { state: { set } }, characters: { upsert: vi.fn(async (c) => c) } }),
+      normalizeStats: (b) => b,
+      normalizeSkills: vi.fn((skills) => skills || []),
+      slug: (s) => String(s).toLowerCase().replace(/\s+/g, '-'),
+      normalizeGearItem: (item, idx) => ({ ...item, id: item.id || 'gear-' + idx }),
+      state: { combatNpcDraft: { qty: '3', attackRows: [] }, combatNpcGen: { archetype: 'corpsec', tier: 'elite', faction: 'Arasaka' } },
+    });
+    const h = combatHandlers(component);
+    await h.spawnRandomNpcs();
+
+    const npcs = component.state.characters.filter(c => c.kind === 'npc');
+    expect(npcs).toHaveLength(3);
+    expect(new Set(npcs.map(c => c.name)).size).toBe(3);
+    npcs.forEach((npc) => {
+      expect(npc.name.startsWith('ELITE CORPSEC ')).toBe(true);
+      expect(npc.tags).toEqual(expect.arrayContaining(['elite', 'corpsec', 'arasaka']));
+      expect(npc.npcOrigin).toMatchObject({ archetype: 'corpsec', tier: 'elite', faction: 'ARASAKA' });
+      expect(npc.base.INT).toBeGreaterThan(0);
+      expect(npc.base.REF).toBeGreaterThanOrEqual(8);
+      expect(npc.armor.body.name).not.toBe('NPC Armor');
+      expect(npc.armor.body.sp).toBeGreaterThanOrEqual(15);
+      expect(npc.gear).toHaveLength(2);
+      expect(npc.gear[0].code).toBeTruthy();
+      expect(npc.notes).toContain('NPC aleatorio');
+      expect(component.state.combatState.order).toContain(npc.id);
+    });
+    expect(component.normalizeSkills).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'Evasion', level: 4 })]), expect.any(Object));
+    expect(component.flash).toHaveBeenCalledWith('3 NPCs aleatorios adicionados ao combate');
+    // The squad lands in the combat state with a single write, not one per NPC.
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(set.mock.calls[0][0].order).toEqual(expect.arrayContaining(npcs.map(c => c.id)));
+  });
+
+  it('saveCombatState adopts the revision the server answers with, so back-to-back writes do not race', async () => {
+    let revision = 3;
+    const set = vi.fn(async (s) => ({ ...s, revision: ++revision }));
+    const component = fakeComponent({ api: () => ({ combat: { state: { set } } }) });
+    const h = combatHandlers(component);
+    await h.addCombatant('rook', 'pc');
+    expect(component.state.combatState.revision).toBe(4);
+    await h.addCombatant('mira', 'pc');
+    expect(set.mock.calls[1][0].revision).toBe(4);
+    expect(component.state.combatState.revision).toBe(5);
+  });
+
+  it('addCombatants adds a whole group in one write and repairs the turn index', async () => {
+    const set = vi.fn(async (s) => s);
+    const component = fakeComponent({
+      api: () => ({ combat: { state: { set } } }),
+      state: { characters: [mira, rook, { ...rook, id: 'g1' }, { ...rook, id: 'g2' }], combatState: { ...baseCombatState(), combatants: {}, order: [], turnIndex: -1 } },
+    });
+    const h = combatHandlers(component);
+    await h.addCombatants(['g1', 'g2', '', 'g1'], 'enemy');
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(component.state.combatState.order).toEqual(['g1', 'g2']);
+    expect(component.state.combatState.combatants.g2.side).toBe('enemy');
+    expect(await h.addCombatants([], 'enemy')).toBeNull();
+  });
+
+  it('createCombatNpc keeps the generated STAT block but lets the edited BODY/REF inputs win', async () => {
+    const set = vi.fn(async (s) => s);
+    const component = fakeComponent({
+      api: () => ({ combat: { state: { set } }, characters: { upsert: vi.fn(async (c) => c) } }),
+      normalizeStats: (b) => b,
+      normalizeSkills: vi.fn((skills) => skills || []),
+      slug: (s) => String(s).toLowerCase().replace(/\s+/g, '-'),
+      normalizeGearItem: (item, idx) => ({ ...item, id: item.id || 'gear-' + idx }),
+    });
+    const h = combatHandlers(component);
+    const draft = npcDraftFromGenerated(generateNpc({ archetype: 'ganger', tier: 'base', seed: 'edit' }));
+    await h.createCombatNpc({ ...draft, body: '9', ref: '2' });
+    const npc = component.state.characters.find(c => c.kind === 'npc');
+    expect(npc.base.BODY).toBe(9);
+    expect(npc.base.REF).toBe(2);
+    expect(npc.base.INT).toBe(draft.generated.stats.INT);
+    expect(npc.tags).toEqual(draft.generated.tags);
+    expect(npc.bodyType).toBe('meat');
+  });
+
+  it('spawnRandomNpcs refuses without GM login', async () => {
+    const component = fakeComponent({ ensureGm: vi.fn(() => false) });
+    const h = combatHandlers(component);
+    await h.spawnRandomNpcs();
+    expect(component.state.characters.filter(c => c.kind === 'npc')).toHaveLength(0);
+  });
+});
+
+describe('ui/views/combat RAW rules: ROF budget, jams, evasion gate, grapple, ticks, shields', () => {
+  beforeEach(() => {
+    global.document = { querySelectorAll: vi.fn(() => []) };
+    global.window = {};
+  });
+  afterEach(() => {
+    delete global.document;
+    delete global.window;
+  });
+
+  const S = (extra) => ({ characters: [mira, rook], gm: true, activeCharacterId: 'mira', combatState: baseCombatState(), comms: [], ...extra });
+  const pistol = { id: 'pistol', name: 'Heavy Pistol', sides: 6, count: 3, skill: 'Handgun', rof: 2 };
+  const shotgun = { id: 'shotgun', name: 'Shotgun', sides: 6, count: 5, skill: 'Shoulder Arms', rof: 1 };
+
+  it('a jammed weapon cannot attack until unjammed, and unjamming burns the Attack Action', () => {
+    const applyCharacterPatch = vi.fn();
+    const component = fakeComponent({ applyCharacterPatch, state: S({ characters: [{ ...mira, gear: [{ ...pistol, jammed: true }] }, rook] }) });
+    const h = combatHandlers(component);
+    h.rollCombatAttack('mira', { ...pistol, jammed: true });
+    expect(component.roll).not.toHaveBeenCalled();
+    expect(component.flash).toHaveBeenCalledWith(expect.stringContaining('travada'));
+    h.unjamWeapon('mira', 'pistol');
+    expect(applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...pistol, jammed: false }] });
+    expect(h.attacksThisTurn('mira')).toEqual([{ weaponId: 'pistol', rof: 1 }]);
+    expect(h.attackBudgetFor('mira', pistol).allowed).toBe(false);
+  });
+
+  it('a natural 1 with a poor-quality weapon jams it', () => {
+    const applyCharacterPatch = vi.fn();
+    const component = fakeComponent({ applyCharacterPatch, weaponRuntimeQuality: vi.fn(() => 'poor'), state: S({ characters: [{ ...mira, gear: [pistol] }, rook] }) });
+    const h = combatHandlers(component);
+    h.rollCombatAttack('mira', pistol);
+    const opts = component.roll.mock.calls[0][0];
+    opts.onResolved({ label: 'x', detail: '', total: 3, fumble: true, crit: false });
+    expect(applyCharacterPatch).toHaveBeenCalledWith('mira', { gear: [{ ...pistol, jammed: true }] });
+    expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('arma travada') }));
+  });
+
+  it('ROF 2 allows two attacks; a ROF 1 weapon spends the whole action (players blocked, GM warned)', () => {
+    const player = fakeComponent({ state: S({ gm: false, characters: [{ ...mira, gear: [pistol, shotgun] }, rook] }) });
+    const h = combatHandlers(player);
+    h.rollCombatAttack('mira', pistol);
+    h.rollCombatAttack('mira', pistol);
+    expect(player.roll).toHaveBeenCalledTimes(2);
+    expect(h.attackBudgetLabel('mira')).toContain('ATAQUES 2/2');
+    h.rollCombatAttack('mira', pistol);
+    expect(player.roll).toHaveBeenCalledTimes(2);
+    expect(player.flash).toHaveBeenCalledWith(expect.stringContaining('Limite de 2 ataques'), 3200);
+
+    const gm = fakeComponent({ state: S({ gm: true, characters: [{ ...mira, gear: [pistol, shotgun] }, rook] }) });
+    const g = combatHandlers(gm);
+    g.rollCombatAttack('mira', shotgun);
+    g.rollCombatAttack('mira', pistol);
+    expect(gm.roll).toHaveBeenCalledTimes(2);
+    expect(gm.flash).toHaveBeenCalledWith(expect.stringContaining('GM: seguindo mesmo assim'), 3200);
+  });
+
+  it('ranged evasion is offered only when the target may dodge bullets (REF 8+), and its result replaces the range DV', () => {
+    const slowRook = { ...rook, base: { REF: 7 } };
+    const component = fakeComponent({ state: S({ characters: [{ ...mira, gear: [pistol] }, slowRook], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    expect(h.canRequestRangedEvasion('mira', pistol)).toBe(false);
+    h.requestEvasion('mira', pistol);
+    expect(component.postChat).not.toHaveBeenCalled();
+    expect(component.flash).toHaveBeenCalledWith(expect.stringContaining('REF abaixo de 8'), 3200);
+
+    const fastRook = { ...rook, base: { REF: 8 } };
+    const quick = fakeComponent({ state: S({ characters: [{ ...mira, gear: [pistol] }, fastRook], combatTargets: { mira: 'rook' }, evasionResults: { mira: { targetId: 'rook', total: 16 } } }) });
+    const q = combatHandlers(quick);
+    expect(q.canRequestRangedEvasion('mira', pistol)).toBe(true);
+    q.rollCombatAttack('mira', pistol);
+    expect(quick.roll).toHaveBeenCalledWith(expect.objectContaining({ dv: 16 }));
+  });
+
+  it('a surprised target or one hiding behind a bulletproof shield cannot evade ranged attacks', () => {
+    const surprised = { ...rook, base: { REF: 9 }, statusEffects: [{ id: 'surprised', modifiers: { cannotEvade: true } }] };
+    const component = fakeComponent({ state: S({ characters: [mira, surprised], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    h.requestEvasion('mira', { id: 'knife', name: 'Knife', melee: true });
+    expect(component.flash).toHaveBeenCalledWith(expect.stringContaining('surpreendido'), 3200);
+    const shielded = { ...rook, base: { REF: 9 }, shield: { itemId: 'BULLETPROOF-SHIELD', hp: 10, maxHp: 10 } };
+    const s = combatHandlers(fakeComponent({ state: S({ characters: [mira, shielded], combatTargets: { mira: 'rook' } }) }));
+    expect(s.canRequestRangedEvasion('mira', pistol)).toBe(false);
+    expect(s.evasionBlockFor('mira', { melee: true })).toBe('');
+  });
+
+  it('a held shield intercepts ranged damage instead of the target HP', () => {
+    const shielded = { ...rook, shield: { itemId: 'BULLETPROOF-SHIELD', hp: 10, maxHp: 10 }, derived: { currentHeadSp: 0, currentBodySp: 0 } };
+    const applyCombatDamage = { execute: vi.fn() };
+    const component = fakeComponent({ app: () => ({ applyCombatDamage }), state: S({ characters: [mira, shielded], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    h.autoApplyCombatDamage('mira', pistol, { total: 7, dice: [] });
+    expect(applyCombatDamage.execute).not.toHaveBeenCalled();
+    expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('INTERCEPTA O ATAQUE') }));
+    expect(component.state.characters.find(c => c.id === 'rook').shield.hp).toBe(3);
+  });
+
+  it('damage on a Mortally Wounded target opens an automatic body critical', () => {
+    const dying = { ...rook, health: { cur: 0, max: 45 }, derived: { currentHeadSp: 0, currentBodySp: 0 } };
+    const applyCombatDamage = { execute: vi.fn(() => ({ hpLoss: 3, spAblated: 0, characterPatch: { health: { cur: 0, max: 45 }, deathSaveWoundPenalty: 1 }, mortalWoundCritical: true, mortalWoundPenaltyDelta: 1 })) };
+    const component = fakeComponent({ app: () => ({ applyCombatDamage }), state: S({ characters: [mira, dying], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    h.autoApplyCombatDamage('mira', pistol, { total: 3, dice: [] });
+    expect(component.state.critInjuryPending).toMatchObject({ targetId: 'rook', location: 'body', automatic: true });
+    expect(component.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('Death Save +1') }));
+  });
+
+  it('grab marks the hold, choke deals BODY direct damage automatically and tracks the streak, throw releases', () => {
+    const addStatusEffect = vi.fn();
+    const applyCharacterPatch = vi.fn();
+    const strongMira = { ...mira, derived: { effectiveStats: { BODY: 7 } } };
+    const heldRook = { ...rook, health: { cur: 20, max: 45 }, statusEffects: [{ instanceId: 'se-g', id: 'grappled', modifiers: { grappledBy: 'mira', chokeTurns: 1, lastChokeRound: 1 } }] };
+    const component = fakeComponent({ addStatusEffect, applyCharacterPatch, state: S({ characters: [strongMira, heldRook], combatTargets: { mira: 'rook' } }) });
+    const h = combatHandlers(component);
+    expect(h.grappleVals('mira', 'rook')).toMatchObject({ canGrab: false, canChoke: true, canThrow: true, canHumanShield: true, holdingLabel: 'AGARRANDO ROOK // CHOKE x1' });
+    h.chokeTarget('mira');
+    const patch = applyCharacterPatch.mock.calls[0][1];
+    expect(patch.health.cur).toBe(13);
+    expect(patch.statusEffects[0].modifiers).toMatchObject({ chokeTurns: 2, lastChokeRound: 2 });
+    expect(h.attacksThisTurn('mira')).toEqual([{ weaponId: 'grapple:choke', rof: 1 }]);
+
+    applyCharacterPatch.mockClear();
+    h.throwTarget('mira');
+    const thrown = applyCharacterPatch.mock.calls[0][1];
+    expect(thrown.health.cur).toBe(13);
+    expect(thrown.statusEffects).toEqual([]);
+
+    const fresh = fakeComponent({ addStatusEffect, state: S({ characters: [strongMira, rook], combatTargets: { mira: 'rook' } }) });
+    combatHandlers(fresh).grabTarget('mira');
+    expect(addStatusEffect).toHaveBeenCalledWith(expect.objectContaining({ id: 'grappled', modifiers: expect.objectContaining({ grappledBy: 'mira' }) }), expect.objectContaining({ targetId: 'rook' }));
+    expect(addStatusEffect).toHaveBeenCalledWith(expect.objectContaining({ id: 'grappling' }), expect.objectContaining({ targetId: 'mira' }));
+  });
+
+  it('a grappled target can be used as a human shield with HP = BODY', () => {
+    const applyCharacterPatch = vi.fn();
+    const heldRook = { ...rook, base: { BODY: 6 }, statusEffects: [{ instanceId: 'se-g', id: 'grappled', modifiers: { grappledBy: 'mira' } }] };
+    const component = fakeComponent({ applyCharacterPatch, state: S({ characters: [mira, heldRook], combatTargets: { mira: 'rook' } }) });
+    combatHandlers(component).useHumanShield('mira');
+    expect(applyCharacterPatch).toHaveBeenCalledWith('mira', { shield: expect.objectContaining({ kind: 'human', hp: 6, maxHp: 6, sourceCharacterId: 'rook' }) });
+  });
+
+  it('end-of-turn fire damage and start-of-turn asphyxiation are direct HP hits, applied once per round', () => {
+    const applyCharacterPatch = vi.fn();
+    const burning = { ...mira, statusEffects: [{ instanceId: 'se-f', id: 'strong_on_fire', label_pt: 'Em chamas', modifiers: { directHpPerTurn: 4, tick: 'end' } }] };
+    const choking = { ...rook, base: { BODY: 5 }, statusEffects: [{ instanceId: 'se-a', id: 'asphyxiating', label_pt: 'Asfixiando', modifiers: { directHpPerTurnStat: 'BODY', tick: 'start' } }] };
+    const component = fakeComponent({ applyCharacterPatch, state: S({ characters: [burning, choking] }) });
+    const h = combatHandlers(component);
+    h.applyTurnTick('mira', 'end');
+    expect(applyCharacterPatch).toHaveBeenCalledWith('mira', { health: { cur: 23, max: 35 } });
+    h.applyTurnTick('rook', 'start', 2);
+    h.applyTurnTick('rook', 'start', 2);
+    expect(applyCharacterPatch).toHaveBeenCalledTimes(2);
+    expect(applyCharacterPatch).toHaveBeenLastCalledWith('rook', { health: { cur: 30, max: 45 } });
   });
 });

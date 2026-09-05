@@ -9,6 +9,7 @@ import {
   CPRED_SKILL_ALIASES,
   CPRED_STAT_MAX,
   CPRED_STAT_ORDER,
+  CPRED_ORIGIN_LANGUAGE_LEVEL,
 } from './constants.ts';
 import type { ArmorSlot, CharacterArmor, CpredStat } from './constants.ts';
 
@@ -57,20 +58,50 @@ export function normalizeArmor(armor: Partial<CharacterArmor> | null | undefined
   };
 }
 
+// Shield kinds (CPR RAW p.179): a Bulletproof Shield is gear with its own HP
+// (10, or 15 High-Density) that intercepts ranged attacks; a Human Shield is
+// a grappled person held in front of you, with HP equal to their BODY, which
+// takes an Action to "equip" and becomes a Corpse Shield (same BODY-worth of
+// HP again) once it drops to 0 while held.
+export type CharacterShieldKind = 'bulletproof' | 'human' | 'corpse';
+
 export interface CharacterShield {
   itemId: string;
   hp: number;
   maxHp: number;
+  kind: CharacterShieldKind;
+  name?: string;
+  sourceCharacterId?: string | null;
 }
+
+export const HUMAN_SHIELD_ITEM_PREFIX = 'HUMAN-SHIELD:';
 
 export function normalizeShield(shield: Partial<CharacterShield> | null | undefined): CharacterShield | null {
   if (!shield || !shield.itemId) return null;
   const maxHp = asNumber(shield.maxHp, 0, 0, 999);
   if (maxHp <= 0) return null;
+  const kind: CharacterShieldKind = shield.kind === 'human' || shield.kind === 'corpse' ? shield.kind : 'bulletproof';
   return {
     itemId: String(shield.itemId),
     hp: asNumber(shield.hp, maxHp, 0, maxHp),
     maxHp,
+    kind,
+    ...(shield.name ? { name: String(shield.name) } : {}),
+    ...(shield.sourceCharacterId ? { sourceCharacterId: String(shield.sourceCharacterId) } : {}),
+  };
+}
+
+export function humanShieldFrom(source: { id?: string; name?: string; base?: Record<string, unknown> | null } | null | undefined): CharacterShield | null {
+  if (!source || !source.id) return null;
+  const body = asNumber(source.base && source.base.BODY, 0, 0, 99);
+  if (body <= 0) return null;
+  return {
+    itemId: HUMAN_SHIELD_ITEM_PREFIX + source.id,
+    hp: body,
+    maxHp: body,
+    kind: 'human',
+    name: source.name || source.id,
+    sourceCharacterId: source.id,
   };
 }
 
@@ -78,7 +109,13 @@ export function damageShield(shield: Partial<CharacterShield> | null | undefined
   const current = normalizeShield(shield);
   if (!current) return null;
   const damage = Math.max(0, Number(amount) || 0);
-  return { ...current, hp: Math.max(0, current.hp - damage) };
+  const hp = Math.max(0, current.hp - damage);
+  // A Human Shield that dies in your hands keeps working as a Corpse Shield
+  // with a fresh BODY-worth of HP (the body still stops bullets).
+  if (hp <= 0 && current.kind === 'human') {
+    return { ...current, kind: 'corpse', hp: current.maxHp, name: (current.name || 'Escudo humano') + ' (cadaver)' };
+  }
+  return { ...current, hp };
 }
 
 export function repairShield(shield: Partial<CharacterShield> | null | undefined, amount: unknown): CharacterShield | null {
@@ -141,6 +178,8 @@ export interface CharacterSkill {
   defaultSkill: boolean;
   difficult: boolean;
   total: number;
+  /** Free Cultural Origin language: `baseLevel` 4 costs nothing. */
+  origin?: boolean;
 }
 
 export interface RawSkillInput {
@@ -150,6 +189,42 @@ export interface RawSkillInput {
   level?: unknown;
   bonus?: unknown;
   difficult?: unknown;
+  origin?: unknown;
+}
+
+const LANGUAGE_SKILL = /^Language \((.+)\)$/;
+
+/**
+ * Languages outside the catalog (Cultural Origin) are the one kind of extra
+ * skill a sheet keeps; everything else unknown is dropped as before.
+ */
+function extraLanguageSkills(incoming: RawSkillInput[], stats: Partial<Record<string, unknown>> | null | undefined): CharacterSkill[] {
+  const catalog = new Set(CPRED_DEFAULT_SKILLS.map((skill) => skill.name));
+  const seen = new Set<string>();
+  const extras: CharacterSkill[] = [];
+  incoming.forEach((src) => {
+    const name = skillCanonicalName(src && src.name);
+    if (!LANGUAGE_SKILL.test(name) || catalog.has(name) || seen.has(name)) return;
+    seen.add(name);
+    const origin = !!(src && src.origin);
+    const baseLevel = origin ? CPRED_ORIGIN_LANGUAGE_LEVEL : 0;
+    const level = asNumber(src.level, baseLevel, baseLevel, 10);
+    const bonus = asNumber(src.bonus, 0, -20, 20);
+    const stat = 'INT';
+    extras.push({
+      id: src.id || 'language-' + name.replace(LANGUAGE_SKILL, '$1').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name,
+      stat,
+      level,
+      baseLevel,
+      bonus,
+      defaultSkill: false,
+      difficult: false,
+      origin,
+      total: (stats && Number(stats[stat])) ? Number(stats[stat]) + level + bonus : level + bonus,
+    });
+  });
+  return extras;
 }
 
 export function normalizeSkills(skills: unknown, stats: Partial<Record<string, unknown>> | null | undefined): CharacterSkill[] {
@@ -171,7 +246,7 @@ export function normalizeSkills(skills: unknown, stats: Partial<Record<string, u
       difficult: src.difficult == null ? !!fallback.difficult : !!src.difficult,
       total: (stats && Number(stats[stat])) ? Number(stats[stat]) + level + bonus : level + bonus,
     };
-  });
+  }).concat(extraLanguageSkills(incoming, stats));
 }
 
 export function skillSpend(skills: unknown): number {

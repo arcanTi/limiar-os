@@ -23,23 +23,19 @@ export function hqRenderVals(state = {}, deps = {}) {
   const userRows = (S.users || []).map(user => ({
     ...user,
     roleLabel: String(user.role || 'player').toUpperCase(),
+    accessToken: user.accessToken || '------',
     canManage: isStaffAdmin || user.role === 'player',
     onEdit: () => deps.editUserDraft(user),
+    onCopyToken: () => deps.copyAccessToken(user.accessToken),
+    onRegenerate: () => deps.regenerateAccessToken(user.username),
     onDelete: () => deps.deleteUser(user.username),
   }));
-  const passwordResetRows = (S.passwordResetRequests || []).map(request => ({
-    ...request,
-    roleLabel: String(request.role || 'player').toUpperCase(),
-    onResolve: () => deps.editUserDraft(request),
-    onDismiss: () => deps.dismissPasswordResetRequest(request.username),
-  }));
+  const issued = S.issuedAccessToken;
 
   return {
     profileUsername: authUser.username || '',
     profileAvatarUrl: authUser.avatarUrl || '',
     profileEmail: profileDraft.email ?? (authUser.email || ''),
-    profileCurrentPassword: profileDraft.currentPassword || '',
-    profileNewPassword: profileDraft.newPassword || '',
     profileIsAdmin: authUser.role === 'admin',
     profileRoleTogglable: authUser.role !== 'admin',
     profileIsGm: profileRole === 'gm',
@@ -47,13 +43,13 @@ export function hqRenderVals(state = {}, deps = {}) {
     profilePlayerBtnStyle: 'lm-ui-btn lm-ui-btn--compact' + (profileRole === 'player' ? ' lm-ui-btn--gold' : ' lm-ui-btn--ghost-gold'),
     profileStatus: S.profileStatus || '',
     onProfileEmail: (e) => deps.setProfileField('email', e.target.value),
-    onProfileCurrentPassword: (e) => deps.setProfileField('currentPassword', e.target.value),
-    onProfileNewPassword: (e) => deps.setProfileField('newPassword', e.target.value),
     onProfileAvatarUpload: (e) => deps.uploadAvatar(e.target.files && e.target.files[0]),
     setProfileRolePlayer: () => deps.setProfileField('role', 'player'),
     setProfileRoleGm: () => deps.setProfileField('role', 'gm'),
     saveProfile: deps.saveProfile,
     openCampaigns: deps.openCampaigns,
+    exportMySheetPdf: () => deps.exportCharacterPdf(S.activeCharacterId),
+    hasSheetToExport: (S.characters || []).length > 0,
 
     hqIp, ipAwardTotal, ipAwardBtnStyle,
     ipAwardGroup: ipAward.group || '',
@@ -70,19 +66,25 @@ export function hqRenderVals(state = {}, deps = {}) {
     hqIpLogRows,
     noHqIpLog: hqIpLogRows.length === 0,
     userRows,
-    passwordResetRows,
-    hasPasswordResetRows: passwordResetRows.length > 0,
     canManageUsers: !!S.gmAuthenticated,
     canManageStaffRoles: isStaffAdmin,
+    hasIssuedToken: !!issued,
+    issuedTokenUsername: issued ? issued.username : '',
+    issuedTokenValue: issued ? issued.accessToken : '',
+    copyIssuedToken: () => deps.copyAccessToken(issued && issued.accessToken),
+    dismissIssuedToken: deps.dismissIssuedToken,
+    hasActiveCampaign: !!S.activeCampaignId,
+    activeCampaignLabel: S.activeCampaignName || S.activeCampaignId || '',
+    userDraftInviteToCampaign: userDraft.inviteToCampaign !== false,
+    userDraftNoCampaignInvite: userDraft.inviteToCampaign === false,
+    onUserDraftInviteToCampaign: (e) => deps.setUserDraftField('inviteToCampaign', e.target.checked),
     userDraftUsername: userDraft.username || '',
-    userDraftPassword: userDraft.password || '',
     userDraftEmail: userDraft.email || '',
     userDraftRole: userRole,
     userRoleAdminSelected: userRole === 'admin',
     userRoleGmSelected: userRole === 'gm',
     userRolePlayerSelected: userRole === 'player',
     onUserDraftUsername: (e) => deps.setUserDraftField('username', e.target.value),
-    onUserDraftPassword: (e) => deps.setUserDraftField('password', e.target.value),
     onUserDraftEmail: (e) => deps.setUserDraftField('email', e.target.value),
     onUserDraftRole: (e) => deps.setUserDraftField('role', e.target.value),
     saveUserDraft: deps.saveUserDraft,
@@ -96,6 +98,7 @@ export function hqHandlers(component) {
   return {
     setProfileField: (key, value) => component.setState(s => ({ profileDraft: { ...(s.profileDraft || {}), [key]: value } })),
     openCampaigns: () => globalThis.limiarCampaigns?.toggle?.(),
+    exportCharacterPdf: (characterId) => component.exportCharacterPdf(characterId),
 
     async saveProfile() {
       if (!(component.api() && component.api().users)) return;
@@ -103,10 +106,6 @@ export function hqHandlers(component) {
       const authUser = component.state.authUser || {};
       const payload = {};
       if (draft.email !== undefined) payload.email = draft.email;
-      if (draft.newPassword) {
-        payload.newPassword = draft.newPassword;
-        payload.currentPassword = draft.currentPassword || '';
-      }
       if (draft.role && draft.role !== authUser.role) payload.role = draft.role;
       try {
         const updated = await component.api().users.updateMe(payload);
@@ -183,28 +182,51 @@ export function hqHandlers(component) {
 
     setUserDraftField: (key, value) => component.setState(s => ({ userDraft: { ...(s.userDraft || {}), [key]: value } })),
 
+    // A brand-new account only exists to carry its token, so the token the
+    // backend just minted is surfaced on its own until the GM dismisses it —
+    // it is what they have to read out to the player.
     async saveUserDraft() {
       if (!(component.api() && component.api().users && component.state.gmAuthenticated)) return;
       const draft = component.state.userDraft || {};
+      const payload = { username: draft.username, role: draft.role || 'player', email: draft.email };
+      if (draft.inviteToCampaign !== false && component.state.activeCampaignId) {
+        payload.campaignId = component.state.activeCampaignId;
+      }
       try {
-        await component.api().users.upsert(draft);
-        component.setState({ userDraft: { username: '', password: '', role: 'player', email: '' }, gmStatus: 'Usuario salvo' });
+        const user = await component.api().users.upsert(payload);
+        component.setState({
+          userDraft: { username: '', role: 'player', email: '', inviteToCampaign: true },
+          issuedAccessToken: user && user.accessToken ? user : null,
+          gmStatus: 'Usuario salvo',
+        });
         await component.loadUsers();
-        await component.loadPasswordResetRequests();
       } catch (err) {
         component.setState({ gmStatus: 'Falha ao salvar usuario: ' + (err.message || '') });
       }
     },
 
-    editUserDraft: (user) => component.setState({ userDraft: { username: user.username || '', password: '', role: user.role || 'player', email: user.email || '' } }),
+    editUserDraft: (user) => component.setState({ userDraft: { username: user.username || '', role: user.role || 'player', email: user.email || '', inviteToCampaign: false } }),
 
-    async dismissPasswordResetRequest(username) {
+    dismissIssuedToken: () => component.setState({ issuedAccessToken: null }),
+
+    async copyAccessToken(accessToken) {
+      if (!accessToken) return;
+      try {
+        await navigator.clipboard.writeText(accessToken);
+        component.flash('Token copiado: ' + accessToken);
+      } catch (_err) {
+        component.setState({ gmStatus: 'Token: ' + accessToken });
+      }
+    },
+
+    async regenerateAccessToken(username) {
       if (!(component.api() && component.api().users && component.state.gmAuthenticated)) return;
       try {
-        await component.api().users.dismissPasswordResetRequest(username);
-        await component.loadPasswordResetRequests();
+        const user = await component.api().users.regenerateAccessToken(username);
+        component.setState({ issuedAccessToken: user || null, gmStatus: 'Token renovado' });
+        await component.loadUsers();
       } catch (err) {
-        component.setState({ gmStatus: 'Falha ao ignorar solicitacao: ' + (err.message || '') });
+        component.setState({ gmStatus: 'Falha ao renovar token: ' + (err.message || '') });
       }
     },
 

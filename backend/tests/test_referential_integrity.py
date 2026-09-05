@@ -19,8 +19,8 @@ def test_transaction_rolls_back_after_failure(db_path):
     message = "rollback probe"
     with pytest.raises(RuntimeError, match=message), db() as conn:
         conn.execute(
-            "INSERT INTO users(username, password_hash, role) "
-            "VALUES ('rollback-user', '', 'player')"
+            "INSERT INTO users(username, access_token, role) "
+            "VALUES ('rollback-user', 'RB1234', 'player')"
         )
         raise RuntimeError(message)
     with db() as conn:

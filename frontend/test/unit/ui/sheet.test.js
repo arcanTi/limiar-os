@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { sheetHandlers, sheetRenderVals } from '../../../src/ui/views/sheet.js';
+import { mountOnboardingWizard } from '../../../src/ui/views/onboarding.js';
+
+vi.mock('../../../src/ui/views/onboarding.js', () => ({ mountOnboardingWizard: vi.fn(() => ({})) }));
 import PersistCharacter from '../../../src/application/PersistCharacter.ts';
 import {
   damageProgramRez,
@@ -366,6 +369,62 @@ describe('ui/views/sheet sheetHandlers', () => {
     expect(component.state.sheetTab).toBe('core');
   });
 
+  it('createPlayerCharacter opens the guided wizard scoped to the active campaign instead of the drawer builder', () => {
+    mountOnboardingWizard.mockClear();
+    const api = vi.fn(() => ({ characters: {}, campaigns: {} }));
+    const svgCard = () => 'svg';
+    const component = fakeComponent({
+      state: { gm: false, gmAuthenticated: false, authAuthenticated: true, activeCampaignId: 'mesa-1', activeCampaignName: 'Mesa Um', sheetOpen: false },
+      api,
+      store: vi.fn(() => ({ svgCard })),
+    });
+    sheetHandlers(component).createPlayerCharacter();
+    expect(mountOnboardingWizard).toHaveBeenCalledOnce();
+    expect(mountOnboardingWizard.mock.calls[0][0]).toMatchObject({ mode: 'new', campaignId: 'mesa-1', campaignName: 'Mesa Um', svgCard });
+    expect(component.state.sheetCreating).toBeUndefined();
+    expect(component.state.sheetEditing).toBeUndefined();
+  });
+
+  it('createPlayerCharacter lands on the new sheet after the wizard finishes', async () => {
+    mountOnboardingWizard.mockClear();
+    const reloadRemoteData = vi.fn(async function () {
+      this.state = { ...this.state, characters: [...characters, { id: 'c', name: 'NEW', role: 'Solo', level: 1 }] };
+    });
+    const component = fakeComponent({
+      state: { gm: false, gmAuthenticated: false, authAuthenticated: true, sheetOpen: false },
+      api: vi.fn(() => ({})),
+    });
+    component.reloadRemoteData = reloadRemoteData;
+    sheetHandlers(component).createPlayerCharacter();
+    const { onDone } = mountOnboardingWizard.mock.calls[0][0];
+    onDone({ skipped: true });
+    expect(reloadRemoteData).not.toHaveBeenCalled();
+    await onDone({ character: { id: 'c' } });
+    expect(reloadRemoteData).toHaveBeenCalledOnce();
+    expect(component.state).toMatchObject({ activeCharacterId: 'c', sheetOpen: true, sheetEditing: false, sheetCreating: false, gm: false });
+  });
+
+  it('createPlayerCharacter redirects to login when nobody is authenticated', () => {
+    mountOnboardingWizard.mockClear();
+    const component = fakeComponent({ state: { gmAuthenticated: false, authAuthenticated: false } });
+    sheetHandlers(component).createPlayerCharacter();
+    expect(component.redirectToLogin).toHaveBeenCalled();
+    expect(mountOnboardingWizard).not.toHaveBeenCalled();
+  });
+
+  it('createSheetCharacter keeps the drawer builder for the GM and routes players to the wizard', () => {
+    mountOnboardingWizard.mockClear();
+    const gm = fakeComponent();
+    sheetHandlers(gm).createSheetCharacter();
+    expect(gm.state).toMatchObject({ sheetEditing: true, sheetCreating: true });
+    expect(mountOnboardingWizard).not.toHaveBeenCalled();
+
+    const player = fakeComponent({ state: { gm: false, gmAuthenticated: false, authAuthenticated: true }, api: vi.fn(() => ({})) });
+    sheetHandlers(player).createSheetCharacter();
+    expect(mountOnboardingWizard).toHaveBeenCalledOnce();
+    expect(player.state.sheetCreating).toBeUndefined();
+  });
+
   it('cancelSheetEdit clears the draft and editing flags', () => {
     const component = fakeComponent({ state: { sheetEditing: true, sheetCreating: true, sheetDraft: { name: 'x' } } });
     sheetHandlers(component).cancelSheetEdit();
@@ -537,11 +596,308 @@ describe('ui/views/sheet sheetHandlers', () => {
     expect(component.flash).toHaveBeenCalledWith('Linked');
   });
 
+  it('the own-sheet card carries the uploaded photo, and only that', () => {
+    const withPhoto = { ...baseCharacter, portraitUrl: '/uploads/face.png' };
+    const vals = sheetRenderVals({ characters: [withPhoto], activeCharacterId: 'a' }, baseDeps());
+
+    expect(vals.myOperativeCard.portrait).toBe('/uploads/face.png');
+    expect(vals.myOperativeCard.hasPortrait).toBe(true);
+    expect(vals.myOperativeCard.noPortrait).toBe(false);
+  });
+
+  it('the wizard generated card art is not a face, so initials stand in', () => {
+    const generated = { ...baseCharacter, portraitUrl: 'data:image/svg+xml;charset=UTF-8,%3Csvg' };
+    const vals = sheetRenderVals({ characters: [generated], activeCharacterId: 'a' }, baseDeps());
+
+    expect(vals.myOperativeCard.portrait).toBe('');
+    expect(vals.myOperativeCard.noPortrait).toBe(true);
+    expect(vals.myOperativeCard.initials).toBe('RO');
+  });
+
+  it('table seats follow the same photo rule as the operative card', () => {
+    const campaign = {
+      roster: [
+        { username: 'bari', role: 'player', characterId: 'a', portraitUrl: '/uploads/face.png' },
+        { username: 'leu', role: 'player', characterId: 'b', portraitUrl: 'data:image/svg+xml,x' },
+      ],
+    };
+    const vals = sheetRenderVals(
+      { characters, activeCharacterId: 'a', activeCampaign: campaign, authUser: { role: 'player', username: 'bari' } },
+      baseDeps(),
+    );
+    const [bari, leu] = vals.tableSeatCards;
+
+    expect(bari.hasPortrait).toBe(true);
+    expect(bari.portraitUrl).toBe('/uploads/face.png');
+    expect(leu.noPortrait).toBe(true);
+    expect(leu.portraitUrl).toBe('');
+    expect(leu.initials).toBe('LE');
+  });
+
   it('onPlayerPortraitUpload stores the uploaded url on the active character', async () => {
     const component = fakeComponent();
     const input = { files: [{ name: 'x.png' }], value: 'x.png' };
     await sheetHandlers(component).onPlayerPortraitUpload({ target: input });
-    expect(component.updateActiveCharacter).toHaveBeenCalledWith({ portraitUrl: 'blob://portrait.png' });
+    expect(component.applyCharacterPatch).toHaveBeenCalledWith('a', { portraitUrl: 'blob://portrait.png' });
     expect(input.value).toBe('');
+  });
+
+  // The GM-gated writer bounced a player to the login screen, which lands on
+  // campaign selection, the first time they set a photo on their own sheet.
+  it('onPlayerPortraitUpload never goes through the GM-gated writer', async () => {
+    const component = fakeComponent();
+    const input = { files: [{ name: 'x.png' }], value: 'x.png' };
+    await sheetHandlers(component).onPlayerPortraitUpload({ target: input });
+    expect(component.updateActiveCharacter).not.toHaveBeenCalled();
+    expect(component.updateCharacterById).not.toHaveBeenCalled();
+    expect(component.redirectToLogin).not.toHaveBeenCalled();
+  });
+});
+
+// --- Barra da mesa x barra da sua ficha ---
+// Antes, uma barra unica listava as fichas do jogador e clicar em qualquer
+// carta trocava o operativo controlado. Hoje o assento e a carta do
+// personagem (nome, classe, foto, cor) com o jogador embaixo; a barra SUA
+// FICHA so volta quando o assento nao da conta (ficha cedida, sem ficha,
+// fora de campanha).
+
+const campaign = {
+  id: 'mesa-1',
+  name: 'noite em watson',
+  roster: [
+    { username: 'bari', role: 'player', characterId: 'a', characterName: 'Rook', characterRole: 'Solo', characterLevel: 4 },
+    { username: 'matheus', role: 'gm', characterId: null },
+  ],
+};
+
+const playerState = (overrides = {}) => ({
+  characters,
+  activeCharacterId: 'a',
+  authUser: { role: 'player', username: 'bari' },
+  authAuthenticated: true,
+  activeCampaign: campaign,
+  activeCampaignName: 'noite em watson',
+  ...overrides,
+});
+
+describe('barra da mesa', () => {
+  it('lista quem esta na mesa', () => {
+    const vals = sheetRenderVals(playerState(), baseDeps());
+    expect(vals.hasTableSeats).toBe(true);
+    expect(vals.tableSeatCount).toBe('2');
+    expect(vals.tableName).toBe('NOITE EM WATSON');
+    expect(vals.tableSeatCards.map(seat => seat.username)).toEqual(['matheus', 'bari']);
+  });
+
+  // O jogador olha a mesa procurando "o Nomad", nao a conta que o dirige.
+  it('o assento lidera com o personagem e cita o jogador embaixo', () => {
+    const vals = sheetRenderVals(playerState(), baseDeps());
+    const mine = vals.tableSeatCards.find(seat => seat.isSelf);
+
+    expect(mine.title).toBe('Rook');
+    expect(mine.classLabel).toBe('SOLO // LVL 4');
+    expect(mine.playerLabel).toBe('BARI');
+    expect(mine.playerLine).toBe('BARI // VOCE');
+    expect(mine.initials).toBe('RO');
+    expect(mine.roleTag).toBe('SOL');
+    expect(mine.vars).toContain('--seat-accent:#fff');
+  });
+
+  it('assento sem ficha cai para o nome da conta', () => {
+    const vals = sheetRenderVals(playerState(), baseDeps());
+    const gm = vals.tableSeatCards.find(seat => seat.isGm);
+
+    expect(gm.title).toBe('matheus');
+    expect(gm.classLabel).toBe('MESTRE DA MESA');
+    expect(gm.hasCharacter).toBe(false);
+    // Sem ficha, o nome da conta ja e o titulo: repetir embaixo seria ruido.
+    expect(gm.showPlayerLine).toBe(false);
+    expect(gm.vars).toContain('--seat-accent:#3fe0d0');
+  });
+
+  it('marca voce entre os assentos, e so o seu abre a ficha', () => {
+    const deps = baseDeps();
+    const vals = sheetRenderVals(playerState(), deps);
+    const mine = vals.tableSeatCards.find(seat => seat.isSelf);
+    expect(mine.username).toBe('bari');
+    expect(mine.selfTag).toBe('VOCE');
+    expect(mine.style).toContain('lm-table-seat--self');
+
+    mine.onClick();
+    expect(deps.setState).toHaveBeenCalledWith({ sheetOpen: true });
+    expect(deps.selectCharacter).not.toHaveBeenCalled();
+
+    // Nenhum assento alheio troca quem voce controla.
+    expect(vals.tableSeatCards.filter(seat => seat.onClick)).toHaveLength(1);
+  });
+
+  it('fora de campanha a barra da mesa nao aparece', () => {
+    const vals = sheetRenderVals(playerState({ activeCampaign: null }), baseDeps());
+    expect(vals.hasTableSeats).toBe(false);
+    expect(vals.tableSeatCards).toEqual([]);
+  });
+});
+
+describe('barra da sua ficha', () => {
+  it('mostra so a ficha ativa, e abrir nao troca de personagem', () => {
+    const deps = baseDeps();
+    const vals = sheetRenderVals(playerState(), deps);
+
+    expect(vals.hasMyOperative).toBe(true);
+    expect(vals.myOperativeCard.id).toBe('a');
+    expect(vals.myOperativeCard.status).toBe('ABRIR FICHA');
+
+    vals.myOperativeCard.onClick();
+
+    expect(deps.selectCharacter).not.toHaveBeenCalled();
+    expect(deps.setState).toHaveBeenCalledWith({ sheetOpen: true });
+  });
+
+  it('a segunda ficha da conta nao vira carta no desktop', () => {
+    const vals = sheetRenderVals(playerState(), baseDeps());
+    expect(vals.myOperativeCard.id).toBe('a');
+    expect(vals.myOperativeCard.name).toBe('Rook');
+  });
+
+  it('sem ficha nenhuma, oferece criar', () => {
+    const vals = sheetRenderVals(playerState({ characters: [], activeCharacterId: null }), baseDeps());
+    expect(vals.hasMyOperative).toBe(false);
+    expect(vals.missingMyOperative).toBe(true);
+    expect(vals.showOwnSheetPanel).toBe(true);
+  });
+
+  // Uma ficha so, ja desenhada no proprio assento: a barra vira repeticao.
+  it('some quando o jogador dirige so a ficha do proprio assento', () => {
+    const vals = sheetRenderVals(playerState(), baseDeps());
+    expect(vals.showOwnSheetPanel).toBe(false);
+  });
+
+  it('volta fora da campanha, onde nao ha assento para ler', () => {
+    const vals = sheetRenderVals(playerState({ activeCampaign: null }), baseDeps());
+    expect(vals.showOwnSheetPanel).toBe(true);
+  });
+});
+
+describe('troca de operativo na gaveta', () => {
+  it('fica escondida para o jogador', () => {
+    const vals = sheetRenderVals(playerState(), baseDeps());
+    expect(vals.showCharacterSwitcher).toBe(false);
+  });
+
+  it('continua disponivel para o mestre autenticado', () => {
+    const vals = sheetRenderVals(playerState({ gm: true, gmAuthenticated: true, authUser: { role: 'gm', username: 'matheus' } }), baseDeps());
+    expect(vals.showCharacterSwitcher).toBe(true);
+    expect(vals.sheetCharacterBtns).toHaveLength(2);
+  });
+
+  it('mestre com uma unica ficha na mesa nao ganha barra de troca vazia', () => {
+    const vals = sheetRenderVals(playerState({ gm: true, gmAuthenticated: true, characters: [characters[0]] }), baseDeps());
+    expect(vals.showCharacterSwitcher).toBe(false);
+  });
+
+  it('criar uma segunda ficha tambem e ferramenta de mestre', () => {
+    expect(sheetRenderVals(playerState(), baseDeps()).showNewSheetButton).toBe(false);
+    expect(sheetRenderVals(playerState({ gm: true, gmAuthenticated: true }), baseDeps()).showNewSheetButton).toBe(true);
+  });
+
+  it('jogador sem ficha ainda pode criar a primeira pelo desktop', () => {
+    const vals = sheetRenderVals(playerState({ characters: [], activeCharacterId: null }), baseDeps());
+    expect(vals.showNewSheetButton).toBe(false);
+    expect(vals.missingMyOperative).toBe(true);
+  });
+});
+
+// --- Cobrindo a ficha de quem faltou ---
+// O mestre cede a ficha do ausente; ela aparece numa barra propria e, ao
+// contrario da carta do proprio operativo, clicar nela assume o controle.
+
+const coveredCampaign = {
+  id: 'mesa-1',
+  name: 'noite em watson',
+  roster: [
+    { username: 'matheus', role: 'gm', characterId: null },
+    { username: 'bari', role: 'player', characterId: 'a' },
+    { username: 'leu', role: 'player', characterId: 'b', controlledBy: 'bari' },
+  ],
+};
+
+const coveringState = (overrides = {}) => ({
+  characters,
+  activeCharacterId: 'a',
+  authUser: { role: 'player', username: 'bari' },
+  authAuthenticated: true,
+  activeCampaign: coveredCampaign,
+  activeCampaignName: 'noite em watson',
+  ...overrides,
+});
+
+describe('barra de fichas cedidas', () => {
+  it('so aparece quando o mestre cedeu alguma', () => {
+    const withoutGrant = sheetRenderVals(playerState(), baseDeps());
+    expect(withoutGrant.hasDelegatedCards).toBe(false);
+    expect(withoutGrant.delegatedCards).toEqual([]);
+
+    const vals = sheetRenderVals(coveringState(), baseDeps());
+    expect(vals.hasDelegatedCards).toBe(true);
+    expect(vals.delegatedCount).toBe('1');
+    expect(vals.delegatedCards[0]).toMatchObject({ id: 'b', name: 'V', coverFor: 'leu' });
+    expect(vals.delegatedCards[0].coverLabel).toBe('NO LUGAR DE LEU');
+  });
+
+  it('clicar na ficha cedida assume o controle e abre a gaveta', () => {
+    const deps = baseDeps();
+    const vals = sheetRenderVals(coveringState(), deps);
+
+    vals.delegatedCards[0].onClick();
+
+    expect(deps.selectCharacter).toHaveBeenCalledWith('b');
+    expect(deps.setState).toHaveBeenCalledWith({ sheetOpen: true });
+  });
+
+  it('com a ficha cedida ativa, a carta propria devolve o controle', () => {
+    const deps = baseDeps();
+    const vals = sheetRenderVals(coveringState({ activeCharacterId: 'b' }), deps);
+
+    expect(vals.myOperativeCard.id).toBe('a');
+    expect(vals.myOperativeCard.status).toBe('VOLTAR AO SEU');
+    expect(vals.delegatedCards[0].status).toBe('ABRIR FICHA');
+
+    vals.myOperativeCard.onClick();
+
+    expect(deps.selectCharacter).toHaveBeenCalledWith('a');
+  });
+
+  it('nao dobra a ficha cedida na barra SUA FICHA', () => {
+    const vals = sheetRenderVals(coveringState({ activeCharacterId: 'b' }), baseDeps());
+    expect(vals.myOperativeCard.id).not.toBe('b');
+  });
+
+  // Com duas fichas em jogo ha escolha a fazer, entao a barra volta.
+  it('a barra SUA FICHA reaparece para quem cobre alguem', () => {
+    expect(sheetRenderVals(coveringState(), baseDeps()).showOwnSheetPanel).toBe(true);
+  });
+
+  it('quem so tem a propria ficha nao vira substituto de si mesmo', () => {
+    const vals = sheetRenderVals(coveringState({ authUser: { role: 'player', username: 'leu' } }), baseDeps());
+    expect(vals.hasDelegatedCards).toBe(false);
+  });
+});
+
+describe('assentos cobertos na barra da mesa', () => {
+  it('dizem quem esta segurando a ficha', () => {
+    const vals = sheetRenderVals(coveringState(), baseDeps());
+    const seat = vals.tableSeatCards.find(entry => entry.username === 'leu');
+
+    expect(seat.isCovered).toBe(true);
+    expect(seat.coverLabel).toBe('VOCE COBRE');
+    expect(seat.style).toContain('lm-table-seat--covered');
+  });
+
+  it('para os outros jogadores, nomeiam o substituto', () => {
+    const vals = sheetRenderVals(coveringState({ authUser: { role: 'player', username: 'leu' } }), baseDeps());
+    const seat = vals.tableSeatCards.find(entry => entry.username === 'leu');
+
+    expect(seat.coverLabel).toBe('COBERTO POR BARI');
+    expect(seat.isNotCovered).toBe(false);
   });
 });

@@ -20,6 +20,7 @@ class EndTurnRequest(BaseModel):
     """Command selecting the combatant whose turn ends."""
 
     target_id: str = Field(alias="targetId", min_length=1, max_length=200)
+    expected_revision: int = Field(alias="expectedRevision", ge=0)
 
 
 class ErrorBody(BaseModel):
@@ -52,14 +53,6 @@ class HealthResponse(BaseModel):
 class LoginArtResponse(BaseModel):
     """Login hero-image contract."""
     images: list[str]
-
-
-class ConfigResponse(BaseModel):
-    """Public login configuration contract."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    google_client_id: str = Field(alias="googleClientId")
 
 
 JsonObject = dict[str, Any]

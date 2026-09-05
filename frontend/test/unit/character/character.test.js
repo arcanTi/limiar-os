@@ -52,6 +52,7 @@ describe('domain/character', () => {
       itemId: 'BULLETPROOF-SHIELD',
       hp: 10,
       maxHp: 10,
+      kind: 'bulletproof',
     });
     expect(normalizeShield({ itemId: '', hp: 10, maxHp: 10 })).toBeNull();
     expect(normalizeShield({ itemId: 'BROKEN', hp: 5, maxHp: 0 })).toBeNull();
@@ -59,10 +60,10 @@ describe('domain/character', () => {
 
   it('degrades shields to destroyed and repairs them up to max HP', () => {
     const shield = { itemId: 'BULLETPROOF-SHIELD', hp: 4, maxHp: 10 };
-    expect(damageShield(shield, 2)).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 2, maxHp: 10 });
-    expect(damageShield(shield, 99)).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 0, maxHp: 10 });
-    expect(repairShield({ ...shield, hp: 0 }, 7)).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 7, maxHp: 10 });
-    expect(repairShield(shield, 99)).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 10, maxHp: 10 });
+    expect(damageShield(shield, 2)).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 2, maxHp: 10, kind: 'bulletproof' });
+    expect(damageShield(shield, 99)).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 0, maxHp: 10, kind: 'bulletproof' });
+    expect(repairShield({ ...shield, hp: 0 }, 7)).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 7, maxHp: 10, kind: 'bulletproof' });
+    expect(repairShield(shield, 99)).toEqual({ itemId: 'BULLETPROOF-SHIELD', hp: 10, maxHp: 10, kind: 'bulletproof' });
   });
 
   it('parses gear damage notation with modifier clamps', () => {

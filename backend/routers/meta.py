@@ -5,9 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from ..application.meta import MetadataService
-from ..config import GOOGLE_CLIENT_ID, ROOT
+from ..config import ROOT
 from ..dependencies import metadata
-from ..schemas import ConfigResponse, HealthResponse, LoginArtResponse
+from ..schemas import HealthResponse, LoginArtResponse
 from .common import Session, require_session
 
 router = APIRouter(tags=["meta"])
@@ -20,11 +20,6 @@ LOGIN_ART_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".avif")
 @router.get("/api/health", response_model=HealthResponse)
 def health(service: Metadata) -> dict[str, object]:
     return service.health()
-
-
-@router.get("/api/meta/config", response_model=ConfigResponse)
-def config() -> dict[str, str]:
-    return {"googleClientId": GOOGLE_CLIENT_ID}
 
 
 @router.get("/api/meta/login-art", response_model=LoginArtResponse)

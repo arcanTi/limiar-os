@@ -20,12 +20,20 @@ export interface HttpClientOptions {
 export class ApiError extends Error {
   status: number;
   path: string;
+  code?: string;
+  details?: Record<string, unknown>;
 
-  constructor(status: number, path: string) {
-    super('API ' + status + ' ' + path);
+  constructor(
+    status: number,
+    path: string,
+    error?: { code?: string; message?: string; details?: Record<string, unknown> },
+  ) {
+    super(error?.message || 'API ' + status + ' ' + path);
     this.name = 'ApiError';
     this.status = status;
     this.path = path;
+    this.code = error?.code;
+    this.details = error?.details;
   }
 }
 
@@ -46,7 +54,12 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
       headers: { ...(isForm ? {} : { 'Content-Type': 'application/json' }), ...authHeader(), ...(requestOptions && requestOptions.headers) },
       ...requestOptions,
     });
-    if (!res.ok) throw new ApiError(res.status, path);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null) as {
+        error?: { code?: string; message?: string; details?: Record<string, unknown> };
+      } | null;
+      throw new ApiError(res.status, path, body?.error);
+    }
     if (res.status === 204) return null as T;
     return res.json() as Promise<T>;
   };

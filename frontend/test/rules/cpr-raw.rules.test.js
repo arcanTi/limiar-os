@@ -26,6 +26,7 @@ import {
 import {
   resolveAttackCheck,
 } from '../../src/domain/combat/combatAttackEngine.ts';
+import { resolveCombatAttack } from '../../src/domain/combat/combatResolver.ts';
 import {
   resolveArmorForLocation,
 } from '../../src/domain/combat/combatArmorEngine.ts';
@@ -217,8 +218,14 @@ describe('CPR RAW character rules', () => {
     expect(deriveStats({ stats: character.base, character, installedCyberware: character.equipped })).toEqual({
       hpMax: 55,
       seriouslyWounded: 28,
+      woundState: 'seriouslyWounded',
       deathSave: 9,
       deathSaveModifier: -1,
+      deathSavesPassed: 0,
+      deathSaveWoundPenalty: 0,
+      effectiveBody: 10,
+      hpBody: 10,
+      linearFrameSources: [],
       humanityMax: 30,
       humanityCurrent: -4,
       cyberpsychosisActive: false,
@@ -234,6 +241,7 @@ describe('CPR RAW character rules', () => {
       actionPenalty: 3,
       conditionActionPenalty: 1,
       woundActionPenalty: 2,
+      woundMovePenalty: 0,
       movePenalty: 0,
       statPenalties: {},
       evasionMod: -2,
@@ -256,9 +264,32 @@ describe('CPR RAW character rules', () => {
         LUCK: 5,
         MOVE: 3,
         BODY: 10,
-        EMP: 3,
+        // Humanity is below zero here, so the EMP that rolls use is 0 while the
+        // sheet keeps its base 3 (p.80: EMP is the tens digit of Humanity).
+        EMP: 0,
       },
     });
+  });
+
+  it('Given Humanity loss, When deriving stats, Then EMP checks fall to the tens digit while the base spread is untouched', () => {
+    const base = { INT: 5, REF: 6, DEX: 5, TECH: 4, COOL: 5, WILL: 7, LUCK: 5, MOVE: 5, BODY: 8, EMP: 4 };
+    const chromed = deriveStats({
+      stats: base,
+      character: { base },
+      installedCyberware: [{ code: 'GORILLA-ARMS', hcost: 14 }, { code: 'ENH-HYD-RAM', hcost: 3 }],
+    });
+
+    expect(chromed.humanityCurrent).toBe(23);
+    expect(chromed.effectiveEmp).toBe(2);
+    expect(chromed.effectiveStats.EMP).toBe(2);
+    expect(base.EMP).toBe(4);
+    // An EMP-based skill rolls against the degraded value, not the sheet's 4.
+    // Human Perception is a basic skill (free level 2), raised to 4 here.
+    expect(normalizeSkills([{ name: 'Human Perception', level: 4 }], chromed.effectiveStats)
+      .find(skill => skill.name === 'Human Perception').total).toBe(6);
+    // A skill on another STAT is untouched by the Humanity loss.
+    expect(normalizeSkills([{ name: 'Persuasion', level: 4 }], chromed.effectiveStats)
+      .find(skill => skill.name === 'Persuasion').total).toBe(9);
   });
 
   it('Given BODY and WILL, When deriving HP maximum, Then the RAW formula is 10 plus five times rounded-up average', () => {
@@ -656,14 +687,42 @@ describe('CPR RAW combat rules', () => {
   });
 
   it('Given fixed ranged DV tie, When resolving an attack check, Then meeting the DV hits', () => {
-    const result = resolveAttackCheck({
+    // CPR RAW: a fixed DV is met or beaten; only an opposed roll gives the tie
+    // to the defender.
+    const tie = resolveAttackCheck({
       attacker: { stats: { REF: 8 }, skills: { Handgun: 6 } },
       weapon: { weaponSkill: 'Handgun' },
       attackRoll: { total: 15 },
       targetDV: 15,
     });
-    expect(result.hit).toBe(true);
-    expect(result.opposed).toBe(false);
+    expect(tie.hit).toBe(true);
+    expect(tie.margin).toBe(0);
+    expect(tie.opposed).toBe(false);
+    const under = resolveAttackCheck({
+      attacker: { stats: { REF: 8 }, skills: { Handgun: 6 } },
+      weapon: { weaponSkill: 'Handgun' },
+      attackRoll: { total: 14 },
+      targetDV: 15,
+    });
+    expect(under.hit).toBe(false);
+    expect(under.margin).toBe(-1);
+  });
+
+  it('Given an Autofire miss, When the attack resolves end to end, Then it deals no damage and never multiplies by zero', () => {
+    const result = resolveCombatAttack({
+      attacker: { stats: { REF: 8 }, skills: { Autofire: 6 } },
+      weapon: { code: 'SMG', damage: '2d6', weaponSkill: 'Autofire', autofire: { enabled: true, multiplier: 3 } },
+      attackMode: 'autofire',
+      attackRoll: { total: 14 },
+      targetDV: 15,
+      damageRoll: { rolls: [6, 6] },
+      target: { armor: { body: { sp: 0, ablates: true } } },
+      canonicalRules,
+    });
+    expect(result.hit).toBe(false);
+    expect(result.attack.hit).toBe(false);
+    expect(result.rawDamage).toBe(0);
+    expect(result.criticalTriggered).toBe(false);
   });
 
   it('Given two sixes on damage dice, When checking critical trigger, Then a critical injury is required', () => {
@@ -849,13 +908,42 @@ describe('CPR RAW cyberware rules', () => {
     });
   });
 
-  it('Given humanity loss changes EMP, When deriving current EMP, Then EMP rounds humanityCurrent / 10 up and never goes negative', () => {
+  it('Given humanity loss changes EMP, When deriving current EMP, Then EMP is the tens digit of Humanity (CPR p.80) and never goes negative', () => {
+    expect(deriveEffectiveEmp(44)).toBe(4); // book example: 44 -> 4
+    expect(deriveEffectiveEmp(39)).toBe(3); // ... until it drops to 39 -> 3
     expect(deriveEffectiveEmp(30)).toBe(3);
-    expect(deriveEffectiveEmp(21)).toBe(3);
+    expect(deriveEffectiveEmp(21)).toBe(2);
     expect(deriveEffectiveEmp(20)).toBe(2);
-    expect(deriveEffectiveEmp(1)).toBe(1);
+    expect(deriveEffectiveEmp(9)).toBe(0);
     expect(deriveEffectiveEmp(0)).toBe(0);
     expect(deriveEffectiveEmp(-1)).toBe(0);
+  });
+
+  it('Given HP below 1, When deriving stats, Then Mortally Wounded applies -4 actions, MOVE -6 (min 1) and counts passed Death Saves', () => {
+    const base = { INT: 5, REF: 6, DEX: 6, TECH: 5, COOL: 5, WILL: 5, LUCK: 5, MOVE: 4, BODY: 7, EMP: 5 };
+    const mortal = deriveStats({ stats: base, character: { base, health: { cur: 0, max: 40 }, deathSavesPassed: 2 }, installedCyberware: [] });
+    expect(mortal.hpMax).toBe(40);
+    expect(mortal.woundState).toBe('mortallyWounded');
+    expect(mortal.woundActionPenalty).toBe(4);
+    expect(mortal.actionPenalty).toBe(4);
+    expect(mortal.woundMovePenalty).toBe(6);
+    expect(mortal.movePenalty).toBe(6);
+    expect(mortal.effectiveStats.MOVE).toBe(1); // 4 - 6 floors at 1
+    expect(mortal.deathSavesPassed).toBe(2);
+    expect(mortal.deathSaveModifier).toBe(-2);
+    expect(mortal.deathSave).toBe(5); // BODY 7 - 2 passed saves
+
+    const serious = deriveStats({ stats: base, character: { base, health: { cur: 20, max: 40 }, deathSavesPassed: 2 }, installedCyberware: [] });
+    expect(serious.woundState).toBe('seriouslyWounded');
+    expect(serious.woundActionPenalty).toBe(2);
+    expect(serious.woundMovePenalty).toBe(0);
+    expect(serious.effectiveStats.MOVE).toBe(4);
+    expect(serious.deathSavesPassed).toBe(0); // streak only bites while mortally wounded
+    expect(serious.deathSave).toBe(7);
+
+    expect(effectiveMoveStat({ base, health: { cur: 0 } })).toBe(1);
+    expect(effectiveMoveStat({ base: { ...base, MOVE: 8 }, health: { cur: 0 } })).toBe(2);
+    expect(effectiveMoveStat({ base, health: { cur: 21 } })).toBe(4);
   });
 });
 

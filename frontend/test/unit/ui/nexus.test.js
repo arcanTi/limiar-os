@@ -414,3 +414,240 @@ describe('ui/views/nexus nexusHandlers', () => {
     expect(component.state.game.status).toBe('fail');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Going Quiet (stealth netrunning DLC)
+// ---------------------------------------------------------------------------
+describe('ui/views/nexus Going Quiet render', () => {
+  it('adds a Quietly Jack In prep row that costs a NET Action and routes to runQuietJackIn', () => {
+    const deps = { ...baseDeps(), runQuietJackIn: vi.fn() };
+    const vals = nexusRenderVals({
+      gm: false,
+      characters,
+      activeCharacterId: 'b',
+      nexusChallenge: { targetId: 'b', architectureTier: 'standard', interfaceRank: 6, watchers: [{ id: 'imp-1', name: 'Imp', kind: 'demon', interface: 3 }] },
+    }, deps);
+    const row = vals.prepRows.find(r => r.id === 'stealth');
+    expect(row.name).toBe('Quietly Jack In');
+    expect(row.effect).toContain('1 Watcher');
+    expect(row.available).toBe(true);
+    row.roll();
+    expect(deps.runQuietJackIn).toHaveBeenCalled();
+    expect(deps.runNexusPrep).not.toHaveBeenCalled();
+  });
+
+  it('GM watcher roster renders presets, draft defaults and removable rows', () => {
+    const deps = { ...baseDeps(), removeNexusWatcher: vi.fn() };
+    const vals = nexusRenderVals({
+      gm: true,
+      characters,
+      nexusWatcherDraft: { presetId: 'balron' },
+      nexusWatchers: [{ id: 'w1', name: 'Imp', kind: 'demon', interface: 3 }],
+    }, deps);
+    expect(vals.nexusWatcherPresetOptions.map(o => o.id)).toEqual(['imp', 'efreet', 'balron', 'netrunner']);
+    expect(vals.nexusWatcherPresetOptions.find(o => o.selected).id).toBe('balron');
+    expect(vals.nexusWatcherDraftInterface).toBe(7);
+    expect(vals.hasNexusWatchers).toBe(true);
+    expect(vals.nexusWatcherRows[0].label).toBe('Imp // INT 3 // DEMONIO');
+    vals.nexusWatcherRows[0].remove();
+    expect(deps.removeNexusWatcher).toHaveBeenCalledWith('w1');
+  });
+
+  it('shows the stealth panel with watcher search only for the GM and once per turn', () => {
+    const state = {
+      characters: [characters[0], { ...characters[1], netPrograms: ['eraser'] }],
+      activeCharacterId: 'b',
+      nexusChallenge: { targetId: 'b', architectureTier: 'standard', interfaceRank: 6, blackIceId: 'skunk', watchers: [{ id: 'imp-1', name: 'Imp', kind: 'demon', interface: 3 }] },
+      nexusStealth: { attempted: true, active: true, turn: 2, watcherSearches: { 'imp-1': 2 } },
+    };
+    const player = nexusRenderVals({ ...state, gm: false }, baseDeps());
+    expect(player.stealthPanel.show).toBe(true);
+    expect(player.stealthPanel.statusLabel).toBe('STEALTH ATIVO');
+    expect(player.stealthPanel.turnLabel).toBe('TURNO 2');
+    expect(player.stealthPanel.netrunnerLabel).toBe('V // INTERFACE 6 // CLOAK +2');
+    expect(player.stealthPanel.canEncounterIce).toBe(true);
+    expect(player.stealthPanel.watchers[0].canSearch).toBe(false);
+
+    const gm = nexusRenderVals({ ...state, gm: true }, baseDeps());
+    expect(gm.stealthPanel.isGm).toBe(true);
+    expect(gm.stealthPanel.watchers[0].canSearch).toBe(false);
+    expect(gm.stealthPanel.watchers[0].searchLabel).toBe('BUSCA USADA');
+    const gmNextTurn = nexusRenderVals({ ...state, gm: true, nexusStealth: { ...state.nexusStealth, turn: 3 } }, baseDeps());
+    expect(gmNextTurn.stealthPanel.watchers[0].canSearch).toBe(true);
+
+    const hidden = nexusRenderVals({ characters, activeCharacterId: 'b', nexusChallenge: { targetId: 'b', architectureTier: 'standard' } }, baseDeps());
+    expect(hidden.stealthPanel.show).toBe(false);
+  });
+
+  it('marks a bypassed Black ICE as out of initiative and summarizes watchers + stealth', () => {
+    const vals = nexusRenderVals({
+      gm: true,
+      characters,
+      nexusChallenge: { targetId: 'b', architectureTier: 'standard', blackIceId: 'skunk', scriptCount: 3, matrixSize: 6, timeLimit: 90, traceRate: 0.4, watchers: [{ id: 'w', name: 'Imp', kind: 'demon', interface: 3 }], stealthActive: true },
+      nexusBlackIce: { id: 'skunk', rez: 10, maxRez: 10, revealed: true, bypassed: true },
+    }, baseDeps());
+    expect(vals.blackIcePanel.statusLabel).toBe('EVITADO // FORA DA INICIATIVA');
+    expect(vals.stealthPanel.iceBypassed).toBe(true);
+    expect(vals.nexusSummary).toContain('1 watcher');
+    expect(vals.nexusSummary).toContain('stealth');
+  });
+});
+
+describe('ui/views/nexus Going Quiet handlers', () => {
+  beforeEach(() => {
+    global.window = { NexusBreach: undefined };
+    global.document = { getElementById: vi.fn(() => ({})), querySelector: vi.fn(() => null) };
+  });
+  afterEach(() => {
+    delete global.window;
+    delete global.document;
+  });
+
+  const stealthComponent = (extraState = {}, overrides = {}) => {
+    const component = fakeComponent({
+      state: {
+        activeCharacterId: 'b',
+        characters: [characters[0], { ...characters[1], netPrograms: ['eraser'] }],
+        nexusChallenge: {
+          targetId: 'b', architectureTier: 'standard', architectureDv: 8, interfaceRank: 6, blackIceId: 'skunk',
+          watchers: [{ id: 'imp-1', name: 'Imp', kind: 'demon', interface: 3 }, { id: 'balron-1', name: 'Balron', kind: 'demon', interface: 7, pathfinder: 0 }],
+        },
+        ...extraState,
+      },
+      activeCharacter: vi.fn(() => ({ ...characters[1], netPrograms: ['eraser'] })),
+      ...overrides,
+    });
+    // NPC dice always show 6 -> Imp 9, Balron 13, Skunk PER 2 -> 8.
+    component.random = () => 0.5;
+    return component;
+  };
+
+  it('addNexusWatcher builds from the draft/preset, removeNexusWatcher drops it, and sendNexusChallenge publishes the roster', async () => {
+    const set = vi.fn(async (cfg) => cfg);
+    const component = fakeComponent({ state: { nexusTargetId: 'b', nexusWatcherDraft: { presetId: 'efreet', name: '' } }, api: () => ({ nexus: { set } }) });
+    const h = nexusHandlers(component);
+    h.addNexusWatcher();
+    h.setNexusWatcherPreset('netrunner');
+    expect(component.state.nexusWatcherDraft).toMatchObject({ presetId: 'netrunner', interface: 4, pathfinder: 0 });
+    h.setNexusWatcherDraft('name', 'Ghost');
+    h.setNexusWatcherDraft('pathfinder', '2');
+    h.addNexusWatcher();
+    expect(component.state.nexusWatchers).toEqual([
+      { id: 'demon-efreet-1', name: 'Efreet', kind: 'demon', interface: 4, pathfinder: 0 },
+      { id: 'netrunner-ghost-2', name: 'Ghost', kind: 'netrunner', interface: 4, pathfinder: 2 },
+    ]);
+    h.removeNexusWatcher('demon-efreet-1');
+    expect(component.state.nexusWatchers.map(w => w.id)).toEqual(['netrunner-ghost-2']);
+
+    await h.sendNexusChallenge();
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ watchers: [{ id: 'netrunner-ghost-2', name: 'Ghost', kind: 'netrunner', interface: 4, pathfinder: 2 }] }));
+    expect(component.state.nexusStealth).toBeNull();
+  });
+
+  it('runQuietJackIn spends a prep NET Action and establishes stealth only when every Watcher is beaten', () => {
+    const win = stealthComponent();
+    win.roll = vi.fn((opts) => opts.onResolved({ total: 14 }));
+    nexusHandlers(win).runQuietJackIn();
+    expect(win.roll).toHaveBeenCalledWith(expect.objectContaining({ label: 'GOING QUIET :: QUIETLY JACK IN', mod: 6, check: true }));
+    expect(win.state.nexusPrepResults).toEqual([{ abilityId: 'stealth', success: true, margin: 1 }]);
+    expect(win.state.nexusStealth).toMatchObject({ attempted: true, active: true });
+    expect(win.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('14 vs Imp 9 / Balron 13 :: STEALTH ATIVO') }));
+
+    const tie = stealthComponent();
+    tie.roll = vi.fn((opts) => opts.onResolved({ total: 13 }));
+    nexusHandlers(tie).runQuietJackIn();
+    expect(tie.state.nexusPrepResults).toEqual([{ abilityId: 'stealth', success: false, margin: 0 }]);
+    expect(tie.state.nexusStealth).toMatchObject({ attempted: true, active: false, brokenBy: null });
+  });
+
+  it('runQuietJackIn refuses a second attempt and respects the NET Action budget', () => {
+    const twice = stealthComponent({ nexusPrepResults: [{ abilityId: 'stealth', success: false, margin: -1 }] });
+    nexusHandlers(twice).runQuietJackIn();
+    expect(twice.roll).not.toHaveBeenCalled();
+    expect(twice.flash).toHaveBeenCalledWith('Quietly Jack In ja tentado nesta conexao');
+
+    // Interface 6 -> 3 NET Actions; three prep rolls already spent.
+    const spent = stealthComponent({ nexusPrepResults: [{ abilityId: 'backdoor' }, { abilityId: 'cloak' }, { abilityId: 'scanner' }] });
+    nexusHandlers(spent).runQuietJackIn();
+    expect(spent.roll).not.toHaveBeenCalled();
+    expect(spent.flash).toHaveBeenCalledWith('NET Actions insuficientes para Quietly Jack In');
+  });
+
+  it('finalizeNexusPrep carries stealth into the run config (trace halved, watchers kept)', () => {
+    const component = stealthComponent({ nexusPrepResults: [{ abilityId: 'stealth', success: true, margin: 2 }] });
+    window.NexusBreach = { isMounted: () => false, mount: vi.fn(), unmount: vi.fn() };
+    nexusHandlers(component).finalizeNexusPrep();
+    expect(component.state.nexusChallenge.stealthActive).toBe(true);
+    expect(component.state.nexusChallenge.watchers).toHaveLength(2);
+    expect(component.state.nexusChallenge.traceRate).toBeLessThan(0.6);
+  });
+
+  it('resolveStealthVsIce rolls Interface + Cloak and either bypasses the ICE or breaks stealth', () => {
+    const pass = stealthComponent({ nexusStealth: { attempted: true, active: true } });
+    pass.roll = vi.fn((opts) => opts.onResolved({ total: 9 }));
+    nexusHandlers(pass).resolveStealthVsIce();
+    expect(pass.roll).toHaveBeenCalledWith(expect.objectContaining({ label: 'GOING QUIET :: CLOAK VS SKUNK', mod: 8, actorId: 'b', skipActionPenalty: true }));
+    expect(pass.state.nexusBlackIce).toMatchObject({ id: 'skunk', bypassed: true, revealed: true });
+    expect(pass.state.nexusStealth).toMatchObject({ active: true, iceBypassed: true });
+
+    const fail = stealthComponent({ nexusStealth: { attempted: true, active: true } });
+    fail.roll = vi.fn((opts) => opts.onResolved({ total: 8 }));
+    nexusHandlers(fail).resolveStealthVsIce();
+    expect(fail.state.nexusBlackIce).toMatchObject({ id: 'skunk', bypassed: false, revealed: true, rez: 10 });
+    expect(fail.state.nexusStealth).toMatchObject({ active: false, brokenBy: 'black-ice' });
+    expect(fail.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('ataca imediatamente') }));
+
+    const inactive = stealthComponent();
+    nexusHandlers(inactive).resolveStealthVsIce();
+    expect(inactive.roll).not.toHaveBeenCalled();
+  });
+
+  it('resolveStealthVsWatcher uses Interface + Pathfinder for the Watcher and a tie spots the Netrunner', () => {
+    const component = stealthComponent({ nexusStealth: { attempted: true, active: true }, nexusChallenge: undefined });
+    component.state.nexusChallenge = { targetId: 'b', architectureTier: 'standard', interfaceRank: 6, watchers: [{ id: 'ghost', name: 'Ghost', kind: 'netrunner', interface: 5, pathfinder: 2 }] };
+    component.roll = vi.fn((opts) => opts.onResolved({ total: 13 }));
+    nexusHandlers(component).resolveStealthVsWatcher('ghost');
+    // Ghost: 5 + 2 + 6 = 13 -> tie -> stealth breaks.
+    expect(component.state.nexusStealth).toMatchObject({ active: false, brokenBy: 'watcher' });
+  });
+
+  it('watcherSearch is GM-only, once per Watcher per turn, and a found Netrunner loses stealth', () => {
+    const component = stealthComponent({ nexusStealth: { attempted: true, active: true, turn: 1 } });
+    component.roll = vi.fn((opts) => opts.onResolved({ total: 9 }));
+    const h = nexusHandlers(component);
+    h.watcherSearch('imp-1'); // Imp 3 + 6 = 9 vs 9 -> tie -> hidden
+    expect(component.state.nexusStealth).toMatchObject({ active: true, watcherSearches: { 'imp-1': 1 } });
+    h.watcherSearch('imp-1');
+    expect(component.flash).toHaveBeenCalledWith('Imp ja gastou a busca deste turno');
+    expect(component.roll).toHaveBeenCalledTimes(1);
+
+    h.advanceNexusTurn();
+    expect(component.state.nexusStealth.turn).toBe(2);
+    h.watcherSearch('balron-1'); // Balron 7 + 6 = 13 vs 9 -> found
+    expect(component.state.nexusStealth).toMatchObject({ active: false, brokenBy: 'search' });
+
+    const notGm = stealthComponent({ nexusStealth: { attempted: true, active: true } }, { ensureGm: vi.fn(() => false) });
+    nexusHandlers(notGm).watcherSearch('imp-1');
+    expect(notGm.roll).not.toHaveBeenCalled();
+  });
+
+  it('Control Nodes and attacks break stealth immediately', () => {
+    const control = stealthComponent({ nexusStealth: { attempted: true, active: true } });
+    nexusHandlers(control).breakNexusStealth('control');
+    expect(control.state.nexusStealth).toMatchObject({ active: false, brokenBy: 'control' });
+    expect(control.postChat).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('Control Node') }));
+
+    const zap = stealthComponent({ nexusStealth: { attempted: true, active: true } });
+    nexusHandlers(zap).rollNetrunnerZapAttack();
+    expect(zap.state.nexusStealth).toMatchObject({ active: false, brokenBy: 'attack' });
+    expect(zap.roll).toHaveBeenCalled();
+
+    const sword = stealthComponent({ nexusStealth: { attempted: true, active: true } });
+    nexusHandlers(sword).rollNetrunnerProgramVsIce('sword');
+    expect(sword.state.nexusStealth).toMatchObject({ active: false, brokenBy: 'attack' });
+
+    const already = stealthComponent({ nexusStealth: { attempted: true, active: false, brokenBy: 'control' } });
+    nexusHandlers(already).rollNetrunnerZapAttack();
+    expect(already.postChat).not.toHaveBeenCalled();
+  });
+});

@@ -5869,5 +5869,167 @@
       ],
       "desc": "fio termico para Monowire; quando o dano atravessa armor, causa +1 ablation adicional e fica visivelmente aquecido enquanto ativo."
     }
+  },
+  "corePoisonAndDrugRules": {
+    "sourceType": "official-core",
+    "source": "Cyberpunk RED Core Rulebook, Poisons & Drugs / Exotic Ammunition",
+    "coreMechanic": {
+      "checkSkill": "Resist Torture/Drugs",
+      "onFailure": "Sofre o efeito completo; o dano vai direto ao HP.",
+      "onSuccess": "Nenhum efeito.",
+      "armorInteraction": {
+        "ablatesArmor": false,
+        "soaksDamage": false
+      },
+      "immuneBodyTypes": [
+        "drone",
+        "fbc"
+      ],
+      "immuneNote": "Venenos dependem de atingir carne (meat); alvos inorganicos sao imunes."
+    },
+    "intensities": {
+      "mild": {
+        "resistDV": 11,
+        "damage": "1d6"
+      },
+      "strong": {
+        "resistDV": 13,
+        "damage": "2d6"
+      },
+      "deadly": {
+        "resistDV": 15,
+        "damage": "3d6"
+      }
+    },
+    "poisons": {
+      "belladonna": {
+        "name": "Beladona",
+        "intensity": "mild"
+      },
+      "toxic-waste": {
+        "name": "Lixo Toxico",
+        "intensity": "mild"
+      },
+      "arsenic": {
+        "name": "Arsenico",
+        "intensity": "strong"
+      },
+      "biotoxin": {
+        "name": "Biotoxina",
+        "intensity": "deadly"
+      },
+      "designer-poison": {
+        "name": "Veneno de Grife",
+        "intensity": "deadly"
+      },
+      "stonefish-venom": {
+        "name": "Veneno de Peixe-Pedra",
+        "intensity": "deadly"
+      }
+    },
+    "drugs": {
+      "alcohol": {
+        "name": "Alcool",
+        "intensity": "mild",
+        "effect": "Embriaguez"
+      },
+      "sodium-pentothal": {
+        "name": "Pentotal Sodico",
+        "intensity": "strong",
+        "effect": "Sugestionabilidade"
+      },
+      "designer-drug": {
+        "name": "Droga de Grife",
+        "intensity": "deadly",
+        "effect": "Intencao do formulador"
+      }
+    },
+    "ammunition": {
+      "AMMO-BIOTOXIN": {
+        "name": "Municao de Biotoxina",
+        "cost": 500,
+        "costCategory": "Expensive",
+        "eligibleWeapons": [
+          "Arrows",
+          "Grenades"
+        ],
+        "dealsBaseWeaponDamage": false,
+        "condition": "meat hit",
+        "resistDV": 15,
+        "damage": "3d6"
+      },
+      "AMMO-POISON": {
+        "name": "Municao de Veneno",
+        "cost": 100,
+        "costCategory": "Premium",
+        "eligibleWeapons": [
+          "Arrows",
+          "Grenades"
+        ],
+        "dealsBaseWeaponDamage": false,
+        "condition": "meat hit",
+        "resistDV": 13,
+        "damage": "2d6"
+      },
+      "AMMO-TEARGAS": {
+        "name": "Municao de Gas Lacrimogeneo",
+        "cost": 50,
+        "costCategory": "Costly",
+        "eligibleWeapons": [
+          "Grenades"
+        ],
+        "dealsBaseWeaponDamage": false,
+        "condition": "meat eyes hit",
+        "resistDV": 13,
+        "damage": "",
+        "inflictedInjury": "crit_head_4",
+        "injuryDuration": "1 minute",
+        "bonusDamageApplied": false
+      }
+    },
+    "doses": {
+      "TOX-BELLADONNA": {
+        "name": "Dose: Beladona",
+        "toxinId": "belladonna"
+      },
+      "TOX-TOXIC-WASTE": {
+        "name": "Dose: Lixo Toxico",
+        "toxinId": "toxic-waste"
+      },
+      "TOX-ARSENIC": {
+        "name": "Dose: Arsenico",
+        "toxinId": "arsenic"
+      },
+      "TOX-BIOTOXIN": {
+        "name": "Dose: Biotoxina",
+        "toxinId": "biotoxin"
+      },
+      "TOX-DESIGNER-POISON": {
+        "name": "Dose: Veneno de Grife",
+        "toxinId": "designer-poison"
+      },
+      "TOX-STONEFISH": {
+        "name": "Dose: Veneno de Peixe-Pedra",
+        "toxinId": "stonefish-venom"
+      },
+      "TOX-ALCOHOL": {
+        "name": "Dose: Alcool",
+        "toxinId": "alcohol"
+      },
+      "TOX-PENTOTHAL": {
+        "name": "Dose: Pentotal Sodico",
+        "toxinId": "sodium-pentothal"
+      },
+      "TOX-DESIGNER-DRUG": {
+        "name": "Dose: Droga de Grife",
+        "toxinId": "designer-drug"
+      }
+    },
+    "relatedCyberware": {
+      "VAMPYRES": "Presas que armazenam e aplicam veneno/biotoxina; cada aplicacao dura 30 minutos.",
+      "NASAL-FILTER": "Imunidade a toxinas que precisam ser inaladas.",
+      "TOX-BIND": "+2 em Resist Torture/Drugs."
+    },
+    "crafting": "Techs sintetizam venenos e biotoxinas com Basic Tech usando a habilidade de funcao Maker."
   }
 }

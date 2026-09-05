@@ -11,6 +11,12 @@
                   <sc-if value="{{ ro.notSelected }}"><option value="{{ ro.value }}">{{ ro.label }}</option></sc-if>
                 </sc-for>
               </select></label>
+              <label class="lm-sheet-field"><span class="lm-sheet-field-label lm-sheet-field-label--wide">CORPO / TOXINAS</span><select value="{{ sheetBodyType }}" onChange="{{ onSheetBodyType }}" class="lm-ui-select lm-ui-select--full">
+                <sc-for list="{{ sheetBodyTypeOptions }}" as="bt" hint-placeholder-count="3">
+                  <sc-if value="{{ bt.selected }}"><option value="{{ bt.value }}" selected>{{ bt.label }}</option></sc-if>
+                  <sc-if value="{{ bt.notSelected }}"><option value="{{ bt.value }}">{{ bt.label }}</option></sc-if>
+                </sc-for>
+              </select></label>
               <label class="lm-sheet-field"><span class="lm-sheet-field-label lm-sheet-field-label--wide">NIVEL</span><input type="number" min="1" max="99" value="{{ sheetLevel }}" onInput="{{ onSheetLevel }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
               <label class="lm-sheet-field"><span class="lm-sheet-field-label lm-sheet-field-label--wide">ROLE ABILITY RANK</span><input type="number" min="1" max="10" value="{{ sheetRoleAbilityRank }}" onInput="{{ onSheetRoleAbilityRank }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
               <label class="lm-sheet-field"><span class="lm-sheet-field-label lm-sheet-field-label--wide">CREDITOS</span><input type="number" min="0" value="{{ sheetCredits }}" onInput="{{ onSheetCredits }}" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" /></label>
@@ -129,6 +135,64 @@
         </sc-if>
 
         <sc-if value="{{ sheetTabConditions }}">
+        <div class="lm-ip-panel" style="margin-bottom:12px;">
+          <div class="lm-ip-section-title">PAINEL DE EFEITOS <span class="lm-sheet-rule"></span> {{ effectsHeadline }}</div>
+          <sc-if value="{{ effectsClean }}">
+            <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;padding:6px 0;">Nada afetando este operativo agora.</div>
+          </sc-if>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+            <sc-if value="{{ hasEffectNegatives }}">
+              <div>
+                <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:2px;color:#c0635b;margin-bottom:6px;">CONTRA ({{ effectNegativeCount }})</div>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <sc-for list="{{ effectNegativeRows }}" as="e" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:44px 1fr auto;gap:7px;align-items:center;background:#080a07;border-left:2px solid #c0635b;border-top:1px solid rgba(192,99,91,.16);border-right:1px solid rgba(192,99,91,.16);border-bottom:1px solid rgba(192,99,91,.16);padding:6px 8px;">
+                      <div style="font:700 13px 'Share Tech Mono',monospace;color:{{ e.valueColor }};">{{ e.valueLabel }}</div>
+                      <div style="min-width:0;">
+                        <div style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;">{{ e.label_pt }}</div>
+                        <sc-if value="{{ e.hasDetail }}"><div style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;margin-top:2px;">{{ e.detail }}</div></sc-if>
+                      </div>
+                      <sc-if value="{{ e.canRemove }}"><button onClick="{{ e.remove }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">X</button></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hasEffectPositives }}">
+              <div>
+                <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0;margin-bottom:6px;">A FAVOR ({{ effectPositiveCount }})</div>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <sc-for list="{{ effectPositiveRows }}" as="e" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:44px 1fr auto;gap:7px;align-items:center;background:#080a07;border-left:2px solid #3fe0d0;border-top:1px solid rgba(63,224,208,.16);border-right:1px solid rgba(63,224,208,.16);border-bottom:1px solid rgba(63,224,208,.16);padding:6px 8px;">
+                      <div style="font:700 13px 'Share Tech Mono',monospace;color:{{ e.valueColor }};">{{ e.valueLabel }}</div>
+                      <div style="min-width:0;">
+                        <div style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;">{{ e.label_pt }}</div>
+                        <sc-if value="{{ e.hasDetail }}"><div style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;margin-top:2px;">{{ e.detail }}</div></sc-if>
+                      </div>
+                      <sc-if value="{{ e.canRemove }}"><button onClick="{{ e.remove }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">X</button></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          <sc-if value="{{ hasEffectNeutral }}">
+            <div style="margin-top:10px;">
+              <div style="font:9px 'Share Tech Mono',monospace;letter-spacing:2px;color:#d6aa4e;margin-bottom:6px;">EM VIGOR (sem numero)</div>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <sc-for list="{{ effectNeutralRows }}" as="e" hint-placeholder-count="2">
+                  <div style="display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center;background:#080a07;border-left:2px solid #d6aa4e;border-top:1px solid rgba(214,170,78,.14);border-right:1px solid rgba(214,170,78,.14);border-bottom:1px solid rgba(214,170,78,.14);padding:6px 8px;">
+                    <div style="min-width:0;">
+                      <div style="font:600 11px 'Chakra Petch',sans-serif;color:#f0ead8;">{{ e.label_pt }}</div>
+                      <sc-if value="{{ e.hasDetail }}"><div style="font:8px 'Share Tech Mono',monospace;color:#6f7a64;margin-top:2px;">{{ e.detail }}</div></sc-if>
+                    </div>
+                    <sc-if value="{{ e.canRemove }}"><button onClick="{{ e.remove }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">X</button></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
         <div class="lm-ip-panel">
           <div class="lm-ip-section-title">{{ tx.conditions }} <span class="lm-sheet-rule"></span> {{ tx.currentSp }}</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;">
@@ -361,6 +425,81 @@
               <label class="lm-sheet-field"><span class="lm-sheet-field-label">ROLEPLAYER</span><input type="number" min="0" value="{{ ipAwardRoleplayer }}" onInput="{{ onIpAwardRoleplayer }}" class="lm-sheet-input" /></label>
             </div>
             <button onClick="{{ applyIpAward }}" class="{{ ipAwardBtnStyle }}">APLICAR IP // +{{ ipAwardTotal }}</button>
+          </div>
+        </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ sheetTabAchievements }}">
+        <div class="lm-ip-panel">
+          <div class="lm-ip-section-title">CONQUISTAS // {{ achievementOwnerName }} <span class="lm-sheet-rule"></span> LVL {{ achievementOwnerLevel }}</div>
+          <sc-if value="{{ noCharacterAchievements }}">
+            <div class="lm-character-empty">Nenhuma conquista registrada nesta ficha.</div>
+          </sc-if>
+          <div class="lm-dense-list" style="margin-top:8px;">
+            <sc-for list="{{ characterAchievementRows }}" as="ac" hint-placeholder-count="3">
+              <div class="lm-ach-row">
+                <div class="lm-ach-row-main">
+                  <span class="lm-ach-title">{{ ac.title }}</span>
+                  <sc-if value="{{ ac.hasNote }}"><span class="lm-ach-note">{{ ac.note }}</span></sc-if>
+                  <span class="lm-ach-when">{{ ac.when }} // <span style="color:{{ ac.scopeColor }};">{{ ac.scopeLabel }}</span></span>
+                </div>
+                <span class="lm-ach-gain">{{ ac.levelLabel }}</span>
+                <span class="lm-ach-gain lm-ach-gain--ip">{{ ac.ipLabel }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ gm }}">
+          <div class="lm-ip-panel">
+            <div class="lm-ip-section-title">REGISTRAR CONQUISTA <span class="lm-sheet-rule"></span> {{ achievementApplyCount }} ALVO(S)</div>
+            <div style="display:grid;grid-template-columns:1fr 84px 84px;gap:7px;">
+              <input value="{{ achievementTitle }}" onInput="{{ onAchievementTitle }}" placeholder="nome da conquista" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono lm-ui-input--full" />
+              <label class="lm-sheet-field"><span class="lm-sheet-field-label">IP</span><input type="number" min="0" value="{{ achievementIp }}" onInput="{{ onAchievementIp }}" class="lm-sheet-input" /></label>
+              <label class="lm-sheet-field"><span class="lm-sheet-field-label">NIVEIS</span><input type="number" min="0" max="10" value="{{ achievementLevels }}" onInput="{{ onAchievementLevels }}" class="lm-sheet-input" /></label>
+            </div>
+            <textarea value="{{ achievementNote }}" onInput="{{ onAchievementNote }}" placeholder="o que a mesa fez para merecer (opcional)" class="lm-ui-input lm-ui-input--gold lm-ui-textarea" style="margin-top:7px;"></textarea>
+            <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;">
+              <button onClick="{{ setAchievementScopeParty }}" class="{{ achievementPartyBtnStyle }}">TODA A PARTY</button>
+              <button onClick="{{ setAchievementScopeIndividual }}" class="{{ achievementIndividualBtnStyle }}">INDIVIDUAL</button>
+              <button onClick="{{ quickLevelParty }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">LEVEL UP PARTY</button>
+              <button onClick="{{ quickLevelSelected }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">LEVEL UP SELECIONADOS</button>
+              <button onClick="{{ clearAchievementDraft }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">LIMPAR</button>
+            </div>
+            <div class="lm-ach-preview">{{ achievementPreview }}</div>
+            <sc-if value="{{ noAchievementTargets }}">
+              <div class="lm-character-empty">Nenhum personagem nesta campanha.</div>
+            </sc-if>
+            <div class="lm-ach-targets">
+              <sc-for list="{{ achievementTargetRows }}" as="at" hint-placeholder-count="3">
+                <label class="lm-ach-target">
+                  <sc-if value="{{ at.checked }}"><input type="checkbox" checked onChange="{{ at.onToggle }}" /></sc-if>
+                  <sc-if value="{{ at.notChecked }}"><input type="checkbox" onChange="{{ at.onToggle }}" /></sc-if>
+                  <span class="lm-ach-target-name">{{ at.name }}</span>
+                  <span class="lm-ach-target-meta">{{ at.meta }}</span>
+                </label>
+              </sc-for>
+            </div>
+            <button onClick="{{ applyAchievement }}" class="{{ achievementApplyBtnStyle }}">{{ achievementApplyLabel }}</button>
+
+            <div class="lm-ip-section-title" style="margin-top:14px;">HISTORICO DA MESA <span class="lm-sheet-rule"></span></div>
+            <sc-if value="{{ noPartyAchievements }}">
+              <div class="lm-character-empty">Nada registrado ainda.</div>
+            </sc-if>
+            <div class="lm-dense-list">
+              <sc-for list="{{ partyAchievementRows }}" as="pa" hint-placeholder-count="3">
+                <div class="lm-ach-row">
+                  <div class="lm-ach-row-main">
+                    <span class="lm-ach-title">{{ pa.title }}</span>
+                    <sc-if value="{{ pa.hasNote }}"><span class="lm-ach-note">{{ pa.note }}</span></sc-if>
+                    <span class="lm-ach-when">{{ pa.when }} // {{ pa.scopeLabel }} // {{ pa.membersLabel }}</span>
+                  </div>
+                  <span class="lm-ach-gain">{{ pa.levelLabel }}</span>
+                  <span class="lm-ach-gain lm-ach-gain--ip">{{ pa.ipLabel }}</span>
+                  <button onClick="{{ pa.onUndo }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">DESFAZER</button>
+                </div>
+              </sc-for>
+            </div>
           </div>
         </sc-if>
         </sc-if>

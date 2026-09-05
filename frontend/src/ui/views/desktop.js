@@ -1,7 +1,9 @@
 import { LIMIAR_TIER_COLORS } from '../view/constants.js';
 import { CPRED_STAT_ORDER } from '../../domain/character/constants.ts';
 import { buildBodyMap } from '../../domain/items/bodyMapEngine.ts';
+import { isPurchasableProduct } from '../../domain/items/itemNormalizers.ts';
 import { gameTabStyle } from '../view/styles.js';
+import { uploadedPortrait } from '../../domain/character/portrait.ts';
 
 const BODY_REGION_LABELS = {
   skull: 'CABECA',
@@ -186,10 +188,18 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const status = depleted ? tx.depleted : g.equipped ? tx.equipped : 'READY';
     const statusColor = hasReqWarning ? '#c0635b' : depleted ? '#c0635b' : g.equipped ? '#3fe0d0' : '#d6aa4e';
     const useEnabled = isWeapon || !depleted;
+    const isMelee = isWeapon && !!(deps.isMeleeWeapon && deps.isMeleeWeapon(g));
+    const knowsReach = !!(g.melee || String(g.skill || '').trim());
     return {
       ...g,
       dmg: isWeapon ? deps.gearDamageText(g) : '—',
       dmgColor: isWeapon ? '#c0635b' : '#3a3f33',
+      // Reach is the first thing a player checks before declaring an attack,
+      // so a weapon says it as a chip instead of hiding it inside the skill.
+      // A row with neither a melee flag nor a skill cannot be classified, and
+      // an unknown weapon gets no chip rather than a confident wrong one.
+      isMeleeWeapon: isMelee,
+      isRangedWeapon: isWeapon && knowsReach && !isMelee,
       rofLabel: g.rof != null && g.rof !== '' ? String(g.rof) : '—',
       magLabel: g.mag != null && g.mag !== '' ? String(g.mag) : '—',
       skillLabel: g.skill || '—',
@@ -249,7 +259,11 @@ export function desktopRenderVals(state = {}, deps = {}) {
   const q = S.marketQuery.trim().toLowerCase();
   const all = deps.products;
   const marketLayout = S.marketLayout || 'holo';
-  const filtered = all.filter(p => {
+  // Rows the rules engine looks up but nobody buys (the BRAWLING-BODY-* damage
+  // table) would otherwise sit on the shelf priced at 0eb. The shelf is also
+  // what the category chips count, so their numbers match what opens.
+  const shelf = all.filter(p => isPurchasableProduct(p));
+  const filtered = shelf.filter(p => {
     if (S.marketCat !== 'ALL' && p.cat !== S.marketCat) return false;
     if (S.marketAvail !== 'ALL' && p.stock !== S.marketAvail) return false;
     if (q && !(p.code + ' ' + p.name + ' ' + p.cat + ' ' + (p.weaponClass || '') + ' ' + (p.skill || '')).toLowerCase().includes(q)) return false;
@@ -279,8 +293,8 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const fx = marketFx(pageStartIndex + i);
     return { ...p, ...fx, num: String(pageStartIndex + i + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), soldout: p.stock === 'SOLD OUT', owned: p.kind === 'weapon' || p.kind === 'trauma-plan' ? false : S.owned.includes(p.code), bonusChips: chips, hasHumanityCost: p.kind !== 'weapon' && p.kind !== 'trauma-plan', hcostLabel: p.hcostNote || ('-' + (p.hcost || 0)), hasImage: !!p.imageUrl, noImage: !p.imageUrl, open: () => deps.setState({ selected: p }) };
   });
-  const cats = ['ALL', ...Array.from(new Set(all.map(p => p.cat || p.category).filter(Boolean)))];
-  const chips = cats.map(c => ({ label: c, count: c === 'ALL' ? all.length : all.filter(p => p.cat === c).length, onClick: () => deps.setState({ marketCat: c, marketPage: 1 }), style: deps.chipStyle(S.marketCat === c) }));
+  const cats = ['ALL', ...Array.from(new Set(shelf.map(p => p.cat || p.category).filter(Boolean)))];
+  const chips = cats.map(c => ({ label: c, count: c === 'ALL' ? shelf.length : shelf.filter(p => p.cat === c).length, onClick: () => deps.setState({ marketCat: c, marketPage: 1 }), style: deps.chipStyle(S.marketCat === c) }));
   const marketLayoutBtns = [{ k: 'holo', l: 'HOLO' }, { k: 'spec', l: 'SPEC' }, { k: 'terminal', l: 'TERMINAL' }].map(o => ({
     label: o.l, onClick: () => deps.setState({ marketLayout: o.k }), style: deps.viewStyle(marketLayout === o.k),
   }));
@@ -346,17 +360,39 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const isTraumaPlanProduct = p.kind === 'trauma-plan';
     const isCurrentTraumaPlan = isTraumaPlanProduct && deps.traumaPlanKey(activeCharacter) === p.planKey;
     const isEquipped = p.kind === 'weapon' ? false : isTraumaPlanProduct ? isCurrentTraumaPlan : eqp && eqp.code === p.code;
+    // Prerequisites are checked BEFORE the click, not after: a shop that only
+    // says "nao pode ser instalado" once the money is gone teaches nothing.
+    // Only real cyberware goes through the install engine — carried gear and
+    // Trauma Team plans have no slots or requirements to fail.
+    const goesThroughInstallEngine = !isTraumaPlanProduct && p.kind !== 'weapon';
+    const requirementBlock = (goesThroughInstallEngine && !isEquipped && canAfford && deps.previewInstall)
+      ? deps.previewInstall(p)
+      : null;
+    const requirementBlocked = !!(requirementBlock && !requirementBlock.ok && requirementBlock.reason === 'requirements');
+
     let buyLabel, buyBg, balLabel, balColor;
-    if (isEquipped) { buyLabel = tx.alreadyInstalled; buyBg = '#3a3f33'; balLabel = tx.activeUnit; balColor = '#3fe0d0'; }
-    else if (p.stock === 'SOLD OUT') { buyLabel = tx.depleted; buyBg = '#3a3f33'; balLabel = tx.outOfStock; balColor = '#c0635b'; }
-    else if (!canAfford) { buyLabel = tx.insufficient + ' ₢'; buyBg = '#3a3f33'; balLabel = tx.shortBy + ' ' + deps.fmt(Math.abs(after)); balColor = '#c0635b'; }
-    else { buyLabel = (isTraumaPlanProduct ? (S.lang === 'pt' ? 'ATIVAR PLANO' : 'ACTIVATE PLAN') : p.kind === 'weapon' ? tx.addToGear : tx.install) + ' →'; buyBg = '#d6aa4e'; balLabel = tx.balanceAfterInstall + ' ' + deps.fmt(after); balColor = '#6f7a64'; }
-    const canInstall = !isEquipped && p.stock !== 'SOLD OUT' && canAfford;
+    let blockLabel = '', blockMessage = '';
+    if (isEquipped) {
+      buyLabel = tx.alreadyInstalled; buyBg = '#3a3f33'; balLabel = tx.activeUnit; balColor = '#3fe0d0';
+      blockLabel = tx.alreadyInstalled; blockMessage = tx.activeUnit;
+    } else if (p.stock === 'SOLD OUT') {
+      buyLabel = tx.depleted; buyBg = '#3a3f33'; balLabel = tx.outOfStock; balColor = '#c0635b';
+      blockLabel = tx.depleted; blockMessage = tx.outOfStock;
+    } else if (!canAfford) {
+      buyLabel = tx.insufficient + ' ₢'; buyBg = '#3a3f33'; balLabel = tx.shortBy + ' ' + deps.fmt(Math.abs(after)); balColor = '#c0635b';
+      blockLabel = tx.insufficient; blockMessage = tx.shortBy + ' ' + deps.fmt(Math.abs(after)) + '.';
+    } else if (requirementBlocked) {
+      buyLabel = tx.requirementPending; buyBg = '#3a3f33'; balLabel = tx.balanceAfterInstall + ' ' + deps.fmt(after); balColor = '#6f7a64';
+      blockLabel = tx.blockedRequirement; blockMessage = requirementBlock.message;
+    } else {
+      buyLabel = (isTraumaPlanProduct ? (S.lang === 'pt' ? 'ATIVAR PLANO' : 'ACTIVATE PLAN') : p.kind === 'weapon' ? tx.addToGear : tx.install) + ' →'; buyBg = '#d6aa4e'; balLabel = tx.balanceAfterInstall + ' ' + deps.fmt(after); balColor = '#6f7a64';
+    }
+    const canInstall = !isEquipped && p.stock !== 'SOLD OUT' && canAfford && !requirementBlocked;
     const buyStyle = 'lm-market-buy-btn' + (canInstall ? ' lm-market-buy-btn--on' : ' lm-market-buy-btn--off');
 
     const selectedFx = marketFx(Math.max(0, idx));
     const traumaPlanStatusLabel = isCurrentTraumaPlan ? '— ACTIVE PLAN —' : '— NOT ACTIVE —';
-    selected = { ...p, ...selectedFx, num: String(idx + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), equippedName: p.kind === 'weapon' ? 'CARRIED GEAR' : isTraumaPlanProduct ? traumaPlanStatusLabel : eqp ? eqp.code + ' INSTALLED' : '— NOT INSTALLED —', cmp, buyLabel, buyStyle, balLabel, balColor, hasImage: !!p.imageUrl, noImage: !p.imageUrl, buy: () => deps.buy(p) };
+    selected = { ...p, ...selectedFx, num: String(idx + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), equippedName: p.kind === 'weapon' ? 'CARRIED GEAR' : isTraumaPlanProduct ? traumaPlanStatusLabel : eqp ? eqp.code + ' INSTALLED' : '— NOT INSTALLED —', cmp, buyLabel, buyStyle, balLabel, balColor, hasImage: !!p.imageUrl, noImage: !p.imageUrl, hasBlock: !!blockMessage, blockLabel, blockMessage, buy: () => deps.buy(p) };
   }
 
   // dice app (SYS.04)
@@ -384,6 +420,13 @@ export function desktopRenderVals(state = {}, deps = {}) {
 
   // mini-games tab shell (SYS.05: Tarot / Nexus Breach switcher)
   const gameTab = S.gameTab;
+
+  // Right-rim grip: same rule as the seats - the wizard's generated card art is
+  // not a face, so it falls back to initials.
+  const handleTone = deps.playerRoleTone(activeCharacter.role || 'EDGERUNNER');
+  const handlePortrait = uploadedPortrait(activeCharacter);
+  const handleHpPct = deps.clampPct(healthMax ? healthCur / healthMax * 100 : 0);
+  const handleHpColor = handleHpPct <= 25 ? '#c0635b' : handleHpPct <= 60 ? '#d6aa4e' : '#3fe0d0';
 
   return {
     scanlines: scanOn,
@@ -420,6 +463,19 @@ export function desktopRenderVals(state = {}, deps = {}) {
     openSheet: () => deps.setState({ sheetOpen: true }),
     closeSheet: () => deps.setState({ sheetOpen: false }),
     sheetOpen: S.sheetOpen,
+    // Edge handle: a permanent grip on the right rim that pulls the operative
+    // file open. It hides itself while the drawer is out so it cannot sit on
+    // top of it, and stays out of the way of the campaign map view.
+    sheetHandleVisible: !S.sheetOpen && S.authAuthenticated && S.view !== 'map',
+    // The grip wears the operative it opens: face (or initials), class colour,
+    // and a hairline of HP down its spine, so the rim says whose file this is
+    // without the drawer being out.
+    sheetHandleVars: '--handle-accent:' + handleTone.color + ';--handle-rgb:' + handleTone.rgb + ';'
+      + '--handle-hp:' + handleHpPct + '%;--handle-hp-color:' + handleHpColor + ';',
+    sheetHandlePortrait: handlePortrait,
+    sheetHandleHasPortrait: handlePortrait.length > 0,
+    sheetHandleNoPortrait: handlePortrait.length === 0,
+    sheetHandleTag: handleTone.label,
     health: { cur: healthCur, max: healthMax, pct: deps.clampPct(healthMax ? healthCur / healthMax * 100 : 0) },
     humanity: { cur: hum, max: derived.humanityMax, pct: deps.clampPct(derived.humanityMax ? hum / derived.humanityMax * 100 : 0) },
     reputation: deps.asNumber(deps.activeCharacter.reputation, 0, 0, 10),
@@ -443,7 +499,7 @@ export function desktopRenderVals(state = {}, deps = {}) {
     bodyMapToggleState: inventoryBodyView ? '[ON]' : '[OFF]',
     toggleBodyView: () => deps.setState({ inventoryBodyView: !S.inventoryBodyView }),
     // market
-    chips, items, resultCount: filtered.length, totalCount: all.length,
+    chips, items, resultCount: filtered.length, totalCount: shelf.length,
     pageStart: filtered.length ? pageStartIndex + 1 : 0,
     pageEnd: Math.min(pageStartIndex + items.length, filtered.length),
     hasPagination: filtered.length > pageSize,
@@ -504,6 +560,16 @@ export function desktopRenderVals(state = {}, deps = {}) {
     triggerGmCharacterUpload: () => deps.triggerFileInput('gm-character-upload'),
     onGmCharacterImageUpload: (e) => deps.onGmCharacterImageUpload(e),
     createGmCharacter: () => deps.createGmCharacter(),
+    // Roster with a delete on every row: a fresh deployment ships the demo
+    // sheets (NOVA/BYTE/IRIS) and a table usually wants them gone once it
+    // actually starts playing.
+    gmCharacterRows: (S.characters || []).map((character) => ({
+      id: character.id,
+      name: character.name || character.id,
+      owner: character.ownerUsername || character.createdBy || 'sem dono',
+      onDelete: () => deps.deleteGmCharacter(character.id),
+    })),
+    noGmCharacterRows: (S.characters || []).length === 0,
     gmItemCode: gmItemDraft.code, gmItemName: gmItemDraft.name, gmItemCat: gmItemDraft.cat, gmItemPrice: gmItemDraft.price, gmItemDesc: gmItemDraft.desc,
     onGmItemCode: (e) => deps.setState(s => ({ gmItemDraft: { ...s.gmItemDraft, code: e.target.value } })),
     onGmItemName: (e) => deps.setState(s => ({ gmItemDraft: { ...s.gmItemDraft, name: e.target.value } })),
@@ -734,6 +800,32 @@ export function desktopHandlers(component) {
     }));
   }
 
+  async function deleteGmCharacter(id) {
+    if (!component.ensureGm('Login do mestre necessario para remover personagem')) return;
+    if (!id) return;
+    const roster = component.state.characters || [];
+    const target = roster.find(c => c && c.id === id);
+    const label = (target && target.name) || id;
+    const ask = typeof globalThis.confirm === 'function' ? globalThis.confirm : null;
+    if (ask && !ask('Remover ' + label + ' desta campanha? Nao ha desfazer.')) return;
+    try {
+      if (component.api()) await component.api().characters.delete(id);
+      const remaining = roster.filter(c => c && c.id !== id);
+      component._charactersTouched = true;
+      component.setState({
+        characters: remaining,
+        // Dropping the active sheet would leave the whole desktop reading from
+        // a character that no longer exists, so hand the selection over.
+        activeCharacterId: component.state.activeCharacterId === id
+          ? ((remaining[0] && remaining[0].id) || null)
+          : component.state.activeCharacterId,
+        gmStatus: 'Personagem removido: ' + label,
+      });
+    } catch (err) {
+      component.setState({ gmStatus: 'Falha ao remover personagem: ' + (err.message || '') });
+    }
+  }
+
   async function upsertGmItem() {
     if (!component.ensureGm('Login do mestre necessario para salvar item')) return;
     const d = component.state.gmItemDraft;
@@ -774,6 +866,9 @@ export function desktopHandlers(component) {
     // the DOM by the time mountNexus runs (no requestAnimationFrame needed).
     component.setState({ gameTab: tab });
     if (tab === 'nexus') component.nexusHandlers().mountNexus();
+    // Same idea for the tarot canvas: it only exists while this tab is mounted,
+    // so a card already on the table needs its FX restarted on the way back in.
+    if (tab === 'tarot') component.tarotHandlers().ensureTarotFx();
   }
 
   return {
@@ -787,6 +882,7 @@ export function desktopHandlers(component) {
     onGmCharacterImageUpload,
     onGmItemImageUpload,
     createGmCharacter,
+    deleteGmCharacter,
     upsertGmItem,
     deleteGmItem,
     selectGameTab,
