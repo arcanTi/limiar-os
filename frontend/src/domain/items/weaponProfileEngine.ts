@@ -26,6 +26,10 @@ export interface RuntimeWeaponProfile {
   rof: number | string | null;
   selectedMode: string;
   mag: number | null;
+  ammoType: string;
+  weaponModes: Record<string, unknown>[];
+  autofire: unknown;
+  suppressiveFire: boolean;
   concealable: boolean;
   hands: number | null;
   melee: boolean;
@@ -42,7 +46,12 @@ export interface RuntimeWeaponProfile {
 export function weaponProfile(item: LegacyCatalogItem | null | undefined, { resolveProduct }: WeaponProfileDeps = {}): RuntimeWeaponProfile {
   const src = item || {};
   const fallback = CYBERWEAPON_PROFILE_OVERRIDES[src.code || ''] || {};
-  const parsed = parseGearDamage(src.dmg);
+  // Catalog rows spell the same two facets `damage`/`magazine` while saved
+  // instances spell them `dmg`/`mag`; reading only the short names left every
+  // catalog weapon with no dice and no magazine.
+  const dmgText = src.dmg || src.damage || '';
+  const magSrc = src.mag ?? src.magazine ?? null;
+  const parsed = parseGearDamage(dmgText);
   const hasOwn = (key: string) => Object.prototype.hasOwnProperty.call(src, key);
   const heldWeapon = src.heldWeapon || src.installedWeapon || src.weapon;
   const heldSource: LegacyCatalogItem | null = typeof heldWeapon === 'string' ? (resolveProduct ? resolveProduct(heldWeapon) ?? null : null) : (heldWeapon as LegacyCatalogItem | null);
@@ -56,7 +65,7 @@ export function weaponProfile(item: LegacyCatalogItem | null | undefined, { reso
     kind: src.kind || (count && sides ? 'weapon' : src.kind),
     weaponClass: src.weaponClass || fallback.weaponClass || src.cat || src.category || '',
     skill: (src.container && heldProfile ? heldProfile.skill : src.skill || fallback.skill) || '',
-    dmg: src.dmg || (count && sides ? count + 'd' + sides + (mod ? (mod > 0 ? '+' + mod : String(mod)) : '') : ''),
+    dmg: String((Array.isArray(src.weaponModes) ? src.weaponModes : []).find(mode => mode && mode.mode === (src.selectedMode || src.activeMode || src.mode || src.weaponMode))?.damage || dmgText || (count && sides ? count + 'd' + sides + (mod ? (mod > 0 ? '+' + mod : String(mod)) : '') : '')),
     sides,
     count,
     mod,
@@ -70,7 +79,11 @@ export function weaponProfile(item: LegacyCatalogItem | null | undefined, { reso
     heldWeaponName: (heldSource && heldSource.name) || '',
     rof: src.rof ?? fallback.rof ?? null,
     selectedMode: src.selectedMode || src.activeMode || src.mode || src.weaponMode || '',
-    mag: src.mag ?? null,
+    mag: magSrc == null || magSrc === '' ? null : asNumber(magSrc, 0, 0, 9999) || null,
+    ammoType: String(src.ammoType || ''),
+    weaponModes: Array.isArray(src.weaponModes) ? src.weaponModes.map(mode => ({ ...mode })) : [],
+    autofire: src.autofire || null,
+    suppressiveFire: !!src.suppressiveFire,
     concealable: !!(src.concealable ?? fallback.concealable),
     hands: src.hands ?? fallback.hands ?? null,
     melee: !!(src.melee ?? fallback.melee),

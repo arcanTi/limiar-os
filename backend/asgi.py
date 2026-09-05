@@ -18,7 +18,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from .application.campaign_events import CampaignEventService
 from .application.errors import ApplicationError
-from .config import DEFAULT_GM_USER, INDEX_FILE, ROOT
+from .config import DEFAULT_GM_USER, INDEX_FILE, UPLOAD_DIR
 from .db import init_db, using_postgres
 from .dependencies import campaign_events
 from .domain.validation import ValidationError
@@ -52,7 +52,7 @@ def _static_headers(path: Path) -> dict[str, str]:
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "same-origin",
     }
-    if path.is_relative_to(ROOT / "uploads"):
+    if path.is_relative_to(UPLOAD_DIR):
         common.update(
             {
                 "Content-Disposition": "inline",

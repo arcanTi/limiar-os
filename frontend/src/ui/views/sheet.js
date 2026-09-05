@@ -7,6 +7,7 @@ import {
   CPRED_SKILL_BUDGET,
   CPRED_STORY_TEMPLATE,
   CPRED_DEFAULT_ARMOR,
+  skillDescription,
 } from '../../domain/character/constants.ts';
 import {
   CPRED_STATUS_PRESETS,
@@ -16,6 +17,7 @@ import {
   useStatusCharge as condUseStatusCharge,
   advanceConditionTime as condAdvanceConditionTime,
 } from '../../domain/conditions/index.ts';
+import { armorSp } from '../../domain/items/marketAcquisition.ts';
 import { LIMIAR_TRAUMA_PLANS } from '../../domain/character/traumaPlans.ts';
 import { moraleBoostRecovery as charMoraleBoostRecovery } from '../../domain/character/index.ts';
 import { filterSkills, splitIntoColumns, summarizeSkillFilter } from '../../domain/character/skillSearch.ts';
@@ -32,7 +34,10 @@ import { BODY_TYPES as TOXIN_BODY_TYPES } from '../../domain/toxins/index.ts';
 import { characterEffectDigest } from '../../domain/effects/index.ts';
 import { effectPresetCatalog } from '../../domain/effects/customEffects.ts';
 import { uploadedPortrait } from '../../domain/character/portrait.ts';
+import { canUploadImage as authCanUploadImage } from '../../domain/auth/policies.ts';
 import { tableSeats } from '../../domain/campaigns/tableSeats.ts';
+import { normalizeCoreSections } from './sheetSections.js';
+import { compatibleAmmunition, isBowWeapon } from '../../domain/combat/combatAmmoEngine.ts';
 
 // SYS.01 // CHARACTER: the sheet drawer — core stats, skills, conditions,
 // IP purchases, installed chrome, trauma team coverage, and the
@@ -52,6 +57,16 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const sessionUsername = (S.authUser && S.authUser.username) || '';
   const cleanTableName = (name) => String(name || '').trim().toUpperCase() || 'MESA SEM NOME';
   const canEditSheet = (S.gmAuthenticated && S.gm) || isPlayer;
+  // The portrait is the one control on the sheet that is not an editing right:
+  // whoever owns the operative gets to change its face whenever they like. It
+  // therefore answers to the upload policy (staff, or the player on their own
+  // sheet) and NOT to `canEditSheet`, which also tracks the GM/player mode
+  // toggle - a GM reading the sheet in player mode used to lose the camera,
+  // which made swapping a photo look like a GM-only feature.
+  const canEditPortrait = authCanUploadImage(
+    { authAuthenticated: S.authAuthenticated, authUser: S.authUser, activeCharacterId: S.activeCharacterId },
+    { staff: S.gmAuthenticated, scope: 'character-portrait', ownerId: activeCharacter.id },
+  );
   const canSaveSheet = canEditSheet || (S.sheetEditing && S.sheetCreating && !S.gmAuthenticated);
 
   const sheetDraft = S.sheetDraft || deps.sheetDraftFrom(activeCharacter);
@@ -110,17 +125,28 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const sheetSkillRemaining = CPRED_SKILL_BUDGET - sheetSkillSpend;
   const sheetSkillBudgetColor = sheetSkillRemaining === 0 ? '#3fe0d0' : sheetSkillRemaining > 0 ? '#d6aa4e' : '#c0635b';
   const activeIp = deps.asNumber(activeCharacter.ip, 0, 0, 999999);
+  // One open balloon at a time: the tip is reference text, so keeping the list
+  // from filling with stacked panels matters more than comparing two blurbs.
+  const openSkillTip = String(S.skillTip || '');
   const skillRows = deps.normalizeSkills(activeCharacter.skills, eff).map(skill => {
     const cyber = deps.skillCyberwareBonus(skill.name, activeCharacter);
     const statCyber = deps.cyberwareStatModBonus(skill.stat, activeCharacter);
     const total = skill.total + cyber.total;
     const cyberBreakdown = deps.cyberSourceBreakdown(statCyber.sources.concat(cyber.sources));
+    const description = skillDescription(skill.name);
+    const tipOpen = !!description && openSkillTip === skill.name;
     return {
       ...skill,
       total,
       cyberBonus: cyber.total,
       hasCyberBonus: cyber.total !== 0,
       cyberBonusTitle: cyberBreakdown.join(' / '),
+      description,
+      hasDescription: !!description,
+      tipOpen,
+      tipStyle: 'lm-skill-info' + (tipOpen ? ' lm-skill-info--on' : ''),
+      tipLabel: (tipOpen ? 'Fechar descricao de ' : 'O que e ') + skill.name,
+      onTip: () => deps.setState({ skillTip: tipOpen ? '' : skill.name }),
       onRoll: () => deps.roll({ label: skill.name.toUpperCase(), sides: 10, count: 1, mod: total, check: true, breakdown: cyberBreakdown }),
     };
   });
@@ -252,7 +278,12 @@ export function sheetRenderVals(state = {}, deps = {}) {
     const skillBonus = deps.effectMap(it.skillBonus);
     Object.keys(statMod).forEach(k => parts.push('+' + statMod[k] + ' ' + k));
     Object.keys(skillBonus).forEach(k => parts.push('+' + skillBonus[k] + ' ' + k));
-    if (it.armor) parts.push('+' + it.armor + ' ARM');
+    // `armor` is numeric on chrome but a {headSP, bodySP, armorPenalty} record
+    // on worn armor, and characters who bought armor before the shop stopped
+    // routing it through the install engine still carry one of those records
+    // here. Concatenating it renders [object Object].
+    const armorValue = armorSp(it);
+    if (armorValue) parts.push('+' + armorValue + ' ARM');
     if (it.ram) parts.push('+' + it.ram + ' RAM');
     return parts.join('  ') || '-';
   };
@@ -263,7 +294,8 @@ export function sheetRenderVals(state = {}, deps = {}) {
     const skillBonus = deps.effectMap(it.skillBonus);
     Object.keys(statMod).forEach(k => chips.push({ val: (statMod[k] >= 0 ? '+' : '') + statMod[k], label: k, kind: 'stat' }));
     Object.keys(skillBonus).forEach(k => chips.push({ val: (skillBonus[k] >= 0 ? '+' : '') + skillBonus[k], label: k, kind: 'skill' }));
-    if (it.armor) chips.push({ val: '+' + it.armor, label: 'ARMOR', kind: 'stat' });
+    const armorValue = armorSp(it);
+    if (armorValue) chips.push({ val: '+' + armorValue, label: 'ARMOR', kind: 'stat' });
     if (it.ram) chips.push({ val: '+' + it.ram, label: 'RAM', kind: 'stat' });
     return chips;
   };
@@ -325,6 +357,16 @@ export function sheetRenderVals(state = {}, deps = {}) {
   // no sheet still gets the CRIAR OPERATIVO card on the desktop, so this hides
   // only the path that would leave an orphan document behind.
   const showNewSheetButton = isStaffSheet;
+
+  // CORE folding. The GM opens a sheet to answer one question, so the four
+  // blocks start folded and remember what was opened; the player's own sheet
+  // stays fully expanded and shows no toggles at all.
+  const coreSections = normalizeCoreSections(S.sheetCoreSections);
+  const coreSectionOpen = (key) => !isStaffSheet || coreSections[key] === true;
+  const coreSectionCaret = (key) => (coreSections[key] ? '\u25be' : '\u25b8');
+  const toggleCoreSection = (key) => {
+    if (deps.toggleCoreSection) deps.toggleCoreSection(key);
+  };
   // The table roster reads `campaign.roster` (username/role/class/portrait),
   // the one cross-player view the backend publishes - character documents stay
   // owner-scoped. The seat leads with the character (name, class, face, class
@@ -633,39 +675,46 @@ export function sheetRenderVals(state = {}, deps = {}) {
   const sheetKitGear = [...deps.normalizeGearList(activeCharacter.gear || []), ...deps.installedCyberweaponGear(activeCharacter)];
   const sheetWeaponRows = sheetKitGear.filter(item => deps.hasDamageProfile(item)).map(item => {
     const hasAmmo = item.magazine != null;
+    const ammunition = compatibleAmmunition(item, deps.normalizeGearList(activeCharacter.gear || []));
+    const loadedAmmo = ammunition.find(ammo => ammo.code === item.loadedAmmoCode);
     return {
       ...item,
       dmgLabel: deps.gearDamageText(item),
       rofLabel: item.rof != null && item.rof !== '' ? String(item.rof) : '-',
       hasAmmo,
-      ammoLabel: hasAmmo ? (item.currentAmmo ?? item.magazine) + '/' + item.magazine : '-',
+      ammoLabel: hasAmmo ? (item.currentAmmo ?? 0) + '/' + item.magazine : (isBowWeapon(item) ? String((loadedAmmo && loadedAmmo.qty) || 0) : '-'),
+      ammoTypeLabel: loadedAmmo ? loadedAmmo.name : (item.loadedAmmoType || item.ammoType || 'SEM MUNICAO'),
+      hasAmmunitionControl: ammunition.length > 0 || hasAmmo,
       needsReload: hasAmmo && Number(item.currentAmmo ?? item.magazine) <= 0,
       attack: () => deps.rollCombatAttack(activeCharacter.id, item),
       damage: () => deps.rollCombatDamage(activeCharacter.id, item),
       reload: () => deps.reloadWeapon(activeCharacter.id, item.id),
+      cycleAmmo: () => deps.cycleWeaponAmmo(activeCharacter.id, item.id),
     };
   });
   const noSheetWeapons = sheetWeaponRows.length === 0;
   const armor = deps.armorTotal(activeCharacter);
   const activeShield = deps.normalizeShield(activeCharacter.shield);
-  const shieldProducts = (deps.products || [])
-    .filter(item => item && (Number(item.shieldHp) > 0 || Number(item.maxHp) > 0))
+  const ownedShields = deps.normalizeGearList(activeCharacter.gear || [])
+    .filter(item => item && Number(item.maxHp ?? item.shieldHp) > 0);
+  const shieldProducts = ownedShields
     .map(item => {
-      const maxHp = deps.asNumber(item.shieldHp ?? item.maxHp, 0, 0, 999);
-      return { ...item, shieldMaxHp: maxHp };
+      const maxHp = deps.asNumber(item.maxHp ?? item.shieldHp, 0, 0, 999);
+      const currentHp = deps.asNumber(item.shieldHp, maxHp, 0, maxHp);
+      return { ...item, shieldMaxHp: maxHp, shieldCurrentHp: currentHp };
     })
     .filter(item => item.shieldMaxHp > 0);
-  const activeShieldProduct = activeShield ? shieldProducts.find(item => item.code === activeShield.itemId) : null;
+  const activeShieldProduct = activeShield ? shieldProducts.find(item => item.id === activeShield.itemId || item.code === activeShield.itemId) : null;
   const shieldDamageAmount = S.shieldDamageAmount ?? '';
   const shieldRepairAmount = S.shieldRepairAmount ?? '';
   const shieldHpPct = activeShield ? deps.clampPct(activeShield.hp / Math.max(1, activeShield.maxHp) * 100) : 0;
   const shieldStatusColor = !activeShield ? '#6f7a64' : activeShield.hp <= 0 ? '#c0635b' : activeShield.hp < activeShield.maxHp ? '#d6aa4e' : '#3fe0d0';
   const shieldOptions = [{ code: '', label: activeShield ? 'TROCAR ESCUDO' : 'EQUIPAR ESCUDO', selected: !activeShield, notSelected: !!activeShield }]
     .concat(shieldProducts.map(item => ({
-      code: item.code,
-      label: (item.name || item.code) + ' // ' + item.shieldMaxHp + ' HP',
-      selected: !!activeShield && activeShield.itemId === item.code,
-      notSelected: !activeShield || activeShield.itemId !== item.code,
+      code: item.id,
+      label: (item.name || item.code) + ' // ' + item.shieldCurrentHp + '/' + item.shieldMaxHp + ' HP',
+      selected: !!activeShield && (activeShield.itemId === item.id || activeShield.itemId === item.code),
+      notSelected: !activeShield || (activeShield.itemId !== item.id && activeShield.itemId !== item.code),
     })));
   const shieldPanel = {
     equipped: !!activeShield,
@@ -692,6 +741,7 @@ export function sheetRenderVals(state = {}, deps = {}) {
   };
   return {
     canEditSheet, notCanEditSheet: !canEditSheet, canSaveSheet,
+    canEditPortrait, notCanEditPortrait: !canEditPortrait,
     isGmSheet: !!S.gm,
     activeIp, activeIpPct: deps.clampPct(activeIp / 1000 * 100),
     portraitUrl: activeCharacter.portraitUrl || '',
@@ -717,6 +767,20 @@ export function sheetRenderVals(state = {}, deps = {}) {
     chromeEffectGroups, noChromeEffects, sheetWeaponRows, noSheetWeapons,
     sheetTabs, sheetDrawerTabs,
     sheetTabCore: sheetTab === 'core',
+    coreSectionsFoldable: isStaffSheet,
+    coreSectionsStatic: !isStaffSheet,
+    coreAttrsOpen: coreSectionOpen('attrs'),
+    coreStatsOpen: coreSectionOpen('stats'),
+    coreDossierOpen: coreSectionOpen('dossier'),
+    coreBriefOpen: coreSectionOpen('brief'),
+    coreAttrsCaret: coreSectionCaret('attrs'),
+    coreStatsCaret: coreSectionCaret('stats'),
+    coreDossierCaret: coreSectionCaret('dossier'),
+    coreBriefCaret: coreSectionCaret('brief'),
+    toggleCoreAttrs: () => toggleCoreSection('attrs'),
+    toggleCoreStats: () => toggleCoreSection('stats'),
+    toggleCoreDossier: () => toggleCoreSection('dossier'),
+    toggleCoreBrief: () => toggleCoreSection('brief'),
     sheetTabSkills: sheetTab === 'skills',
     sheetTabConditions: sheetTab === 'conditions',
     sheetTabIp: sheetTab === 'ip',
@@ -1232,9 +1296,9 @@ export function sheetHandlers(component) {
   }
 
   // Interface Ability roll (CPR RAW NET Action): 1d10 + Interface rank
-  // (roleAbilityRank on a Netrunner). DV/target resolution against a NET
-  // Architecture is a GM call until that phase lands — this only rolls and
-  // labels the check, same seam as rollFromRequest for other role rolls.
+  // (roleAbilityRank on a Netrunner). The `netrunning` tag makes the resolved
+  // check open the Nexus Breach run (Component.commitRoll -> launchNetTestRun);
+  // without a GM DV the run falls back to the Standard tier's own DV.
   function rollNetrunningAbility(ability) {
     const active = component.activeCharacter();
     const rank = component.asNumber(active.roleAbilityRank, 0, 0, 10);
@@ -1245,6 +1309,7 @@ export function sheetHandlers(component) {
       count: 1,
       mod: rank,
       check: true,
+      netrunning: ability.id,
     });
   }
 
@@ -1295,25 +1360,38 @@ export function sheetHandlers(component) {
     component.flash('REZ :: ' + programId + ' ' + (changed ? changed.rez + '/' + changed.maxRez : ''));
   }
 
-  function shieldProduct(itemId) {
-    return (component.products || []).find(item => item && item.code === itemId && (Number(item.shieldHp) > 0 || Number(item.maxHp) > 0));
+  function shieldInventoryItem(itemId) {
+    const active = component.activeCharacter();
+    return component.normalizeGearList(active.gear || component.gearList)
+      .find(item => item && (item.id === itemId || item.code === itemId) && Number(item.maxHp ?? item.shieldHp) > 0);
   }
 
   function equipShield(itemId) {
     if (!itemId) return;
     if (!component.ensureGm('Login do mestre necessario para equipar escudo')) return;
-    const product = shieldProduct(itemId);
-    if (!product) { component.flash('Escudo nao encontrado no catalogo'); return; }
-    const maxHp = component.asNumber(product.shieldHp ?? product.maxHp, 0, 0, 999);
+    const active = component.activeCharacter();
+    const product = shieldInventoryItem(itemId);
+    if (!product) { component.flash('Escudo nao encontrado no inventario'); return; }
+    const maxHp = component.asNumber(product.maxHp ?? product.shieldHp, 0, 0, 999);
     if (!maxHp) { component.flash('Item sem HP de escudo'); return; }
-    component.updateActiveCharacter({ shield: { itemId: product.code, hp: maxHp, maxHp } });
-    component.flash((product.name || product.code) + ' EQUIPADO :: ESCUDO ' + maxHp + '/' + maxHp);
+    const currentHp = component.asNumber(product.shieldHp, maxHp, 0, maxHp);
+    if (!currentHp) { component.flash('Escudo destruido: repare antes de equipar'); return; }
+    const gear = component.normalizeGearList(active.gear || component.gearList).map(item => Number(item.maxHp ?? item.shieldHp) > 0
+      ? { ...item, equipped: item.id === product.id, shieldLocation: item.id === product.id ? 'equipped' : 'carried' }
+      : item);
+    component.updateActiveCharacter({ gear, shield: { itemId: product.id, name: product.name, hp: currentHp, maxHp } });
+    component.flash((product.name || product.code) + ' EQUIPADO :: ESCUDO ' + currentHp + '/' + maxHp + ' :: OCUPA 1 BRACO');
   }
 
   function removeShield() {
     if (!component.ensureGm('Login do mestre necessario para desequipar escudo')) return;
-    component.updateActiveCharacter({ shield: null });
-    component.flash('ESCUDO DESEQUIPADO');
+    const active = component.activeCharacter();
+    const shield = component.normalizeShield(active.shield);
+    const gear = component.normalizeGearList(active.gear || component.gearList).map(item => shield && (item.id === shield.itemId || item.code === shield.itemId)
+      ? { ...item, equipped: false, shieldLocation: 'carried', shieldHp: shield.hp }
+      : item);
+    component.updateActiveCharacter({ gear, shield: null });
+    component.flash('ESCUDO GUARDADO :: BRACO LIVRE');
   }
 
   function damageActiveShield(amount) {
@@ -1324,7 +1402,10 @@ export function sheetHandlers(component) {
     const value = component.asNumber(amount, 0, 0, 999);
     if (!value) { component.flash('Informe dano de escudo maior que zero'); return; }
     const next = component.damageShield(shield, value);
-    component.updateActiveCharacter({ shield: next });
+    const gear = component.normalizeGearList(active.gear || component.gearList).map(item => item.id === shield.itemId || item.code === shield.itemId
+      ? { ...item, shieldHp: next.hp, equipped: next.hp > 0, shieldLocation: next.hp > 0 ? 'equipped' : 'dropped' }
+      : item);
+    component.updateActiveCharacter({ gear, shield: next.hp > 0 ? next : null });
     component.setState({ shieldDamageAmount: '' });
     component.flash('ESCUDO :: HP ' + next.hp + '/' + next.maxHp + (next.hp <= 0 ? ' :: DESTRUIDO' : ''));
   }
@@ -1337,7 +1418,10 @@ export function sheetHandlers(component) {
     const value = component.asNumber(amount, 0, 0, 999);
     if (!value) { component.flash('Informe reparo de escudo maior que zero'); return; }
     const next = component.repairShield(shield, value);
-    component.updateActiveCharacter({ shield: next });
+    const gear = component.normalizeGearList(active.gear || component.gearList).map(item => item.id === shield.itemId || item.code === shield.itemId
+      ? { ...item, shieldHp: next.hp }
+      : item);
+    component.updateActiveCharacter({ gear, shield: next });
     component.setState({ shieldRepairAmount: '' });
     component.flash('ESCUDO :: HP ' + next.hp + '/' + next.maxHp);
   }

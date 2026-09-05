@@ -116,6 +116,41 @@ const baseDeps = (overrides = {}) => ({
 });
 
 describe('ui/views/sheet sheetRenderVals', () => {
+  const gmState = { characters, gm: true, gmAuthenticated: true };
+
+  it('folds every CORE block away for a GM and offers the toggles', () => {
+    const vals = sheetRenderVals(gmState, baseDeps());
+    expect(vals.coreSectionsFoldable).toBe(true);
+    expect(vals.coreSectionsStatic).toBe(false);
+    expect([vals.coreAttrsOpen, vals.coreStatsOpen, vals.coreDossierOpen, vals.coreBriefOpen])
+      .toEqual([false, false, false, false]);
+  });
+
+  it('unfolds the CORE blocks the GM already opened', () => {
+    const vals = sheetRenderVals({ ...gmState, sheetCoreSections: { dossier: true } }, baseDeps());
+    expect(vals.coreDossierOpen).toBe(true);
+    expect(vals.coreDossierCaret).toBe('\u25be');
+    expect(vals.coreAttrsOpen).toBe(false);
+    expect(vals.coreAttrsCaret).toBe('\u25b8');
+  });
+
+  it('keeps a player sheet fully expanded and never shows a toggle', () => {
+    // The player's own sheet is not a lookup surface: folding it would read as
+    // data lost, so the stored GM preference must not reach this view.
+    const vals = sheetRenderVals({ characters, sheetCoreSections: { attrs: false, dossier: false } }, baseDeps());
+    expect(vals.coreSectionsFoldable).toBe(false);
+    expect(vals.coreSectionsStatic).toBe(true);
+    expect([vals.coreAttrsOpen, vals.coreStatsOpen, vals.coreDossierOpen, vals.coreBriefOpen])
+      .toEqual([true, true, true, true]);
+  });
+
+  it('routes a CORE toggle to the component so the choice is persisted', () => {
+    const toggleCoreSection = vi.fn();
+    const vals = sheetRenderVals(gmState, baseDeps({ toggleCoreSection }));
+    vals.toggleCoreBrief();
+    expect(toggleCoreSection).toHaveBeenCalledWith('brief');
+  });
+
   it('defaults to the core tab and switches on click', () => {
     const vals = sheetRenderVals({ characters }, baseDeps());
     expect(vals.sheetTabCore).toBe(true);
@@ -129,6 +164,35 @@ describe('ui/views/sheet sheetRenderVals', () => {
     const vals = sheetRenderVals({ characters }, deps);
     expect(vals.attrEditors).toHaveLength(10);
     expect(vals.attrEditors[0]).toMatchObject({ key: 'INT', value: '6' });
+  });
+
+  it('attaches a reference blurb and a tip toggle to each catalog skill row', () => {
+    const skills = [
+      { id: 's1', name: 'Handgun', stat: 'REF', level: 4, bonus: 0, total: 12, difficult: false },
+      { id: 's2', name: 'Sabedoria Caseira', stat: 'INT', level: 2, bonus: 0, total: 8, difficult: false },
+    ];
+    const deps = baseDeps({ normalizeSkills: () => skills });
+    const vals = sheetRenderVals({ characters }, deps);
+    const [handgun, homebrew] = vals.skillRows;
+    expect(handgun.hasDescription).toBe(true);
+    expect(handgun.description).toMatch(/^Armas de mao\.|^Armas de mão\./);
+    expect(handgun.tipOpen).toBe(false);
+    handgun.onTip();
+    expect(deps.setState).toHaveBeenCalledWith({ skillTip: 'Handgun' });
+    // A skill outside the catalog gets no blurb, so no "?" renders for it.
+    expect(homebrew.hasDescription).toBe(false);
+    expect(homebrew.description).toBe('');
+  });
+
+  it('opens one skill balloon at a time and closes the open one', () => {
+    const skills = [{ id: 's1', name: 'Handgun', stat: 'REF', level: 4, bonus: 0, total: 12, difficult: false }];
+    const deps = baseDeps({ normalizeSkills: () => skills });
+    const vals = sheetRenderVals({ characters, skillTip: 'Handgun' }, deps);
+    const handgun = vals.skillRows[0];
+    expect(handgun.tipOpen).toBe(true);
+    expect(handgun.tipStyle).toContain('lm-skill-info--on');
+    handgun.onTip();
+    expect(deps.setState).toHaveBeenCalledWith({ skillTip: '' });
   });
 
   it('caps an IP purchase row at MAX once the target is capped', () => {
@@ -261,7 +325,7 @@ describe('ui/views/sheet sheetRenderVals', () => {
   });
 
   it('renders equipped shield HP and wires sheet shield controls', () => {
-    const shielded = { ...baseCharacter, shield: { itemId: 'BULLETPROOF-SHIELD', hp: 7, maxHp: 10 } };
+    const shielded = { ...baseCharacter, gear: [{ id: 'shield-1', code: 'BULLETPROOF-SHIELD', name: 'Bulletproof Shield', shieldHp: 7, maxHp: 10 }], shield: { itemId: 'shield-1', hp: 7, maxHp: 10 } };
     const deps = baseDeps({
       activeCharacter: shielded,
       products: [{ code: 'BULLETPROOF-SHIELD', name: 'Bulletproof Shield', shieldHp: 10, maxHp: 10 }],
@@ -523,13 +587,13 @@ describe('ui/views/sheet sheetHandlers', () => {
     expect(component9.recoverHumanity).toHaveBeenCalledWith('a', 6, expect.objectContaining({ label: 'MORALE BOOST :: UPGRADE 9' }));
   });
 
-  it('rollNetrunningAbility rolls Interface + 1d10 using the character roleAbilityRank as mod', () => {
+  it('rollNetrunningAbility rolls Interface + 1d10 using the character roleAbilityRank as mod, tagged to open the Nexus run', () => {
     const component = fakeComponent({
       activeCharacter: vi.fn(() => ({ id: 'a', role: 'Netrunner', roleAbilityRank: 6 })),
     });
     sheetHandlers(component).rollNetrunningAbility({ id: 'scanner', name: 'Scanner' });
     expect(component.roll).toHaveBeenCalledWith(expect.objectContaining({
-      actorId: 'a', label: 'INTERFACE :: SCANNER', sides: 10, count: 1, mod: 6, check: true,
+      actorId: 'a', label: 'INTERFACE :: SCANNER', sides: 10, count: 1, mod: 6, check: true, netrunning: 'scanner',
     }));
   });
 
@@ -565,18 +629,26 @@ describe('ui/views/sheet sheetHandlers', () => {
     expect(component.updateActiveCharacter).toHaveBeenCalledWith({ equipped: [{ code: 'NASAL' }], owned: ['NASAL'] });
   });
 
-  it('equipShield installs a catalog shield at full HP and damageActiveShield degrades it', () => {
+  it('equipShield uses the owned instance and damage at zero drops it without restoring HP', () => {
+    let active = { ...baseCharacter, gear: [{ id: 'shield-1', code: 'BULLETPROOF-SHIELD', name: 'Bulletproof Shield', shieldHp: 4, maxHp: 10 }] };
     const component = fakeComponent({
       products: [{ code: 'BULLETPROOF-SHIELD', name: 'Bulletproof Shield', shieldHp: 10, maxHp: 10 }],
-      activeCharacter: vi.fn(() => ({ ...baseCharacter, shield: { itemId: 'BULLETPROOF-SHIELD', hp: 4, maxHp: 10 } })),
+      activeCharacter: vi.fn(() => active),
     });
+    component.updateActiveCharacter.mockImplementation(patch => { active = { ...active, ...patch }; });
     const h = sheetHandlers(component);
 
-    h.equipShield('BULLETPROOF-SHIELD');
-    expect(component.updateActiveCharacter).toHaveBeenCalledWith({ shield: { itemId: 'BULLETPROOF-SHIELD', hp: 10, maxHp: 10 } });
+    h.equipShield('shield-1');
+    expect(component.updateActiveCharacter).toHaveBeenCalledWith(expect.objectContaining({
+      shield: { itemId: 'shield-1', name: 'Bulletproof Shield', hp: 4, maxHp: 10 },
+      gear: [expect.objectContaining({ id: 'shield-1', shieldHp: 4, shieldLocation: 'equipped' })],
+    }));
 
     h.damageActiveShield(5);
-    expect(component.updateActiveCharacter).toHaveBeenCalledWith({ shield: { itemId: 'BULLETPROOF-SHIELD', hp: 0, maxHp: 10 } });
+    expect(component.updateActiveCharacter).toHaveBeenLastCalledWith(expect.objectContaining({
+      shield: null,
+      gear: [expect.objectContaining({ id: 'shield-1', shieldHp: 0, shieldLocation: 'dropped' })],
+    }));
   });
 
   it('buyIpIncrease requires GM auth and applies the use-case result', () => {
@@ -632,6 +704,35 @@ describe('ui/views/sheet sheetHandlers', () => {
     expect(leu.noPortrait).toBe(true);
     expect(leu.portraitUrl).toBe('');
     expect(leu.initials).toBe('LE');
+  });
+
+  // Swapping the face is an ownership right, not an editing right: it must not
+  // follow the GM/player mode toggle the way the rest of the sheet does.
+  it('the portrait stays editable for a GM reading the sheet in player mode', () => {
+    const vals = sheetRenderVals(
+      { characters, activeCharacterId: 'a', authAuthenticated: true, gmAuthenticated: true, gm: false, authUser: { role: 'admin', username: 'mestre' } },
+      baseDeps(),
+    );
+
+    expect(vals.canEditSheet).toBe(false);
+    expect(vals.canEditPortrait).toBe(true);
+    expect(vals.notCanEditPortrait).toBe(false);
+  });
+
+  it('a player owns the portrait on their own sheet', () => {
+    const vals = sheetRenderVals(
+      { characters, activeCharacterId: 'a', authAuthenticated: true, authUser: { role: 'player', username: 'bari' } },
+      baseDeps(),
+    );
+
+    expect(vals.canEditPortrait).toBe(true);
+  });
+
+  it('a signed-out viewer gets a read-only portrait', () => {
+    const vals = sheetRenderVals({ characters, activeCharacterId: 'a' }, baseDeps());
+
+    expect(vals.canEditPortrait).toBe(false);
+    expect(vals.notCanEditPortrait).toBe(true);
   });
 
   it('onPlayerPortraitUpload stores the uploaded url on the active character', async () => {
@@ -899,5 +1000,27 @@ describe('assentos cobertos na barra da mesa', () => {
 
     expect(seat.coverLabel).toBe('COBERTO POR BARI');
     expect(seat.isNotCovered).toBe(false);
+  });
+});
+
+describe('ui/views/sheet armor bonus rendering', () => {
+  it('reads worn-armor records left in equipped by the old shop path', () => {
+    // Buying armor used to run through the install engine, so characters made
+    // before that changed carry a {headSP, bodySP, armorPenalty} record here
+    // instead of the plain number chrome uses. The chip used to stringify the
+    // record straight into the label as [object Object].
+    const skinWeave = { code: 'SKINWEAVE', name: 'Skin Weave', cat: 'EXTERNAL', armor: 7 };
+    const flak = { code: 'FLAK', name: 'Flak', cat: 'EXTERNAL', armor: { headSP: 15, bodySP: 15, armorPenalty: { REF: -4, DEX: -4, MOVE: -4 } } };
+    const equipped = [skinWeave, flak];
+
+    const vals = sheetRenderVals(
+      { characters: [{ ...baseCharacter, equipped }], gm: true, gmAuthenticated: true },
+      baseDeps({ sheetDraftFrom: vi.fn(() => ({ base: baseCharacter.base, skills: [], equipped })) }),
+    );
+
+    expect(JSON.stringify(vals)).not.toContain('object Object');
+    const labels = JSON.stringify(vals);
+    expect(labels).toContain('+7 ARM');
+    expect(labels).toContain('+15 ARM');
   });
 });

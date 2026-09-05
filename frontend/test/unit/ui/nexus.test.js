@@ -8,6 +8,7 @@ const baseDeps = () => ({
   setNexusTarget: vi.fn(),
   setNexusConfigMode: vi.fn(),
   setNexusTier: vi.fn(),
+  setNexusConnection: vi.fn(),
   setNexusBlackIce: vi.fn(),
   setNexusBlackIceTargetProgram: vi.fn(),
   runNexusPrep: vi.fn(),
@@ -78,6 +79,16 @@ describe('ui/views/nexus nexusRenderVals', () => {
     expect(vals.nexusSummary).toBe('3 scripts · matriz 5×5 · 1:30 · trace 2x · continuidade · bônus');
   });
 
+  it('shows the link and the speed contest that shaped the run', () => {
+    const vals = nexusRenderVals({
+      nexusChallenge: {
+        architectureTierLabel: 'Uncommon', architectureDv: 10, scriptCount: 3, matrixSize: 6, timeLimit: 67, traceRate: 1.65,
+        sequenceContinuity: 'linked', connectionLabel: 'Remoto', connectionCheckMod: -2, runnerSpeed: 4, systemSpeed: 6, speedDelta: -2,
+      },
+    }, baseDeps());
+    expect(vals.nexusSummary).toBe('Uncommon DV 10 · remoto (-2 nos checks) · 3 scripts · matriz 6×6 · 1:07 · trace 1.65x · spd 4v6 · continuidade');
+  });
+
   it('renders architecture tier options and prep rows for a player before the run starts', () => {
     const vals = nexusRenderVals({
       gm: false,
@@ -104,10 +115,25 @@ describe('ui/views/nexus nexusRenderVals', () => {
     }, baseDeps());
 
     expect(vals.nexusPreviewConfig.scriptCount).toBe(2);
-    expect(vals.nexusPreviewConfig.timeLimit).toBe(136);
+    // Interface 6 + Speedy Gonzalvez's +2 SPD against a Standard system's 4.
+    expect(vals.nexusPreviewConfig.timeLimit).toBe(116);
     expect(vals.nexusPreviewConfig.programModifierLabels).toContain('Worm: Backdoor automatico');
     expect(vals.nexusPreviewProgramLabels).toContain('Eraser: trace x0.90');
     expect(vals.hasNexusPreviewProgramLabels).toBe(true);
+  });
+
+  it('renders the connection picker and digests the three difficulty axes', () => {
+    const deps = baseDeps();
+    const vals = nexusRenderVals({ gm: true, characters, nexusTargetId: 'b', nexusTier: 'uncommon', nexusConnection: 'remote' }, deps);
+
+    expect(vals.nexusConnection).toBe('remote');
+    expect(vals.nexusConnectionOptions.map(o => o.id)).toEqual(['hardline', 'wireless', 'remote']);
+    expect(vals.nexusConnectionOptions.find(o => o.id === 'remote').selected).toBe(true);
+    expect(vals.nexusPreviewConfig).toMatchObject({ connection: 'remote', traceRate: 1.56, connectionCheckMod: -2 });
+    expect(vals.nexusDifficultyDigest).toEqual(['DV 10 // Uncommon', 'SPD 6 vs 6 (+0)', 'REMOTO // trace x1.30 // checks -2']);
+
+    vals.onNexusConnection({ target: { value: 'hardline' } });
+    expect(deps.setNexusConnection).toHaveBeenCalledWith('hardline');
   });
 
   it('renders Black ICE selection and traced confrontation controls', () => {
@@ -379,8 +405,170 @@ describe('ui/views/nexus nexusHandlers', () => {
     document.getElementById = vi.fn(() => ({ id: 'limiar-nexus-root' }));
     nexusHandlers(component).finalizeNexusPrep();
 
-    expect(component.state.nexusChallenge).toMatchObject({ scriptCount: 1, timeLimit: 156, prepComplete: true, blackIceId: 'wisp', programModifierLabels: ['Speedy Gonzalvez: +12s'] });
-    expect(mount).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ showSetup: false, config: expect.objectContaining({ scriptCount: 1, timeLimit: 156 }) }));
+    // Interface 6 + 2 SPD against a Basic system's 2 caps the contest at +6.
+    expect(component.state.nexusChallenge).toMatchObject({ scriptCount: 1, timeLimit: 144, prepComplete: true, blackIceId: 'wisp', programModifierLabels: ['Boosters: +2 SPD'] });
+    expect(mount).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ showSetup: false, config: expect.objectContaining({ scriptCount: 1, timeLimit: 144 }) }));
+  });
+
+  it('launchNetTestRun opens a local run from the request DV, seeding the rolled ability as prep', () => {
+    const component = fakeComponent({
+      state: { gm: false, activeCharacterId: 'b', view: 'sheet' },
+      activeCharacter: vi.fn(() => characters[1]),
+    });
+    const mount = vi.fn();
+    window.NexusBreach = { isMounted: () => false, mount, unmount: vi.fn() };
+    document.getElementById = vi.fn(() => ({ id: 'limiar-nexus-root' }));
+
+    const launched = nexusHandlers(component).launchNetTestRun({ abilityId: 'backdoor', label: 'BACKDOOR', dv: 10, total: 15, success: true, actorId: 'b' });
+
+    expect(launched).toBe(true);
+    expect(component.state.nexusLocalRun).toBe(true);
+    expect(component.state.view).toBe('games');
+    expect(component.state.gameTab).toBe('nexus');
+    expect(component.state.nexusChallenge).toMatchObject({
+      architectureTier: 'uncommon',
+      targetId: 'b',
+      interfaceRank: 6,
+      // Uncommon starts at 4 scripts; the successful Backdoor drops one.
+      scriptCount: 3,
+      // Interface 6 against an Uncommon system's Speed 6: dead even.
+      timeLimit: 90,
+      speedDelta: 0,
+      connection: 'wireless',
+      prepRequired: false,
+      prepComplete: true,
+      netTest: { abilityId: 'backdoor', label: 'BACKDOOR', dv: 10, total: 15, success: true },
+    });
+    expect(component.state.nexusChallenge.prepResults).toEqual([{ abilityId: 'backdoor', success: true, margin: 5, source: 'teste NET' }]);
+    expect(mount).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ showSetup: false, config: expect.objectContaining({ scriptCount: 3 }) }));
+  });
+
+  it('launchNetTestRun without a DV uses the Standard tier and its own DV to judge the roll', () => {
+    const component = fakeComponent({ state: { gm: false, activeCharacterId: 'b' }, activeCharacter: vi.fn(() => characters[1]) });
+    window.NexusBreach = { isMounted: () => false, mount: vi.fn(), unmount: vi.fn() };
+    document.getElementById = vi.fn(() => ({ id: 'limiar-nexus-root' }));
+
+    nexusHandlers(component).launchNetTestRun({ abilityId: 'scanner', total: 8 });
+
+    // Standard DV is 8, and RAW says a tie fails, so the Scanner did not land.
+    expect(component.state.nexusChallenge).toMatchObject({ architectureTier: 'standard', scannerRevealed: false, netTest: { dv: 8, success: false } });
+    expect(component.state.nexusChallenge.prepResults).toEqual([{ abilityId: 'scanner', success: false, margin: 0, source: 'teste NET' }]);
+  });
+
+  it('launchNetTestRun drops abilities the run has no prep slot for', () => {
+    const component = fakeComponent({ state: { gm: false, activeCharacterId: 'b' }, activeCharacter: vi.fn(() => characters[1]) });
+    window.NexusBreach = { isMounted: () => false, mount: vi.fn(), unmount: vi.fn() };
+    document.getElementById = vi.fn(() => ({ id: 'limiar-nexus-root' }));
+
+    nexusHandlers(component).launchNetTestRun({ abilityId: 'zap', dv: 6, total: 12 });
+
+    expect(component.state.nexusChallenge.prepResults).toEqual([]);
+    expect(component.state.nexusChallenge.netTest).toMatchObject({ abilityId: 'zap', success: true });
+  });
+
+  it('launchNetTestRun refuses for the GM, for another operative, and while a run is mounted', () => {
+    const gm = fakeComponent({ state: { gm: true, activeCharacterId: 'b' } });
+    expect(nexusHandlers(gm).launchNetTestRun({ abilityId: 'backdoor', dv: 8, total: 12 })).toBe(false);
+    expect(gm.state.nexusChallenge).toBeUndefined();
+
+    const other = fakeComponent({ state: { gm: false, activeCharacterId: 'b' } });
+    expect(nexusHandlers(other).launchNetTestRun({ abilityId: 'backdoor', dv: 8, total: 12, actorId: 'a' })).toBe(false);
+    expect(other.state.nexusChallenge).toBeUndefined();
+
+    const running = fakeComponent({ state: { gm: false, activeCharacterId: 'b' }, activeCharacter: vi.fn(() => characters[1]) });
+    window.NexusBreach = { isMounted: () => true, mount: vi.fn(), unmount: vi.fn() };
+    expect(nexusHandlers(running).launchNetTestRun({ abilityId: 'backdoor', dv: 8, total: 12 })).toBe(false);
+    expect(running.state.nexusChallenge).toBeUndefined();
+    expect(running.flash).toHaveBeenCalledWith(expect.stringContaining('Run em andamento'));
+  });
+
+  it('launchNetTestRun leaves an unplayed GM challenge alone', () => {
+    const component = fakeComponent({
+      state: {
+        gm: false,
+        activeCharacterId: 'b',
+        nexusChallenge: { targetId: 'b', architectureTier: 'advanced' },
+        nexusResult: null,
+      },
+      activeCharacter: vi.fn(() => characters[1]),
+    });
+    window.NexusBreach = { isMounted: () => false, mount: vi.fn(), unmount: vi.fn() };
+
+    expect(nexusHandlers(component).launchNetTestRun({ abilityId: 'backdoor', dv: 6, total: 12 })).toBe(false);
+    expect(component.state.nexusChallenge).toEqual({ targetId: 'b', architectureTier: 'advanced' });
+    expect(component.flash).toHaveBeenCalledWith(expect.stringContaining('Desafio do mestre pendente'));
+  });
+
+  it('setNexusConnection normalizes the link the GM picked', () => {
+    const component = fakeComponent({ state: { gm: true } });
+    const h = nexusHandlers(component);
+    h.setNexusConnection('hardline');
+    expect(component.state.nexusConnection).toBe('hardline');
+    h.setNexusConnection('satellite');
+    expect(component.state.nexusConnection).toBe('wireless');
+  });
+
+  it('sendNexusChallenge publishes the link the run happens over', async () => {
+    const component = fakeComponent({
+      state: { gm: true, activeCharacterId: 'b', nexusTargetId: 'b', nexusTier: 'standard', nexusConnection: 'hardline', nexusBlackIceId: 'none' },
+    });
+    await nexusHandlers(component).sendNexusChallenge();
+    // Interface 6 vs Standard's Speed 4 (trace x0.94), then hardline's x0.85.
+    expect(component.state.nexusChallenge).toMatchObject({ connection: 'hardline', connectionCheckMod: 1, timeLimit: 118, traceRate: 0.8 });
+  });
+
+  it('launchNetTestRun carries the link of the test into the run', () => {
+    const component = fakeComponent({ state: { gm: false, activeCharacterId: 'b' }, activeCharacter: vi.fn(() => characters[1]) });
+    window.NexusBreach = { isMounted: () => false, mount: vi.fn(), unmount: vi.fn() };
+    document.getElementById = vi.fn(() => ({ id: 'limiar-nexus-root' }));
+
+    nexusHandlers(component).launchNetTestRun({ abilityId: 'pathfinder', dv: 8, total: 12, connection: 'remote' });
+
+    expect(component.state.nexusChallenge).toMatchObject({
+      connection: 'remote',
+      connectionCheckMod: -2,
+      // Standard tier, Interface 6 vs Speed 4, minus the remote link's 15s.
+      timeLimit: 93,
+      // 1.0 x 0.94 (speed) x 1.30 (remote).
+      traceRate: 1.22,
+    });
+    expect(component.state.nexusChallenge.netTest.connection).toBe('remote');
+  });
+
+  it('runNexusPrep rolls against the run DV with the link modifier applied', () => {
+    const component = fakeComponent({
+      state: {
+        activeCharacterId: 'b',
+        nexusChallenge: { targetId: 'b', architectureTier: 'uncommon', architectureDv: 11, interfaceRank: 6, connection: 'remote', connectionLabel: 'Remoto', connectionCheckMod: -2 },
+      },
+      activeCharacter: vi.fn(() => characters[1]),
+    });
+    component.roll = vi.fn((opts) => opts.onResolved({ total: 12 }));
+
+    nexusHandlers(component).runNexusPrep('pathfinder');
+
+    expect(component.roll).toHaveBeenCalledWith(expect.objectContaining({
+      label: 'NEXUS PREP :: PATHFINDER (-2 REMOTO)',
+      mod: 4,
+      dv: 11,
+    }));
+    expect(component.state.nexusPrepResults).toEqual([{ abilityId: 'pathfinder', success: true, margin: 1 }]);
+  });
+
+  it('mountNexus keeps a local NET test run local instead of pulling the server challenge', () => {
+    const get = vi.fn(async () => null);
+    const component = fakeComponent({
+      state: { gm: false, activeCharacterId: 'b', nexusLocalRun: true, nexusChallenge: { targetId: 'b', scriptCount: 3 } },
+      api: () => ({ nexus: { get } }),
+    });
+    const mount = vi.fn();
+    window.NexusBreach = { isMounted: () => false, mount };
+    document.getElementById = vi.fn(() => ({ id: 'limiar-nexus-root' }));
+
+    nexusHandlers(component).mountNexus();
+
+    expect(get).not.toHaveBeenCalled();
+    expect(mount).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ config: { targetId: 'b', scriptCount: 3 } }));
   });
 
   it('mountNexus pulls the GM challenge for a player and mounts it locked when addressed to them', async () => {

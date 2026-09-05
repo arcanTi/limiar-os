@@ -5,6 +5,7 @@
 // (see @seed alias in vite.config.js).
 import criticalInjuriesJson from '@seed/critical-injuries.json';
 import skillRowsJson from '@seed/skills.json';
+import skillDescriptionsJson from '@seed/skill-descriptions.json';
 
 export interface CriticalInjuryMechanics {
   penalties: { scope: string; stat?: string; value: number }[];
@@ -114,6 +115,18 @@ export type SkillRow = [string, string] | [string, string, boolean];
 export let CPRED_SKILL_ROWS: SkillRow[] = skillRowsJson as SkillRow[];
 export const CPRED_SKILL_ALIASES: Record<string, string> = { 'Local Expert (Home)': 'Local Expert (Your Home)', 'Melee Weapons': 'Melee Weapon' };
 
+// Player-facing "what is this skill for" blurbs, keyed by the catalog name in
+// data/seed/skills.json. Reference text only — nothing here feeds a roll.
+export const CPRED_SKILL_DESCRIPTIONS: Record<string, string> = skillDescriptionsJson as Record<string, string>;
+
+// Characters carry skills the catalog does not list by name: the language and
+// local-expert families are parameterized (`Language (Portuguese)`), so they
+// fall back to the family blurb instead of showing nothing.
+const SKILL_DESCRIPTION_FAMILIES: { test: RegExp; text: string }[] = [
+  { test: /^Language\s*\(/i, text: 'Idioma. Usada para falar, ler e escrever nessa lingua especifica, entender giria local e sotaques, e traduzir conversas ou documentos.' },
+  { test: /^Local Expert\s*\(/i, text: 'Especialista local. Conhecimento profundo sobre essa regiao: pontos de interesse, rotas seguras, gangues locais e quem realmente manda no pedaco.' },
+];
+
 export interface DefaultSkill {
   id: string;
   name: string;
@@ -139,4 +152,15 @@ export let CPRED_DEFAULT_SKILLS: DefaultSkill[] = buildDefaultSkills(CPRED_SKILL
 export function setSkillRows(rows: SkillRow[]): void {
   CPRED_SKILL_ROWS = rows;
   CPRED_DEFAULT_SKILLS = buildDefaultSkills(rows);
+}
+
+// Resolves the blurb for any skill name a sheet may carry, aliases and the
+// parameterized families included. Unknown custom skills return ''.
+export function skillDescription(name: unknown): string {
+  const raw = String(name || '').trim();
+  const canonical = CPRED_SKILL_ALIASES[raw] || raw;
+  const exact = CPRED_SKILL_DESCRIPTIONS[canonical];
+  if (exact) return exact;
+  const family = SKILL_DESCRIPTION_FAMILIES.find((entry) => entry.test.test(canonical));
+  return family ? family.text : '';
 }

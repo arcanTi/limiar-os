@@ -34,13 +34,19 @@ import { resolveStabilizationDV } from '../../domain/combat/stabilizationEngine.
 import { attackBudget, ATTACK_BUDGET_REASON_PT } from '../../domain/combat/attackBudget.ts';
 import { evasionBlockedReason, EVASION_BLOCK_REASON_PT } from '../../domain/combat/evasionRules.ts';
 import { resolveGrappleAction } from '../../domain/combat/grapple.ts';
-import { getAvailableAttacksThisAction } from '../../domain/combat/combatAmmoEngine.ts';
+import { compatibleAmmunition, getAvailableAttacksThisAction, isBowWeapon } from '../../domain/combat/combatAmmoEngine.ts';
 import { applyStatDrain, resolveTurnTick } from '../../domain/conditions/turnTick.ts';
 import { CPRED_STATUS_PRESETS, removeStatusEffect, statusEffectEntry } from '../../domain/conditions/index.ts';
 import { humanShieldFrom, skillCanonicalName as charSkillCanonicalName } from '../../domain/character/index.ts';
-import { eligibleToxinAmmoFor as toxinEligibleAmmoFor, toxinAmmunitionFor } from '../../domain/toxins/index.ts';
+import { TOXIN_DELIVERIES, toxinAmmunitionFor, toxinCatalog } from '../../domain/toxins/index.ts';
 import { weaponRangeBand } from '../../domain/combat/combatAttackEngine.ts';
 import { canFireWeapon as combatCanFireWeapon, spendAmmo as combatSpendAmmo } from '../../domain/combat/combatAmmoEngine.ts';
+
+function combatWeaponFireModes(weapon) {
+  const modes = (Array.isArray(weapon && weapon.weaponModes) ? weapon.weaponModes : []).map(row => row && row.mode).filter(Boolean);
+  if (weapon && weapon.autofire && !modes.includes('autofire')) modes.push('autofire');
+  return modes.length ? modes : ['standard'];
+}
 import { netActionsPerTurn } from '../../domain/netrunning/index.ts';
 import { weaponRollTone as viewWeaponRollTone } from '../view/constants.js';
 import { templateCells } from '../../domain/map/templateEngine.ts';
@@ -96,6 +102,11 @@ export function combatRenderVals(state = {}, deps = {}) {
       // Only weapons with a numeric magazine track ammo.
       // melee/bows/exotics without one show no counter (see normalizeGearItem).
       const hasAmmo = item.magazine != null;
+      const ammunition = compatibleAmmunition(item, deps.normalizeGearList(character.gear || []))
+        .filter(ammo => Number(ammo.qty || 0) > 0 || ammo.code === item.loadedAmmoCode);
+      const loadedAmmo = ammunition.find(ammo => ammo.code === item.loadedAmmoCode);
+      const loadedToxin = toxinAmmunitionFor(item.loadedAmmoCode);
+      const fireModes = combatWeaponFireModes(item);
       return {
         ...item,
         dmgLabel: deps.gearDamageText(item),
@@ -106,9 +117,17 @@ export function combatRenderVals(state = {}, deps = {}) {
         canShieldDamage: !!targetShield,
         shieldDamage: () => deps.rollCombatShieldDamage(id, item),
         hasAmmo,
-        ammoLabel: hasAmmo ? (item.currentAmmo ?? item.magazine) + '/' + item.magazine : '',
+        ammoLabel: hasAmmo ? (item.currentAmmo ?? 0) + '/' + item.magazine : '',
+        ammoTypeLabel: loadedAmmo ? loadedAmmo.name : (item.loadedAmmoType || item.ammoType || 'SEM MUNICAO'),
+        hasLoadedToxin: !!loadedToxin,
+        loadedToxinLabel: loadedToxin ? loadedToxin.name.toUpperCase() : '',
+        hasAmmunitionControl: ammunition.length > 0 || hasAmmo,
         needsReload: hasAmmo && Number(item.currentAmmo ?? item.magazine) <= 0,
         reload: () => deps.reloadWeapon(id, item.id),
+        cycleAmmo: () => deps.cycleWeaponAmmo(id, item.id),
+        hasFireModes: fireModes.length > 1,
+        fireModeLabel: String(item.selectedMode || fireModes[0] || 'standard').toUpperCase(),
+        cycleFireMode: () => deps.cycleWeaponFireMode(id, item.id),
         // Poor-quality malfunction: a natural 1 jams the weapon until the
         // wielder spends a full Action clearing it (unjamWeapon).
         jammed: !!item.jammed,
@@ -124,13 +143,6 @@ export function combatRenderVals(state = {}, deps = {}) {
         // "Suppressive Fire" special-rule text) get a batch WILL-save action.
         hasSuppressiveFire: !!item.suppressiveFire,
         suppressiveFire: () => deps.requestSuppressiveFire(id, item),
-        // Arrows and grenades can carry a toxin round, which replaces the
-        // weapon's damage with a Resist Torture/Drugs check on the target.
-        canLoadToxin: toxinEligibleAmmoFor(item).length > 0,
-        loadedToxinLabel: (toxinAmmunitionFor(item.toxinAmmoCode) || {}).name
-          ? toxinAmmunitionFor(item.toxinAmmoCode).name.toUpperCase()
-          : 'SEM TOXINA',
-        cycleToxinRound: () => deps.cycleToxinRound(id, item),
       };
     });
     const ctxAvail = deps.attackContextAvailable(character);
@@ -203,16 +215,55 @@ export function combatRenderVals(state = {}, deps = {}) {
       rollParamedic: () => deps.rollStabilize(id, selectedTargetId, 'Paramedic'),
     };
     const utilityRows = kitGear.filter(item => !deps.hasDamageProfile(item) && (
-      item.type.includes('CONSUMABLE') || item.type.includes('GRENADE') || item.type.includes('AMMO') || item.type.includes('MED') || item.qty > 1 || item.lastUsedAt
+      item.toxinId || item.type.includes('CONSUMABLE') || item.type.includes('GRENADE') || item.type.includes('AMMO') || item.type.includes('MED') || item.qty > 1 || item.lastUsedAt
     )).map(item => ({
       ...item,
       qtyLabel: String(item.qty),
+      isToxinDose: !!item.toxinId,
       hasDamage: !!(item.sides && item.count),
       damage: () => deps.rollCombatDamage(id, item),
       canShieldDamage: !!targetShield && !!(item.sides && item.count),
       shieldDamage: () => deps.rollCombatShieldDamage(id, item),
       use: () => deps.useCombatUtility(id, item.id),
     }));
+    const pendingDose = S.combatDosePending && S.combatDosePending.actorId === id
+      ? S.combatDosePending
+      : null;
+    const pendingDoseItem = pendingDose ? utilityRows.find(item => item.id === pendingDose.itemId) : null;
+    const pendingToxin = pendingDoseItem
+      ? toxinCatalog(S.toxins).find(toxin => toxin.id === pendingDoseItem.toxinId) || null
+      : null;
+    const pendingPreset = pendingToxin && pendingToxin.statusPresetId
+      ? CPRED_STATUS_PRESETS.find(preset => preset.id === pendingToxin.statusPresetId) || null
+      : null;
+    const durationUnits = { hour: 'h', min: 'min', round: 'round', turn: 'turn' };
+    const duration = pendingPreset && pendingPreset.duration
+      ? `${pendingPreset.duration.value} ${durationUnits[pendingPreset.duration.unit] || pendingPreset.duration.unit}`
+      : pendingToxin && pendingToxin.kind === 'poison' ? 'indefinida' : '—';
+    const dosePending = pendingToxin ? {
+      itemName: pendingDoseItem.name,
+      toxinName: pendingToxin.name,
+      dvLabel: `DV ${pendingToxin.resistDV}`,
+      damageLabel: pendingToxin.damage ? `${pendingToxin.damage} direto no HP` : 'sem dano direto',
+      conditionLabel: pendingPreset ? pendingPreset.label_pt : pendingToxin.effect_pt,
+      durationLabel: duration,
+      targetOptions: (S.characters || []).map(target => ({
+        id: target.id,
+        name: target.name || target.id,
+        selected: target.id === pendingDose.targetId,
+        notSelected: target.id !== pendingDose.targetId,
+      })),
+      deliveryOptions: TOXIN_DELIVERIES.map(delivery => ({
+        id: delivery.id,
+        label: delivery.label_pt,
+        selected: delivery.id === pendingDose.delivery,
+        notSelected: delivery.id !== pendingDose.delivery,
+      })),
+      onTargetChange: (event) => deps.setCombatDoseField('targetId', event.target.value),
+      onDeliveryChange: (event) => deps.setCombatDoseField('delivery', event.target.value),
+      confirm: () => deps.confirmCombatDose(),
+      cancel: () => deps.cancelCombatDose(),
+    } : null;
     const checkNames = ['Evasion'];
     weaponRows.forEach(item => {
       const skill = deps.skillCanonicalName(item.skill);
@@ -304,6 +355,8 @@ export function combatRenderVals(state = {}, deps = {}) {
       hasAttackToggles: attackToggles.length > 0,
       hasWeapons: weaponRows.length > 0,
       hasUtility: utilityRows.length > 0,
+      hasDosePending: !!dosePending,
+      dosePending,
       hasChecks: checkRows.length > 0,
       hasKit,
       noKit: !hasKit,
@@ -869,6 +922,7 @@ export function combatHandlers(component) {
     // Poor-quality malfunction: a jammed weapon cannot fire until a full
     // Action is spent clearing it (unjamWeapon).
     if (weapon && weapon.jammed) return component.flash((weapon.name || 'Arma') + ' esta travada: gaste 1 acao para destravar');
+    if (weapon && weapon.destroyed) return component.flash((weapon.name || 'Arma') + ' esta inutilizada permanentemente');
     // Attacks per turn (CPR RAW ROF): players are held to the budget, the
     // GM only gets the warning so a house ruling can still go through.
     const budget = attackBudgetFor(actorId, weapon);
@@ -880,6 +934,13 @@ export function combatHandlers(component) {
     const mod = combatAttackMod(actor, weapon);
     const ctx = cyberContextToHit(actor);
     const pending = consumePendingRollMods(actorId);
+    // CPR scope benefit is contextual: +1 only for an Aimed Shot at 51m+.
+    // A map measurement is authoritative when present; the manual combat
+    // toggle remains available for theatre-of-the-mind encounters.
+    const attackContext = attackContextState();
+    const hasSnipingScope = (weapon.installedAttachments || []).includes('SCOPE');
+    const scopeAtRange = mapContext ? mapContext.rangeMeters >= 51 : attackContext.beyond51m;
+    const scopeMod = hasSnipingScope && attackContext.aimedShot && scopeAtRange ? 1 : 0;
     // A captured evasion result becomes this attack's DV — one-shot, only
     // when it's still for the currently selected target. Melee is always
     // opposed; a ranged shot only if the target may dodge bullets (REF 8+).
@@ -887,25 +948,30 @@ export function combatHandlers(component) {
     const evasionApplies = !!(weapon && (weapon.melee || canRequestRangedEvasion(actorId, weapon)));
     const evasion = evasionApplies ? consumeEvasionResult(actorId, combatTargetFor(actorId)) : null;
     // Ammo is spent on the shot fired (attack roll), never on damage.
-    // Advisory only — a warning is added to the breakdown, the roll still
-    // happens (canFireWeapon/spendAmmo never take the count below 0).
-    const ammoState = weaponAmmoState(weapon);
-    const ammoCheck = ammoState ? combatCanFireWeapon(weapon, ammoState, 'singleShot') : null;
+    // The declaration is rigid: insufficient ammunition blocks the attack
+    // before dice, pending modifiers, or attack budget are consumed.
+    const attackMode = weaponAttackMode(weapon);
+    const ammoState = weaponAmmoState(actor, weapon);
+    const ammoCheck = ammoState ? combatCanFireWeapon(weapon, ammoState, attackMode) : null;
+    if (ammoCheck && !ammoCheck.canFire) {
+      return component.flash(`Municao insuficiente: ${ammoCheck.currentAmmo}/${ammoCheck.requiredAmmo} necessarias`, 3200);
+    }
     if (ammoState) {
-      const spent = combatSpendAmmo(weapon, ammoState, 'singleShot');
-      persistGearPatch(actorId, weapon.id, { currentAmmo: spent.ammoState.currentAmmo });
+      const spent = combatSpendAmmo(weapon, ammoState, attackMode);
+      spendWeaponAmmunition(actorId, weapon, spent.requiredAmmo, spent.ammoState.currentAmmo);
     }
     component.roll({
       actorId,
       check: true,
       sides: 10,
       count: 1,
-      mod: mod.mod + ctx.mod + pending.luck + pending.adHoc,
+      mod: mod.mod + ctx.mod + pending.luck + pending.adHoc + scopeMod,
       ...(evasion ? { dv: evasion.total } : range ? { dv: range.dv } : {}),
       breakdown: component.cyberSourceBreakdown(mod.sources.concat(ctx.sources))
         .concat(range ? [`RANGE ${mapContext.rangeMeters}m // ${range.range} // DV ${range.dv}`] : [])
         .concat(evasion ? [`EVASAO DO ALVO: ${evasion.total}` + (range ? ' (substitui o DV de alcance)' : '')] : [])
         .concat(pendingModBreakdown(pending))
+        .concat(scopeMod ? ['+1 SNIPING SCOPE // AIMED SHOT 51m+'] : [])
         .concat(ammoCheck && ammoCheck.needsReload ? [`SEM MUNICAO (${ammoCheck.currentAmmo}/${weapon.magazine}) — recarregue`] : []),
       label: (((actor.name || 'OPERATIVO') + ' :: ' + ((weapon && weapon.name) || 'ARMA') + ' ATAQUE').toUpperCase()) + combatTargetLabelSuffix(actorId),
       onResolved: (result) => {
@@ -925,6 +991,9 @@ export function combatHandlers(component) {
       },
     });
     recordAttack(actorId, weapon);
+    if (/teen dreem/i.test(`${weapon.code || ''} ${weapon.name || ''}`) && (attackMode === 'autofire' || attackMode === 'suppressiveFirePlaceholder')) {
+      persistGearPatch(actorId, weapon.id, { destroyed: true, currentAmmo: 0 });
+    }
     // Per-roll reset: to-hit toggles are consumed by this attack.
     setAttackContext({ beyond51m: false, aimedShot: false });
   }
@@ -940,9 +1009,16 @@ export function combatHandlers(component) {
     return entry && entry.key === attackLogKey(actorId) && Array.isArray(entry.attacks) ? entry.attacks : [];
   }
   function weaponAttackRof(weapon) {
-    const ctx = attackContextState();
-    const mode = ctx.aimedShot ? 'aimedShot' : (weapon && charSkillCanonicalName(weapon.skill) === 'Autofire') ? 'autofire' : 'singleShot';
+    const mode = weaponAttackMode(weapon);
     return Math.max(1, Math.min(2, Number(getAvailableAttacksThisAction(weapon || {}, mode)) || 1));
+  }
+  function weaponAttackMode(weapon) {
+    const ctx = attackContextState();
+    if (ctx.aimedShot) return 'aimedShot';
+    const selected = String((weapon && (weapon.selectedMode || weapon.mode)) || '').toLowerCase();
+    if (selected === 'autofire') return 'autofire';
+    if (weapon && charSkillCanonicalName(weapon.skill) === 'Autofire') return 'autofire';
+    return 'singleShot';
   }
   function attackBudgetFor(actorId, weapon) {
     return attackBudget(attacksThisTurn(actorId), weaponAttackRof(weapon));
@@ -1058,8 +1134,11 @@ export function combatHandlers(component) {
     const overflow = Math.max(0, damage - shield.hp);
     const nextShield = component.damageShield(shield, damage);
     const becameCorpse = shield.kind === 'human' && nextShield && nextShield.kind === 'corpse';
+    const gear = component.normalizeGearList(target.gear || []).map(item => item.id === shield.itemId || item.code === shield.itemId
+      ? { ...item, shieldHp: nextShield.hp, equipped: nextShield.hp > 0, shieldLocation: nextShield.hp > 0 ? 'equipped' : 'dropped' }
+      : item);
     component.setState(s => ({
-      characters: (s.characters || []).map(c => c.id === target.id ? component.normalizeCharacter({ ...c, shield: nextShield }) : c),
+      characters: (s.characters || []).map(c => c.id === target.id ? component.normalizeCharacter({ ...c, gear, shield: nextShield.hp > 0 || nextShield.kind === 'corpse' ? nextShield : null }) : c),
     }));
     const kindLabel = shield.kind === 'corpse' ? 'ESCUDO CADAVER' : shield.kind === 'human' ? 'ESCUDO HUMANO' : 'ESCUDO';
     component.postChat({
@@ -1082,7 +1161,7 @@ export function combatHandlers(component) {
     // A toxin round deals no weapon damage at all (dealsBaseWeaponDamage:
     // false), so the hit hands the target to the resist check and stops here —
     // running the armor path too would double-resolve the attack.
-    if (weapon && weapon.toxinAmmoCode) {
+    if (weapon && toxinAmmunitionFor(weapon.loadedAmmoCode || weapon.ammoCode)) {
       component.maybeApplyToxinAmmo(weapon, targetId);
       return;
     }
@@ -1268,10 +1347,66 @@ export function combatHandlers(component) {
     const current = component.normalizeGearList(actor.gear || []);
     const item = current.find(row => row.id === itemId);
     if (!item) return;
+    if (item.toxinId) {
+      if (Number(item.qty || 0) <= 0) return component.flash('Dose esgotada');
+      const toxin = toxinCatalog(component.state.toxins).find(row => row.id === item.toxinId);
+      if (!toxin) return component.flash('Toxina da dose nao encontrada');
+      component.setState({
+        combatDosePending: {
+          actorId,
+          itemId,
+          targetId: combatTargetFor(actorId) || actorId,
+          delivery: toxin.delivery,
+        },
+      });
+      return;
+    }
     const consumes = item.type.includes('CONSUMABLE') || item.type.includes('GRENADE') || item.type.includes('AMMO') || item.type.includes('MED') || item.qty > 1;
     const gear = current.map(row => row.id === itemId ? { ...row, qty: consumes ? Math.max(0, row.qty - 1) : row.qty, lastUsedAt: new Date().toISOString() } : row);
     component.updateCharacterById(actor.id, { gear });
     component.flash(item.name + (consumes ? ' usado' : ' marcado como usado'));
+  }
+  function setCombatDoseField(key, value) {
+    component.setState(s => ({ combatDosePending: s.combatDosePending ? { ...s.combatDosePending, [key]: value } : null }));
+  }
+  function cancelCombatDose() {
+    component.setState({ combatDosePending: null });
+  }
+  function confirmCombatDose() {
+    if (!component.ensureGm('Login do mestre necessario para aplicar a dose')) return null;
+    const pending = component.state.combatDosePending;
+    if (!pending) return null;
+    const actor = combatCharacter(pending.actorId);
+    const gear = component.normalizeGearList((actor && actor.gear) || []);
+    const item = gear.find(row => row.id === pending.itemId);
+    const toxin = item && toxinCatalog(component.state.toxins).find(row => row.id === item.toxinId);
+    if (!actor || !item || !toxin) return component.flash('Dose nao encontrada no inventario');
+    if (!pending.targetId) return component.flash('Selecione um alvo');
+    if (Number(item.qty || 0) <= 0) return component.flash('Dose esgotada');
+    const result = component.applyToxinExposure({
+      toxin: { ...toxin, delivery: pending.delivery || toxin.delivery },
+      targetIds: [pending.targetId],
+      source: `dose:${item.code || item.id}`,
+      // Persist below, together with inventory consumption when actor=target,
+      // so two writes cannot race on the same character revision.
+      persist: false,
+    });
+    if (!result || result.error) return result;
+    result.outcomes.forEach(outcome => {
+      if (outcome.characterPatch && outcome.targetId !== pending.actorId) {
+        component.applyCharacterPatch(outcome.targetId, outcome.characterPatch);
+      }
+    });
+    const currentActor = combatCharacter(pending.actorId);
+    const currentGear = component.normalizeGearList((currentActor && currentActor.gear) || []);
+    component.applyCharacterPatch(pending.actorId, {
+      gear: currentGear.map(row => row.id === pending.itemId
+        ? { ...row, qty: Math.max(0, Number(row.qty || 0) - 1), lastUsedAt: new Date().toISOString() }
+        : row),
+    });
+    component.setState({ combatDosePending: null });
+    component.flash(`${item.name} aplicada em ${(component.state.characters || []).find(row => row.id === pending.targetId)?.name || pending.targetId}`);
+    return result;
   }
   async function rollInitiative() {
     if (!component.ensureGm('Login do mestre necessario para rolar iniciativa')) return;
@@ -1988,6 +2123,9 @@ export function combatHandlers(component) {
     if (!campaignId) return component.flash('Nenhum mapa de campanha ativo para posicionar o template');
     if (!component.app().campaignMap.available()) return component.flash('Mapa indisponivel');
     const actor = combatCharacter(actorId) || component.activeCharacter();
+    const ammoState = weaponAmmoState(actor, weapon);
+    const ammoCheck = ammoState ? combatCanFireWeapon(weapon, ammoState, 'suppressiveFirePlaceholder') : null;
+    if (ammoCheck && !ammoCheck.canFire) return component.flash(`Fogo supressivo exige ${ammoCheck.requiredAmmo} balas; restam ${ammoCheck.currentAmmo}`, 3200);
     try {
       const mapState = await component.app().campaignMap.get(campaignId);
       const tokens = Array.isArray(mapState && mapState.tokens) ? mapState.tokens : [];
@@ -2020,11 +2158,14 @@ export function combatHandlers(component) {
     const mod = combatCheckMod(actor, 'Autofire');
     const pending = consumePendingRollMods(actorId);
     const reporter = combatGmRollReporter(actor);
-    const ammoState = weaponAmmoState(weapon);
+    const ammoState = weaponAmmoState(actor, weapon);
     const ammoCheck = ammoState ? combatCanFireWeapon(weapon, ammoState, 'suppressiveFirePlaceholder') : null;
     if (ammoState) {
       const spent = combatSpendAmmo(weapon, ammoState, 'suppressiveFirePlaceholder');
-      persistGearPatch(actorId, weapon.id, { currentAmmo: spent.ammoState.currentAmmo });
+      spendWeaponAmmunition(actorId, weapon, spent.requiredAmmo, spent.ammoState.currentAmmo);
+    }
+    if (/teen dreem/i.test(`${weapon.code || ''} ${weapon.name || ''}`)) {
+      persistGearPatch(actorId, weapon.id, { destroyed: true, currentAmmo: 0 });
     }
     component.roll({
       actorId,
@@ -2347,11 +2488,24 @@ export function combatHandlers(component) {
 
   // --- Weapon magazine ammo. Only tracked for gear with a numeric
   // `magazine`; bows, melee weapons, and charge-based exotics are outside this
-  // magazine-ammo contract. See
-  // normalizeGearItem). Spend happens on the ATTACK roll (the shot fired),
-  // never on the DAMAGE roll.
-  function weaponAmmoState(weapon) {
-    if (!weapon || weapon.magazine == null) return null;
+  // magazine-ammo contract; bows consume one compatible inventory arrow as
+  // part of the attack and therefore never need a separate reload action.
+  // Spend happens on the ATTACK roll, never on the DAMAGE roll.
+  function selectedAmmoItem(actor, weapon) {
+    const gear = component.normalizeGearList((actor && actor.gear) || []);
+    const compatible = compatibleAmmunition(weapon || {}, gear);
+    if (weapon && weapon.loadedAmmoCode) {
+      return compatible.find(row => row.code === weapon.loadedAmmoCode) || null;
+    }
+    return compatible.find(row => Number(row.qty) > 0) || null;
+  }
+  function weaponAmmoState(actor, weapon) {
+    if (!weapon) return null;
+    if (isBowWeapon(weapon)) {
+      const ammo = selectedAmmoItem(actor, weapon);
+      return { currentAmmo: Number((ammo && ammo.qty) || 0) };
+    }
+    if (weapon.magazine == null) return null;
     return { currentAmmo: weapon.currentAmmo, magazine: weapon.magazine };
   }
   function persistGearPatch(actorId, itemId, patch) {
@@ -2360,15 +2514,79 @@ export function combatHandlers(component) {
     const gear = component.normalizeGearList(actor.gear || []).map(row => row.id === itemId ? { ...row, ...patch } : row);
     component.applyCharacterPatch(actorId, { gear });
   }
+  function spendWeaponAmmunition(actorId, weapon, requiredAmmo, magazineRemaining) {
+    const actor = combatCharacter(actorId);
+    if (!actor) return;
+    const gear = component.normalizeGearList(actor.gear || []);
+    if (isBowWeapon(weapon)) {
+      const ammo = selectedAmmoItem(actor, weapon);
+      if (!ammo) return;
+      component.applyCharacterPatch(actorId, { gear: gear.map(row => row.id === ammo.id ? { ...row, qty: Math.max(0, Number(row.qty) - requiredAmmo) } : row) });
+      return;
+    }
+    component.applyCharacterPatch(actorId, { gear: gear.map(row => row.id === weapon.id ? { ...row, currentAmmo: magazineRemaining } : row) });
+  }
   function reloadWeapon(actorId, itemId) {
     if (!canRollCombatActor(actorId)) return component.flash('Voce so pode recarregar seu proprio equipamento');
     const actor = combatCharacter(actorId);
     const item = actor && component.normalizeGearList(actor.gear || []).find(row => row.id === itemId);
-    if (!item || item.magazine == null) return;
-    persistGearPatch(actorId, itemId, { currentAmmo: item.magazine });
-    component.flash((item.name || 'Arma') + ' recarregada');
+    if (!item || item.magazine == null || isBowWeapon(item)) return;
+    const gear = component.normalizeGearList(actor.gear || []);
+    const compatible = compatibleAmmunition(item, gear);
+    const ammo = compatible.find(row => row.code === item.loadedAmmoCode && Number(row.qty) > 0)
+      || compatible.find(row => Number(row.qty) > 0);
+    if (!ammo) return component.flash('Nenhuma municao compativel no inventario');
+    if (Number(item.currentAmmo || 0) > 0 && item.loadedAmmoCode && ammo.code !== item.loadedAmmoCode) {
+      return component.flash('Descarregue antes de trocar o tipo de municao');
+    }
+    const missing = Math.max(0, Number(item.magazine) - Number(item.currentAmmo || 0));
+    const transferred = Math.min(missing, Number(ammo.qty || 0));
+    if (!transferred) return component.flash((item.name || 'Arma') + ' ja esta cheia');
+    const next = gear.map(row => {
+      if (row.id === item.id) return { ...row, currentAmmo: Number(item.currentAmmo || 0) + transferred, loadedAmmoCode: ammo.code, loadedAmmoType: ammo.ammoType };
+      if (row.id === ammo.id) return { ...row, qty: Number(row.qty || 0) - transferred };
+      return row;
+    });
+    component.applyCharacterPatch(actorId, { gear: next });
+    component.flash(`${item.name || 'Arma'}: ${transferred} municoes transferidas`);
   }
-
+  function cycleWeaponAmmo(actorId, itemId) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode manipular seu proprio equipamento');
+    const actor = combatCharacter(actorId);
+    const gear = component.normalizeGearList((actor && actor.gear) || []);
+    const weapon = gear.find(row => row.id === itemId);
+    if (!weapon) return;
+    const options = compatibleAmmunition(weapon, gear)
+      .filter(row => Number(row.qty || 0) > 0 || row.code === weapon.loadedAmmoCode);
+    const currentIndex = options.findIndex(row => row.code === weapon.loadedAmmoCode);
+    const nextAmmo = options[currentIndex + 1] || null;
+    let rows = gear;
+    if (weapon.magazine != null && Number(weapon.currentAmmo || 0) > 0) {
+      const returnTo = options.find(row => row.code === weapon.loadedAmmoCode);
+      if (!returnTo) return component.flash('Nao foi possivel localizar a pilha da municao carregada para descarregar');
+      rows = rows.map(row => row.id === returnTo.id ? { ...row, qty: Number(row.qty || 0) + Number(weapon.currentAmmo || 0) } : row);
+    }
+    rows = rows.map(row => row.id === weapon.id ? {
+      ...row, currentAmmo: weapon.magazine == null ? row.currentAmmo : 0,
+      loadedAmmoCode: nextAmmo ? nextAmmo.code : '', loadedAmmoType: nextAmmo ? nextAmmo.ammoType : '',
+    } : row);
+    component.applyCharacterPatch(actorId, { gear: rows });
+    component.flash(nextAmmo ? `Selecionada: ${nextAmmo.name}` : 'Arma descarregada; municao recuperada');
+  }
+  function weaponFireModes(weapon) {
+    return combatWeaponFireModes(weapon);
+  }
+  function cycleWeaponFireMode(actorId, itemId) {
+    if (!canRollCombatActor(actorId)) return component.flash('Voce so pode alterar sua propria arma');
+    const actor = combatCharacter(actorId);
+    const weapon = actor && component.normalizeGearList(actor.gear || []).find(row => row.id === itemId);
+    if (!weapon) return;
+    const modes = weaponFireModes(weapon);
+    const current = modes.indexOf(weapon.selectedMode || modes[0]);
+    const selectedMode = modes[(current + 1) % modes.length];
+    persistGearPatch(actorId, itemId, { selectedMode });
+    component.flash(`Modo de disparo: ${selectedMode}`);
+  }
   return {
     combatDomainOptions,
     defaultCombatState,
@@ -2412,6 +2630,9 @@ export function combatHandlers(component) {
     combatStabilizationInfo,
     rollStabilize,
     useCombatUtility,
+    setCombatDoseField,
+    cancelCombatDose,
+    confirmCombatDose,
     rollInitiative,
     applyInitiativeRolls,
     setInitiative,
@@ -2466,16 +2687,8 @@ export function combatHandlers(component) {
     consumePendingRollMods,
     resetLuckForSession,
     reloadWeapon,
-    // Cycles through the rounds this weapon accepts and back to none, so a
-    // single button covers load/swap/unload without another dropdown.
-    cycleToxinRound: (actorId, weapon) => {
-      const options = toxinEligibleAmmoFor(weapon);
-      if (!options.length) return;
-      const current = options.findIndex(row => row.code === (weapon && weapon.toxinAmmoCode));
-      const next = options[current + 1] || null;
-      persistGearPatch(actorId, weapon.id, { toxinAmmoCode: next ? next.code : null });
-      component.flash(next ? 'Carregado: ' + next.name : 'Toxina removida da arma');
-    },
+    cycleWeaponAmmo,
+    cycleWeaponFireMode,
     requestSuppressiveFire,
     attacksThisTurn,
     attackBudgetFor,

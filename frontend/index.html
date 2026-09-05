@@ -432,6 +432,27 @@
         <div style="background:#0b0e0a;border:1px solid rgba(63,224,208,0.18);padding:11px 13px;"><div style="font:8px 'Share Tech Mono',monospace;letter-spacing:1.5px;color:#6f7a64;">EQUIPADOS</div><div style="font:700 14px 'Share Tech Mono',monospace;color:#3fe0d0;margin-top:3px;">{{ inventoryEquippedTotal }}</div></div>
         <div style="background:#0b0e0a;border:1px solid rgba(192,99,91,0.18);padding:11px 13px;"><div style="font:8px 'Share Tech Mono',monospace;letter-spacing:1.5px;color:#6f7a64;">ARMAS</div><div style="font:700 14px 'Share Tech Mono',monospace;color:#c0635b;margin-top:3px;">{{ inventoryWeaponTotal }}</div></div>
       </div>
+      <div style="border:1px solid rgba(214,170,78,0.2);background:#0b0e0a;padding:13px;margin-bottom:18px;">
+        <div style="font:8px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;margin-bottom:9px;">ARMADURA VESTIDA // SP EFETIVO NA FICHA</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
+          <sc-for list="{{ wornArmorRows }}" as="a" hint-placeholder-count="2">
+            <div style="background:#080a07;border:1px solid rgba(214,170,78,0.14);padding:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+                <span style="font:8px 'Share Tech Mono',monospace;letter-spacing:1.5px;color:#6f7a64;">{{ a.locationLabel }}</span>
+                <span style="font:700 15px 'Share Tech Mono',monospace;color:{{ a.spColor }};">{{ a.spLabel }}</span>
+              </div>
+              <div style="font:11px 'Chakra Petch',sans-serif;color:#f0ead8;margin-top:4px;">{{ a.nameLabel }}</div>
+              <div style="font:9px 'Share Tech Mono',monospace;color:#9a9883;margin-top:3px;">PENALIDADE {{ a.penaltyLabel }}</div>
+              <sc-if value="{{ a.canRepair }}">
+                <div style="display:flex;gap:6px;margin-top:9px;">
+                  <button data-limiar-armor-repair="one" onClick="{{ a.repairOne }}" class="lm-ui-btn lm-ui-btn--compact">REPARAR +1</button>
+                  <button data-limiar-armor-repair="all" onClick="{{ a.repairAll }}" class="lm-ui-btn lm-ui-btn--compact">RESTAURAR</button>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
       <sc-if value="{{ canEditSheet }}">
         <div style="border:1px solid rgba(63,224,208,0.18);background:rgba(8,14,12,0.82);padding:13px;margin-bottom:20px;">
           <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#3fe0d0;margin-bottom:10px;">ADICIONAR AO INVENTARIO // {{ activeName }}</div>
@@ -552,6 +573,50 @@
             <sc-if value="{{ g.hasEnhancements }}"><div style="font:9px 'Share Tech Mono',monospace;color:#b388ff;letter-spacing:1px;margin-top:8px;">ENH // {{ g.enhancementSummary }}</div></sc-if>
             <sc-if value="{{ g.hasSpecial }}"><div style="font:11px/1.35 'Chakra Petch',sans-serif;color:#d6aa4e;margin-top:7px;">{{ g.special }}</div></sc-if>
             <sc-if value="{{ g.hasNotes }}"><div style="font:11px/1.35 'Chakra Petch',sans-serif;color:#9a9883;margin-top:10px;">{{ g.notes }}</div></sc-if>
+            <sc-if value="{{ g.hasInstalledAttachments }}">
+              <div style="font:9px 'Share Tech Mono',monospace;color:#3fe0d0;letter-spacing:1px;margin-top:9px;">ATTACHMENTS // SLOTS {{ g.attachmentSlotsLabel }}</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;">
+                <sc-for list="{{ g.installedAttachmentRows }}" as="a" hint-placeholder-count="3">
+                  <button onClick="{{ a.remove }}" class="lm-enh-link-btn lm-enh-link-btn--on">REMOVER {{ a.name }}</button>
+                  <sc-if value="{{ a.hasTransferHosts }}">
+                    <sc-for list="{{ a.transferHosts }}" as="host" hint-placeholder-count="2">
+                      <button onClick="{{ host.transfer }}" class="{{ host.style }}" title="{{ host.reason }}">{{ a.code }} → {{ host.name }}</button>
+                    </sc-for>
+                  </sc-if>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ g.hasAttachmentHosts }}">
+              <div style="font:9px 'Share Tech Mono',monospace;color:#d6aa4e;letter-spacing:1px;margin-top:9px;">INSTALAR EM //</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;">
+                <sc-for list="{{ g.attachmentHosts }}" as="host" hint-placeholder-count="3">
+                  <button onClick="{{ host.install }}" class="{{ host.style }}" title="{{ host.reason }}">{{ host.name }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ g.isWornArmor }}">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;">
+                <span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#3fe0d0;border:1px solid rgba(63,224,208,.45);padding:3px 6px;">SP {{ g.armorSpLabel }}</span>
+                <sc-if value="{{ g.hasArmorPenalty }}"><span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#c0635b;border:1px solid rgba(192,99,91,.45);padding:3px 6px;">{{ g.armorPenaltyLabel }}</span></sc-if>
+                <sc-if value="{{ g.hasArmorAblation }}"><span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#d6aa4e;border:1px solid rgba(214,170,78,.45);padding:3px 6px;">DANIFICADA {{ g.armorAblatedLabel }}</span></sc-if>
+              </div>
+              <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;">
+                <sc-for list="{{ g.armorSlots }}" as="slot" hint-placeholder-count="2">
+                  <button data-limiar-armor-slot="{{ slot.location }}" onClick="{{ slot.toggle }}" class="{{ slot.style }}">{{ slot.label }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ g.isShield }}">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;">
+                <span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#3fe0d0;border:1px solid rgba(63,224,208,.45);padding:3px 6px;">ESCUDO {{ g.shieldHpLabel }}</span>
+                <span style="font:700 8px 'Share Tech Mono',monospace;letter-spacing:1px;color:#d6aa4e;border:1px solid rgba(214,170,78,.45);padding:3px 6px;">{{ g.shieldPopupLabel }}</span>
+                <sc-if value="{{ g.shieldDropped }}"><span style="font:700 8px 'Share Tech Mono',monospace;color:#c0635b;">SOLTO NA CENA</span></sc-if>
+              </div>
+              <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;">
+                <button onClick="{{ g.dropShield }}" class="lm-ui-btn lm-ui-btn--ghost-danger lm-ui-btn--compact">SOLTAR</button>
+                <button onClick="{{ g.repairShield }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">REPARAR FULL</button>
+              </div>
+            </sc-if>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:12px;">
               <button data-limiar-inventory-action="use" onClick="{{ g.use }}" class="{{ g.useStyle }}">{{ g.useActionLabel }}</button>
               <sc-if value="{{ g.canManage }}"><button data-limiar-inventory-action="equip" onClick="{{ g.toggleEquip }}" class="{{ g.equipStyle }}">{{ g.equipLabel }}</button></sc-if>
@@ -1031,12 +1096,13 @@
                           <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}<sc-if value="{{ w.hasAmmo }}"> // {{ w.ammoLabel }}</sc-if></div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
                           <sc-if value="{{ w.canRequestEvasion }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
                           <sc-if value="{{ w.hasSuppressiveFire }}"><button onClick="{{ w.suppressiveFire }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">SUPRESSAO</button></sc-if>
+                          <sc-if value="{{ w.hasFireModes }}"><button onClick="{{ w.cycleFireMode }}" title="Alternar modo de disparo e seu consumo" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">{{ w.fireModeLabel }}</button></sc-if>
                           <sc-if value="{{ w.jammed }}"><button onClick="{{ w.unjam }}" title="Arma travada (falha critica com qualidade Poor): destravar custa 1 acao" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">TRAVADA // DESTRAVAR</button></sc-if>
 <button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
                           <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                           <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
                           <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RECARREGAR</button></sc-if>
-                          <sc-if value="{{ w.canLoadToxin }}"><button onClick="{{ w.cycleToxinRound }}" title="Trocar a municao de toxina carregada" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ w.loadedToxinLabel }}</button></sc-if>
+                          <sc-if value="{{ w.hasAmmunitionControl }}"><button onClick="{{ w.cycleAmmo }}" title="Escolher, trocar ou descarregar municao; projeteis no carregador voltam ao inventario" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ w.ammoTypeLabel }}</button></sc-if>
                         </div>
                       </sc-for>
                     </div>
@@ -1052,6 +1118,26 @@
                           <button onClick="{{ u.use }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">{{ tx.use }}</button>
                         </div>
                       </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ combatFocusCard.hasDosePending }}">
+                    <div class="lm-combat-subtitle lm-combat-subtitle--danger">CONFIRMAR DOSE // {{ combatFocusCard.dosePending.itemName }}</div>
+                    <div class="lm-combat-kit-list">
+                      <div class="lm-combat-row lm-combat-row--utility" style="align-items:flex-end;flex-wrap:wrap;">
+                        <label class="lm-combat-row-main">ALVO
+                          <select onChange="{{ combatFocusCard.dosePending.onTargetChange }}">
+                            <sc-for list="{{ combatFocusCard.dosePending.targetOptions }}" as="opt"><sc-if value="{{ opt.selected }}"><option value="{{ opt.id }}" selected>{{ opt.name }}</option></sc-if><sc-if value="{{ opt.notSelected }}"><option value="{{ opt.id }}">{{ opt.name }}</option></sc-if></sc-for>
+                          </select>
+                        </label>
+                        <label class="lm-combat-row-main">APLICACAO
+                          <select onChange="{{ combatFocusCard.dosePending.onDeliveryChange }}">
+                            <sc-for list="{{ combatFocusCard.dosePending.deliveryOptions }}" as="opt"><sc-if value="{{ opt.selected }}"><option value="{{ opt.id }}" selected>{{ opt.label }}</option></sc-if><sc-if value="{{ opt.notSelected }}"><option value="{{ opt.id }}">{{ opt.label }}</option></sc-if></sc-for>
+                          </select>
+                        </label>
+                        <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ combatFocusCard.dosePending.toxinName }} // {{ combatFocusCard.dosePending.dvLabel }}</div><div class="lm-combat-row-meta">DANO {{ combatFocusCard.dosePending.damageLabel }} // DURACAO {{ combatFocusCard.dosePending.durationLabel }} // CONDICAO {{ combatFocusCard.dosePending.conditionLabel }}</div></div>
+                        <button onClick="{{ combatFocusCard.dosePending.cancel }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">CANCELAR</button>
+                        <button onClick="{{ combatFocusCard.dosePending.confirm }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">CONFIRMAR E CONSUMIR</button>
+                      </div>
                     </div>
                   </sc-if>
                   <sc-if value="{{ combatFocusCard.hasChecks }}">
@@ -1157,12 +1243,13 @@
                             <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ w.name }}<sc-if value="{{ w.hasAmmo }}"> // {{ w.ammoLabel }}</sc-if></div><div class="lm-combat-row-meta">{{ w.dmgLabel }} // {{ w.modLabel }}</div></div>
                             <sc-if value="{{ w.canRequestEvasion }}"><button onClick="{{ w.requestEvasion }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">PEDIR EVASAO</button></sc-if>
                             <sc-if value="{{ w.hasSuppressiveFire }}"><button onClick="{{ w.suppressiveFire }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">SUPRESSAO</button></sc-if>
+                            <sc-if value="{{ w.hasFireModes }}"><button onClick="{{ w.cycleFireMode }}" title="Alternar modo de disparo e seu consumo" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">{{ w.fireModeLabel }}</button></sc-if>
                             <sc-if value="{{ w.jammed }}"><button onClick="{{ w.unjam }}" title="Arma travada (falha critica com qualidade Poor): destravar custa 1 acao" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">TRAVADA // DESTRAVAR</button></sc-if>
 <button onClick="{{ w.attack }}" class="lm-ui-btn lm-ui-btn--gold lm-ui-btn--compact">{{ tx.attack }}</button>
                             <button onClick="{{ w.damage }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">{{ tx.damage }}</button>
                             <sc-if value="{{ w.canShieldDamage }}"><button onClick="{{ w.shieldDamage }}" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">ESCUDO</button></sc-if>
                             <sc-if value="{{ w.hasAmmo }}"><button onClick="{{ w.reload }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">RECARREGAR</button></sc-if>
-                          <sc-if value="{{ w.canLoadToxin }}"><button onClick="{{ w.cycleToxinRound }}" title="Trocar a municao de toxina carregada" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ w.loadedToxinLabel }}</button></sc-if>
+                          <sc-if value="{{ w.hasAmmunitionControl }}"><button onClick="{{ w.cycleAmmo }}" title="Escolher, trocar ou descarregar municao; projeteis no carregador voltam ao inventario" class="lm-ui-btn lm-ui-btn--ghost-teal lm-ui-btn--compact">{{ w.ammoTypeLabel }}</button></sc-if>
                           </div>
                         </sc-for>
                       </div>
@@ -1178,6 +1265,26 @@
                             <button onClick="{{ u.use }}" class="lm-ui-btn lm-ui-btn--teal lm-ui-btn--compact">{{ tx.use }}</button>
                           </div>
                         </sc-for>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ c.hasDosePending }}">
+                      <div class="lm-combat-subtitle lm-combat-subtitle--danger">CONFIRMAR DOSE // {{ c.dosePending.itemName }}</div>
+                      <div class="lm-combat-kit-list">
+                        <div class="lm-combat-row lm-combat-row--utility" style="align-items:flex-end;flex-wrap:wrap;">
+                          <label class="lm-combat-row-main">ALVO
+                            <select onChange="{{ c.dosePending.onTargetChange }}">
+                              <sc-for list="{{ c.dosePending.targetOptions }}" as="opt"><sc-if value="{{ opt.selected }}"><option value="{{ opt.id }}" selected>{{ opt.name }}</option></sc-if><sc-if value="{{ opt.notSelected }}"><option value="{{ opt.id }}">{{ opt.name }}</option></sc-if></sc-for>
+                            </select>
+                          </label>
+                          <label class="lm-combat-row-main">APLICACAO
+                            <select onChange="{{ c.dosePending.onDeliveryChange }}">
+                              <sc-for list="{{ c.dosePending.deliveryOptions }}" as="opt"><sc-if value="{{ opt.selected }}"><option value="{{ opt.id }}" selected>{{ opt.label }}</option></sc-if><sc-if value="{{ opt.notSelected }}"><option value="{{ opt.id }}">{{ opt.label }}</option></sc-if></sc-for>
+                            </select>
+                          </label>
+                          <div class="lm-combat-row-main"><div class="lm-combat-row-name">{{ c.dosePending.toxinName }} // {{ c.dosePending.dvLabel }}</div><div class="lm-combat-row-meta">DANO {{ c.dosePending.damageLabel }} // DURACAO {{ c.dosePending.durationLabel }} // CONDICAO {{ c.dosePending.conditionLabel }}</div></div>
+                          <button onClick="{{ c.dosePending.cancel }}" class="lm-ui-btn lm-ui-btn--ghost-gold lm-ui-btn--compact">CANCELAR</button>
+                          <button onClick="{{ c.dosePending.confirm }}" class="lm-ui-btn lm-ui-btn--danger lm-ui-btn--compact">CONFIRMAR E CONSUMIR</button>
+                        </div>
                       </div>
                     </sc-if>
                     <sc-if value="{{ c.hasChecks }}">
@@ -1595,6 +1702,15 @@
                 </select>
               </label>
               <label style="display:flex;flex-direction:column;gap:6px;min-width:220px;">
+                <span style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;">CONEXAO</span>
+                <select onChange="{{ onNexusConnection }}" style="min-height:40px;border:1px solid rgba(63,224,208,0.32);background:rgba(2,7,9,0.82);color:#eefcff;padding:0 10px;font:700 13px 'Share Tech Mono',monospace;letter-spacing:1px;cursor:pointer;">
+                  <sc-for list="{{ nexusConnectionOptions }}" as="link" hint-placeholder-count="3">
+                    <sc-if value="{{ link.selected }}"><option value="{{ link.id }}" selected>{{ link.label }}</option></sc-if>
+                    <sc-if value="{{ link.notSelected }}"><option value="{{ link.id }}">{{ link.label }}</option></sc-if>
+                  </sc-for>
+                </select>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:6px;min-width:220px;">
                 <span style="font:10px 'Share Tech Mono',monospace;letter-spacing:2px;color:#6f7a64;">BLACK ICE</span>
                 <select onChange="{{ onNexusBlackIce }}" style="min-height:40px;border:1px solid rgba(192,99,91,0.32);background:rgba(9,2,2,0.82);color:#ffeceb;padding:0 10px;font:700 13px 'Share Tech Mono',monospace;letter-spacing:1px;cursor:pointer;">
                   <sc-for list="{{ nexusBlackIceOptions }}" as="ice" hint-placeholder-count="4">
@@ -1604,7 +1720,12 @@
                 </select>
               </label>
               <div style="font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:#6f7a64;min-width:240px;">
-                <div>INTERFACE {{ nexusTargetRank }} // BUFFER {{ nexusPreviewConfig.bufferSize }} // {{ nexusPreviewConfig.scriptCount }} SCRIPTS // TRACE {{ nexusPreviewConfig.traceRate }}x</div>
+                <div>INTERFACE {{ nexusTargetRank }} // BUFFER {{ nexusPreviewConfig.bufferSize }} // {{ nexusPreviewConfig.scriptCount }} SCRIPTS // TRACE {{ nexusPreviewConfig.traceRate }}x // {{ nexusPreviewConfig.timeLimit }}s</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;">
+                  <sc-for list="{{ nexusDifficultyDigest }}" as="axis" hint-placeholder-count="3">
+                    <span class="lm-chip" style="cursor:default;color:#d6aa4e;border-color:rgba(214,170,78,0.34);background:rgba(214,170,78,0.045);">{{ axis }}</span>
+                  </sc-for>
+                </div>
                 <div style="margin-top:4px;color:#c0635b;">ICE // {{ nexusPreviewBlackIceLabel }}</div>
                 <sc-if value="{{ hasNexusPreviewProgramLabels }}">
                   <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;">
@@ -2159,7 +2280,7 @@
       <!-- LEFT: identity sidebar -->
       <aside class="flex-shrink-0 w-64 bg-cyber-surface border-r border-cyber-border flex flex-col overflow-y-auto">
         <div class="relative">
-          <sc-if value="{{ canEditSheet }}">
+          <sc-if value="{{ canEditPortrait }}">
             <div onClick="{{ triggerPlayerPortraitUpload }}" class="lm-fx-static-img h-44 overflow-hidden relative bg-cyber-panel flex items-center justify-center cursor-pointer group">
               <sc-if value="{{ portraitUrl }}"><img class="w-full h-full object-cover object-top" data-src="{{ portraitUrl }}" /></sc-if>
               <sc-if value="{{ noPortrait }}"><div class="text-[9px] font-mono tracking-widest text-cyber-dim">PORTRAIT</div></sc-if>
@@ -2172,7 +2293,7 @@
               <div class="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-cyber-gold"></div>
             </div>
           </sc-if>
-          <sc-if value="{{ notCanEditSheet }}">
+          <sc-if value="{{ notCanEditPortrait }}">
             <div class="lm-fx-static-img h-44 overflow-hidden relative bg-cyber-panel flex items-center justify-center">
               <sc-if value="{{ portraitUrl }}"><img class="w-full h-full object-cover object-top" data-src="{{ portraitUrl }}" /></sc-if>
               <sc-if value="{{ noPortrait }}"><div class="text-[9px] font-mono tracking-widest text-cyber-dim">PORTRAIT</div></sc-if>
@@ -2448,6 +2569,15 @@
                     <input type="number" min="0" value="{{ rosterNetDv }}" onInput="{{ onRosterNetDv }}" placeholder="DV" title="DV livre (vazio = mestre decide)" class="lm-ui-input lm-ui-input--gold lm-ui-input--mono" style="width:70px;" />
                     <button onClick="{{ toggleRosterNetAll }}" class="{{ rosterNetAllStyle }}" title="Enviar para todos os jogadores da mesa">TODOS OS PJS</button>
                   </div>
+                  <div class="lm-roster-console-row">
+                    <select onChange="{{ onRosterNetConnection }}" class="lm-ui-select lm-ui-select--full" title="Como o operativo esta plugado: muda o teste, o trace e o relogio da run">
+                      <sc-for list="{{ rosterNetConnectionOptions }}" as="nc" hint-placeholder-count="3">
+                        <sc-if value="{{ nc.selected }}"><option value="{{ nc.value }}" selected>{{ nc.label }}</option></sc-if>
+                        <sc-if value="{{ nc.notSelected }}"><option value="{{ nc.value }}">{{ nc.label }}</option></sc-if>
+                      </sc-for>
+                    </select>
+                  </div>
+                  <div class="lm-roster-net-desc">{{ rosterNetConnectionSummary }}</div>
                   <div class="lm-roster-net-target">
                     <span class="lm-roster-net-target-label">ALVO</span>
                     <span class="lm-roster-net-target-name">{{ rosterNetTargetLabel }}</span>
@@ -2463,12 +2593,12 @@
           </sc-if>
         </div>
         </sc-if>
-        <div class="flex-shrink-0 bg-cyber-surface border-b border-cyber-border flex items-center overflow-x-auto">
+        <div class="lm-sheet-tabs flex-shrink-0 bg-cyber-bg border-b border-cyber-border flex items-center overflow-x-auto">
           <sc-for list="{{ sheetTabs }}" as="tab" hint-placeholder-count="6">
             <button onClick="{{ tab.onClick }}" class="{{ tab.style }}">{{ tab.label }}</button>
           </sc-for>
         </div>
-        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div class="lm-sheet-scroll flex-1 overflow-y-auto px-6 py-5 space-y-5">
         <!-- @include frontend/templates/character-sheet-content.html -->
         </div>
       </main>
@@ -2554,7 +2684,7 @@
       </div>
       <button onClick="{{ closeSheet }}" aria-label="Fechar ficha" class="lm-operative-close flex-shrink-0 bg-black/40 border border-cyber-border text-cyber-muted hover:text-cyber-cyan hover:border-cyber-cyan text-sm w-7 h-7 flex items-center justify-center transition-all ml-3">&#10005;</button>
     </div>
-    <div class="flex-1 overflow-y-auto px-4 py-4">
+    <div class="lm-sheet-scroll flex-1 overflow-y-auto px-4 py-4">
       <sc-if value="{{ canEditSheet }}">
         <div class="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-cyber-border/50 flex-wrap">
           <div class="flex gap-1.5 flex-wrap min-w-0">
@@ -2581,7 +2711,7 @@
       </sc-if>
       <div class="lm-operative-profile">
         <div class="lm-operative-portrait-wrap flex-shrink-0" style="width:112px;">
-          <sc-if value="{{ canEditSheet }}">
+          <sc-if value="{{ canEditPortrait }}">
             <div onClick="{{ triggerPlayerPortraitUploadDrawer }}" class="lm-operative-portrait lm-fx-static-img relative overflow-hidden bg-cyber-panel flex items-center justify-center cursor-pointer group" style="width:112px;height:140px;">
               <sc-if value="{{ portraitUrl }}"><img class="absolute inset-0 w-full h-full object-cover" data-src="{{ portraitUrl }}" /></sc-if>
               <sc-if value="{{ noPortrait }}"><div class="text-[9px] font-mono tracking-widest text-cyber-dim">PORTRAIT</div></sc-if>
@@ -2591,7 +2721,7 @@
               </div>
             </div>
           </sc-if>
-          <sc-if value="{{ notCanEditSheet }}">
+          <sc-if value="{{ notCanEditPortrait }}">
             <div class="lm-operative-portrait lm-fx-static-img relative overflow-hidden bg-cyber-panel flex items-center justify-center" style="width:112px;height:140px;">
               <sc-if value="{{ portraitUrl }}"><img class="absolute inset-0 w-full h-full object-cover" data-src="{{ portraitUrl }}" /></sc-if>
               <sc-if value="{{ noPortrait }}"><div class="text-[9px] font-mono tracking-widest text-cyber-dim">PORTRAIT</div></sc-if>

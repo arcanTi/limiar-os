@@ -11,7 +11,12 @@ export function getRequiredAmmo(weapon: WeaponCombatProfile = {}, attackMode: At
   const selectedMode = weapon.selectedMode || weapon.mode || attackMode;
   const mode = (weapon.weaponModes || []).find(row => row.mode === selectedMode);
   if (mode && Number(mode.ammoCost) > 0) return Number(mode.ammoCost);
-  if (attackMode === 'autofire' || attackMode === 'suppressiveFirePlaceholder') return 10;
+  if (attackMode === 'autofire' || attackMode === 'suppressiveFirePlaceholder') {
+    const identity = `${weapon.code || ''} ${weapon.name || ''}`.toLowerCase();
+    if (identity.includes('helix')) return 20;
+    if (identity.includes('teen dreem')) return Math.max(2, Number(weapon.currentAmmo || 0));
+    return 10;
+  }
   return 1;
 }
 
@@ -40,6 +45,48 @@ export function canFireWeapon(weapon: WeaponCombatProfile = {}, ammoState: AmmoS
   const needsReload = currentAmmo < requiredAmmo;
   if (needsReload) issues.push(combatIssue('warning', 'needs_reload', 'Weapon does not have enough ammo for this attack.', { currentAmmo, requiredAmmo }));
   return { canFire: !needsReload, requiredAmmo, needsReload, currentAmmo, issues };
+}
+
+export interface AmmunitionItem {
+  id?: string;
+  code?: string;
+  name?: string;
+  type?: string;
+  cat?: string;
+  category?: string;
+  ammoType?: string;
+  qty?: number;
+  toxinAmmo?: boolean;
+}
+
+function ammoKey(value: unknown): string {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+export function isAmmunitionItem(item: AmmunitionItem = {}): boolean {
+  return [item.type, item.cat, item.category].some(value => String(value || '').toUpperCase().includes('AMMUNITION'))
+    || /^AMMO-/i.test(String(item.code || ''));
+}
+
+export function isBowWeapon(weapon: WeaponCombatProfile = {}): boolean {
+  return ammoKey(weapon.ammoType) === 'arrow' || /bow|crossbow/i.test(`${weapon.weaponType || ''} ${weapon.name || ''}`);
+}
+
+export function ammunitionFitsWeapon(weapon: WeaponCombatProfile = {}, ammo: AmmunitionItem = {}): boolean {
+  if (!isAmmunitionItem(ammo)) return false;
+  const weaponType = ammoKey(weapon.ammoType);
+  const roundType = ammoKey(ammo.ammoType);
+  const code = String(ammo.code || '').toUpperCase();
+  if (ammo.toxinAmmo || ['AMMO-BIOTOXIN', 'AMMO-POISON', 'AMMO-TEARGAS'].includes(code)) {
+    if (isBowWeapon(weapon)) return code !== 'AMMO-TEARGAS';
+    return weaponType === 'grenade';
+  }
+  if (weaponType === 'slug' || weaponType === 'shell') return roundType === 'slug' || roundType === 'shell';
+  return !!weaponType && weaponType === roundType;
+}
+
+export function compatibleAmmunition(weapon: WeaponCombatProfile = {}, gear: AmmunitionItem[] = []): AmmunitionItem[] {
+  return gear.filter(item => ammunitionFitsWeapon(weapon, item));
 }
 
 export interface SpendAmmoResult extends CanFireResult {

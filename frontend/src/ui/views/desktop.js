@@ -2,8 +2,209 @@ import { LIMIAR_TIER_COLORS } from '../view/constants.js';
 import { CPRED_STAT_ORDER } from '../../domain/character/constants.ts';
 import { buildBodyMap } from '../../domain/items/bodyMapEngine.ts';
 import { isPurchasableProduct } from '../../domain/items/itemNormalizers.ts';
+import { acquisitionMode, armorPenaltyOf, armorSp, hasWeaponStatBlock, purchaseQuantity } from '../../domain/items/marketAcquisition.ts';
+import { equipWornArmor, repairWornArmor, unequipWornArmor, wornArmorSummary } from '../../domain/items/wornArmorEngine.ts';
 import { gameTabStyle } from '../view/styles.js';
 import { uploadedPortrait } from '../../domain/character/portrait.ts';
+import {
+  installAttachment,
+  occupiedWeaponAttachmentSlots,
+  removeAttachment,
+  validateAttachmentInstallation,
+  weaponAttachmentMaxSlots,
+} from '../../domain/items/weaponAttachmentEngine.ts';
+
+// First visual-market pilot: these ten catalog codes share one generated art
+// direction, while every other product keeps its catalog-provided fallback.
+const MARKET_ITEM_IMAGE_URLS = {
+  BIOMON: '/assets/market/items/biomon.png',
+  CHEMSKIN: '/assets/market/items/chemskin.png',
+  'LIGHT-TAT': '/assets/market/items/light-tat.png',
+  'NEURAL-LINK': '/assets/market/items/neural-link.png',
+  'CHIP-SOCKET': '/assets/market/items/chip-socket.png',
+  'INTERFACE-PLUGS': '/assets/market/items/interface-plugs.png',
+  KERENZIKOV: '/assets/market/items/kerenzikov.png',
+  SANDEVISTAN: '/assets/market/items/sandevistan.png',
+  'PAIN-EDITOR': '/assets/market/items/pain-editor.png',
+  CYBEREYE: '/assets/market/items/cybereye.png',
+  'IMAGE-ENH': '/assets/market/items/image-enh.png',
+  'LOWLIGHT-UV': '/assets/market/items/lowlight-uv.png',
+  'TARGET-SCOPE': '/assets/market/items/target-scope.png',
+  CYBERAUDIO: '/assets/market/items/cyberaudio.png',
+  'AMP-HEARING': '/assets/market/items/amp-hearing.png',
+  'RADIO-COMM': '/assets/market/items/radio-comm.png',
+  'VOICE-STRESS': '/assets/market/items/voice-stress.png',
+  AUDIOVOX: '/assets/market/items/audiovox.png',
+  GILLS: '/assets/market/items/gills.png',
+  'MUSCLE-LACE': '/assets/market/items/muscle-lace.png',
+  'NASAL-FILTER': '/assets/market/items/nasal-filter.png',
+  'HIDDEN-HOLSTER': '/assets/market/items/hidden-holster.png',
+  'SKIN-WEAVE': '/assets/market/items/skin-weave.png',
+  'SUBDERMAL-ARMOR': '/assets/market/items/subdermal-armor.png',
+  CYBERARM: '/assets/market/items/cyberarm.png',
+  'BIG-KNUCKS': '/assets/market/items/big-knucks.png',
+  'GRAPPLE-HAND': '/assets/market/items/grapple-hand.png',
+  'POPUP-GL': '/assets/market/items/popup-gl.png',
+  TECHSCANNER: '/assets/market/items/techscanner.png',
+  WOLVERS: '/assets/market/items/wolvers.png',
+  CYBERLEG: '/assets/market/items/cyberleg.png',
+  'JUMP-BOOSTER': '/assets/market/items/jump-booster.png',
+  'LINEAR-SIGMA': '/assets/market/items/linear-sigma.png',
+  'LINEAR-BETA': '/assets/market/items/linear-beta.png',
+  MULTIOPTIC: '/assets/market/items/multioptic.png',
+  'SENSOR-ARRAY': '/assets/market/items/sensor-array.png',
+  'BACKUP-DRIVE': '/assets/market/items/backup-drive.png',
+  'DNA-LOCK': '/assets/market/items/dna-lock.png',
+  'HARD-CIRCUIT': '/assets/market/items/hard-circuit.png',
+  'RANGE-UPGRADE': '/assets/market/items/range-upgrade.png',
+  CHAINRIPP: '/assets/market/items/chainripp.png',
+  'MANTIS-BLADE': '/assets/market/items/mantis-blade.png',
+  MONOWIRE: '/assets/market/items/monowire.png',
+  'REFLEX-CO': '/assets/market/items/reflex-co.png',
+  'COMBAT-TAIL': '/assets/market/items/combat-tail.png',
+  'SMART-GLASSES': '/assets/market/items/smart-glasses.png',
+  'EMP-THREAD': '/assets/market/items/emp-thread.png',
+  SKINWATCH: '/assets/market/items/skinwatch.png',
+  TECHHAIR: '/assets/market/items/techhair.png',
+  'BD-REC': '/assets/market/items/bd-rec.png',
+  'CHEM-ANAL': '/assets/market/items/chem-anal.png',
+  'MEM-CHIP': '/assets/market/items/mem-chip.png',
+  'OLF-BOOST': '/assets/market/items/olf-boost.png',
+  'SKILL-CHIP': '/assets/market/items/skill-chip.png',
+  'TACT-BOOST': '/assets/market/items/tact-boost.png',
+  'ANTI-DAZ': '/assets/market/items/anti-daz.png',
+  CHYRON: '/assets/market/items/chyron.png',
+  'COLOR-SH': '/assets/market/items/color-sh.png',
+  'DARTGUN-EYE': '/assets/market/items/dartgun-eye.png',
+  'MICRO-OPT': '/assets/market/items/micro-opt.png',
+  'MICRO-VID': '/assets/market/items/micro-vid.png',
+  'RAD-DET-OPT': '/assets/market/items/rad-det-opt.png',
+  'TELE-OPT': '/assets/market/items/tele-opt.png',
+  VIRTUALITY: '/assets/market/items/virtuality.png',
+  'AUD-REC': '/assets/market/items/aud-rec.png',
+  'BUG-DET': '/assets/market/items/bug-det.png',
+  'HOM-TRAC': '/assets/market/items/hom-trac.png',
+  'INT-AGENT': '/assets/market/items/int-agent.png',
+  'LEVEL-DAMP': '/assets/market/items/level-damp.png',
+  'RADAR-DET': '/assets/market/items/radar-det.png',
+  'SCRAM-DESC': '/assets/market/items/scram-desc.png',
+  'ENH-ANTI': '/assets/market/items/enh-anti.png',
+  SNAKE: '/assets/market/items/snake.png',
+  'AIR-SUPP': '/assets/market/items/air-supp.png',
+  'SEX-IMPL': '/assets/market/items/sex-impl.png',
+  'RAD-SON-INT': '/assets/market/items/rad-son-int.png',
+  'TOX-BIND': '/assets/market/items/tox-bind.png',
+  VAMPYRES: '/assets/market/items/vampyres.png',
+  'SUB-POCKET': '/assets/market/items/sub-pocket.png',
+  'STD-HAND': '/assets/market/items/std-hand.png',
+  'STD-FOOT': '/assets/market/items/std-foot.png',
+  'SKATE-FOOT': '/assets/market/items/skate-foot.png',
+  'TALON-FOOT': '/assets/market/items/talon-foot.png',
+  'WEB-FOOT': '/assets/market/items/web-foot.png',
+  'HARD-SHIELD': '/assets/market/items/hard-shield.png',
+  MEDSCAN: '/assets/market/items/medscan.png',
+  'POP-MELEE': '/assets/market/items/pop-melee.png',
+  'POP-SHIELD': '/assets/market/items/pop-shield.png',
+  RIPPERS: '/assets/market/items/rippers.png',
+  SCRATCHERS: '/assets/market/items/scratchers.png',
+  'SH-CAM': '/assets/market/items/sh-cam.png',
+  'SLICE-DICE': '/assets/market/items/slice-dice.png',
+  'SUB-GRIP': '/assets/market/items/sub-grip.png',
+  'TOOL-HAND': '/assets/market/items/tool-hand.png',
+  'ART-SHOULDER': '/assets/market/items/art-shoulder.png',
+  'FACE-QC': '/assets/market/items/face-qc.png',
+  'QUICK-DIGITS': '/assets/market/items/quick-digits.png',
+  SKYDRIVERS: '/assets/market/items/skydrivers.png',
+  CYBERSPINE: '/assets/market/items/cyberspine.png',
+  'CYBER-COND': '/assets/market/items/cyber-cond.png',
+  'CONC-SLEEVE': '/assets/market/items/conc-sleeve.png',
+  'GORILLA-ARMS': '/assets/market/items/gorilla-arms.png',
+  'ENH-HYD-RAM': '/assets/market/items/enh-hyd-ram.png',
+  'ENH-PNEU-ACT': '/assets/market/items/enh-pneu-act.png',
+  'ENH-TUNG-REIN': '/assets/market/items/enh-tung-rein.png',
+  'ENH-DBL-EDGE': '/assets/market/items/enh-dbl-edge.png',
+  'ENH-MONO-EDG': '/assets/market/items/enh-mono-edg.png',
+  'ENH-BARB-LIN': '/assets/market/items/enh-barb-lin.png',
+  'ENH-ELECTRO': '/assets/market/items/enh-electro.png',
+  'ENH-THERMAL': '/assets/market/items/enh-thermal.png',
+  'TRAUMA-SILVER': '/assets/market/items/trauma-silver.png',
+  'TRAUMA-GOLD': '/assets/market/items/trauma-gold.png',
+  'TRAUMA-PLATINUM': '/assets/market/items/trauma-platinum.png',
+  'TRAUMA-EXECUTIVE': '/assets/market/items/trauma-executive.png',
+  'RADIO-SCAN-MUSIC': '/assets/market/items/radio-scan-music.png',
+  CONTRACEPTIVE: '/assets/market/items/contraceptive.png',
+  'CYBERDECK-ARM': '/assets/market/items/cyberdeck-arm.png',
+  'POP-RANGED': '/assets/market/items/pop-ranged.png',
+  'QUICK-MOUNT': '/assets/market/items/quick-mount.png',
+  'GRIP-FOOT': '/assets/market/items/grip-foot.png',
+  'PLASTIC-COVER': '/assets/market/items/plastic-cover.png',
+  'REALSKINN-COVER': '/assets/market/items/realskinn-cover.png',
+  'SUPERCHROME-COVER': '/assets/market/items/superchrome-cover.png',
+  'MEDIUM-PISTOL': '/assets/market/items/medium-pistol.png',
+  'HEAVY-PISTOL': '/assets/market/items/heavy-pistol.png',
+  'VERY-HEAVY-PISTOL': '/assets/market/items/very-heavy-pistol.png',
+  SMG: '/assets/market/items/smg.png',
+  'HEAVY-SMG': '/assets/market/items/heavy-smg.png',
+  SHOTGUN: '/assets/market/items/shotgun.png',
+  'ASSAULT-RIFLE': '/assets/market/items/assault-rifle.png',
+  'SNIPER-RIFLE': '/assets/market/items/sniper-rifle.png',
+  'BOW-CROSSBOW': '/assets/market/items/bow-crossbow.png',
+  'GRENADE-LAUNCHER': '/assets/market/items/grenade-launcher.png',
+  'ROCKET-LAUNCHER': '/assets/market/items/rocket-launcher.png',
+  'LIGHT-MELEE': '/assets/market/items/light-melee.png',
+  'MEDIUM-MELEE': '/assets/market/items/medium-melee.png',
+  'HEAVY-MELEE': '/assets/market/items/heavy-melee.png',
+  'VERY-HEAVY-MELEE': '/assets/market/items/very-heavy-melee.png',
+  'BRAWLING-BODY-LOW': '/assets/market/items/brawling-body-low.png',
+  'BRAWLING-BODY-MID': '/assets/market/items/brawling-body-mid.png',
+  'BRAWLING-BODY-HIGH': '/assets/market/items/brawling-body-high.png',
+  'BRAWLING-BODY-SUPERHUMAN': '/assets/market/items/brawling-body-superhuman.png',
+  SCOPE: '/assets/market/items/scope.png',
+  'SMARTGUN-LINK': '/assets/market/items/smartgun-link.png',
+  'EXTENDED-MAG': '/assets/market/items/extended-mag.png',
+  'DRUM-MAG': '/assets/market/items/drum-mag.png',
+  'UNDERBARREL-SHOTGUN': '/assets/market/items/underbarrel-shotgun.png',
+  'UNDERBARREL-GL': '/assets/market/items/underbarrel-gl.png',
+  'AMMO-M-PISTOL': '/assets/market/items/ammo-m-pistol.png',
+  'AMMO-H-PISTOL': '/assets/market/items/ammo-h-pistol.png',
+  'AMMO-VH-PISTOL': '/assets/market/items/ammo-vh-pistol.png',
+  'AMMO-RIFLE': '/assets/market/items/ammo-rifle.png',
+  'AMMO-SLUG': '/assets/market/items/ammo-slug.png',
+  'AMMO-SHELL': '/assets/market/items/ammo-shell.png',
+  'AMMO-ARROW': '/assets/market/items/ammo-arrow.png',
+  'AMMO-GRENADE': '/assets/market/items/ammo-grenade.png',
+  'AMMO-ROCKET': '/assets/market/items/ammo-rocket.png',
+  'THERMAL-DAGGER': '/assets/market/items/thermal-dagger.png',
+  'NATS-LONG-BARRELED-PISTOL': '/assets/market/items/nats-long-barreled-pistol.png',
+  'E-TACK-RAPID-RESPONDER': '/assets/market/items/e-tack-rapid-responder.png',
+  'STUN-BAYONET': '/assets/market/items/stun-bayonet.png',
+  'SMART-GLOVE': '/assets/market/items/smart-glove.png',
+  'HIGH-DENSITY-SHIELD': '/assets/market/items/high-density-shield.png',
+  'LIGHT-METALGEAR': '/assets/market/items/light-metalgear.png',
+  LEATHERS: '/assets/market/items/leathers.png',
+  KEVLAR: '/assets/market/items/kevlar.png',
+  'LIGHT-ARMORJACK': '/assets/market/items/light-armorjack.png',
+  'BODYWEIGHT-SUIT': '/assets/market/items/bodyweight-suit.png',
+  'MEDIUM-ARMORJACK': '/assets/market/items/medium-armorjack.png',
+  'HEAVY-ARMORJACK': '/assets/market/items/heavy-armorjack.png',
+  FLAK: '/assets/market/items/flak.png',
+  METALGEAR: '/assets/market/items/metalgear.png',
+  'BULLETPROOF-SHIELD': '/assets/market/items/bulletproof-shield.png',
+  'SMART-EARS': '/assets/market/items/smart-ears.png',
+  'CYBER-COND-INTEGRATED': '/assets/market/items/cyber-cond-integrated.png',
+  'AMMO-BIOTOXIN': '/assets/market/items/ammo-biotoxin.png',
+  'AMMO-POISON': '/assets/market/items/ammo-poison.png',
+  'AMMO-TEARGAS': '/assets/market/items/ammo-teargas.png',
+  'TOX-BELLADONNA': '/assets/market/items/tox-belladonna.png',
+  'TOX-TOXIC-WASTE': '/assets/market/items/tox-toxic-waste.png',
+  'TOX-ARSENIC': '/assets/market/items/tox-arsenic.png',
+  'TOX-BIOTOXIN': '/assets/market/items/tox-biotoxin.png',
+  'TOX-DESIGNER-POISON': '/assets/market/items/tox-designer-poison.png',
+  'TOX-STONEFISH': '/assets/market/items/tox-stonefish.png',
+  'TOX-ALCOHOL': '/assets/market/items/tox-alcohol.png',
+  'TOX-PENTOTHAL': '/assets/market/items/tox-pentothal.png',
+  'TOX-DESIGNER-DRUG': '/assets/market/items/tox-designer-drug.png',
+};
 
 const BODY_REGION_LABELS = {
   skull: 'CABECA',
@@ -190,6 +391,24 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const useEnabled = isWeapon || !depleted;
     const isMelee = isWeapon && !!(deps.isMeleeWeapon && deps.isMeleeWeapon(g));
     const knowsReach = !!(g.melee || String(g.skill || '').trim());
+    const isAttachment = String(g.kind || '').toLowerCase() === 'weaponattachment';
+    const isShield = Number(g.maxHp ?? g.shieldHp) > 0;
+    const shieldMaxHp = isShield ? Number(g.maxHp ?? g.shieldHp) : 0;
+    const shieldCurrentHp = isShield ? Number(g.shieldHp ?? shieldMaxHp) : 0;
+    const installedAttachmentCodes = Array.isArray(g.installedAttachments) ? g.installedAttachments : [];
+    const attachmentHosts = isAttachment && g.qty > 0
+      ? carriedGear.filter(candidate => deps.hasDamageProfile(candidate)).map(weapon => {
+        const validation = validateAttachmentInstallation(weapon, g);
+        return {
+          id: weapon.id,
+          name: weapon.name,
+          enabled: validation.ok,
+          reason: validation.reason || '',
+          style: validation.ok ? 'lm-enh-link-btn' : 'lm-enh-link-btn lm-use-btn--off',
+          install: () => validation.ok && deps.installWeaponAttachment(g.id, weapon.id),
+        };
+      })
+      : [];
     return {
       ...g,
       dmg: isWeapon ? deps.gearDamageText(g) : '—',
@@ -214,6 +433,40 @@ export function desktopRenderVals(state = {}, deps = {}) {
       hasModes: Array.isArray(g.modes) && g.modes.length > 0,
       modesLabel: Array.isArray(g.modes) ? g.modes.join(' / ') : '',
       hasSpecial: !!g.special,
+      isAttachment,
+      isShield,
+      shieldHpLabel: isShield ? shieldCurrentHp + '/' + shieldMaxHp + ' HP' : '',
+      shieldBroken: isShield && shieldCurrentHp <= 0,
+      shieldDropped: isShield && g.shieldLocation === 'dropped',
+      shieldPopupLabel: isShield ? (g.cannotBeInstalledInPopupShield ? 'POPUP INCOMPATIVEL' : 'POPUP COMPATIVEL') : '',
+      dropShield: () => deps.dropInventoryShield(g.id),
+      repairShield: () => deps.repairInventoryShield(g.id),
+      hasAttachmentHosts: attachmentHosts.length > 0,
+      attachmentHosts,
+      hasInstalledAttachments: installedAttachmentCodes.length > 0,
+      installedAttachmentRows: installedAttachmentCodes.map(code => {
+        const item = deps.products.find(product => product.code === code) || { code, name: code, kind: 'weaponAttachment' };
+        const sourceWithoutAttachment = removeAttachment(g, code);
+        const transferHosts = carriedGear.filter(candidate => candidate.id !== g.id && deps.hasDamageProfile(candidate)).map(candidate => {
+          const validation = validateAttachmentInstallation(candidate, item);
+          return {
+            name: candidate.name,
+            enabled: validation.ok,
+            reason: validation.reason || '',
+            style: validation.ok ? 'lm-enh-link-btn' : 'lm-enh-link-btn lm-use-btn--off',
+            transfer: () => validation.ok && deps.transferWeaponAttachment(g.id, candidate.id, code),
+          };
+        });
+        return {
+          code,
+          name: item.name || code,
+          remove: () => deps.removeWeaponAttachment(g.id, code),
+          transferHosts,
+          hasTransferHosts: transferHosts.length > 0,
+          sourceSlotsAfterRemoval: occupiedWeaponAttachmentSlots(sourceWithoutAttachment),
+        };
+      }),
+      attachmentSlotsLabel: isWeapon ? occupiedWeaponAttachmentSlots(g) + '/' + weaponAttachmentMaxSlots(g) : '',
       qtyLabel: String(g.qty),
       useLabel: g.lastUsedAt ? 'USADO' : isWeapon ? 'DANO' : 'READY',
       useActionLabel: isWeapon ? tx.roll : 'USAR',
@@ -226,11 +479,50 @@ export function desktopRenderVals(state = {}, deps = {}) {
       useStyle: 'lm-use-btn' + (useEnabled ? ' lm-use-btn--on' : ' lm-use-btn--off'),
       equipLabel: g.equipped ? 'GUARDAR' : 'EQUIPAR',
       equipStyle: 'lm-equip-btn' + (g.equipped ? ' lm-equip-btn--on' : ' lm-equip-btn--off'),
+      // A full armor set covers head and body, but a player may want the vest
+      // without the helmet, so each covered location gets its own control.
+      isWornArmor: !!g.armorProfile,
+      armorSpLabel: g.armorProfile ? String(Math.max(g.armorProfile.headSp, g.armorProfile.bodySp)) : '',
+      armorPenaltyLabel: g.armorProfile && g.armorProfile.penalty ? '-' + g.armorProfile.penalty + ' REF/DEX/MOVE' : '',
+      hasArmorPenalty: !!(g.armorProfile && g.armorProfile.penalty),
+      armorAblatedLabel: g.spAblated ? '-' + g.spAblated + ' SP' : '',
+      hasArmorAblation: !!g.spAblated,
+      armorSlots: (g.armorProfile ? g.armorProfile.covers : []).map(loc => {
+        const on = (g.wornAt || []).includes(loc);
+        return {
+          location: loc,
+          label: (loc === 'head' ? 'CABECA' : 'CORPO') + ' ' + (loc === 'head' ? g.armorProfile.headSp : g.armorProfile.bodySp),
+          on,
+          style: 'lm-equip-btn' + (on ? ' lm-equip-btn--on' : ' lm-equip-btn--off'),
+          toggle: () => deps.toggleInventoryEquip(g.id, [loc]),
+        };
+      }),
       use: () => deps.useInventoryGear(g.id),
       toggleEquip: () => deps.toggleInventoryEquip(g.id),
       remove: () => deps.deleteInventoryGear(g.id),
     };
   });
+  // What is actually worn, straight from the inventory, so the panel can never
+  // disagree with the rows above it.
+  const wornArmorRows = wornArmorSummary(
+    { ...activeCharacter, gear: allGear },
+    (entry) => entry,
+    // The sheet's own aggregate, so this panel and the SP beside it cannot
+    // disagree: it already folds in both combat ablation and hand-applied
+    // ablation conditions.
+    derived.spAblation,
+  ).map(row => ({
+    ...row,
+    locationLabel: row.location === 'head' ? 'CABECA' : 'CORPO',
+    nameLabel: row.empty ? '— SEM ARMADURA —' : row.name,
+    spLabel: row.empty ? '—' : row.currentSp + '/' + row.maxSp,
+    spColor: row.empty ? '#3a3f33' : row.ablated ? '#c0635b' : '#3fe0d0',
+    penaltyLabel: row.penalty ? '-' + row.penalty : '—',
+    canRepair: row.ablated > 0,
+    repairOne: () => deps.repairInventoryArmor(row.location, 1),
+    repairAll: () => deps.repairInventoryArmor(row.location, null),
+  }));
+  const wornArmorAny = wornArmorRows.some(row => !row.empty);
   const activeIp = deps.asNumber(activeCharacter.ip, 0, 0, 999999);
   const currentRank = deps.asNumber(activeCharacter.roleAbilityRank, 4, 1, 10);
   const characterDetailVitals = [
@@ -280,10 +572,14 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const skillBonus = deps.effectMap(p.skillBonus);
     Object.keys(statMod).forEach(k => chips.push('+' + statMod[k] + ' ' + k));
     Object.keys(skillBonus).forEach(k => chips.push('+' + skillBonus[k] + ' ' + k));
-    if (p.armor) chips.push('+' + p.armor + ' ARMOR');
+    const cardSp = armorSp(p);
+    if (cardSp) chips.push('+' + cardSp + ' ' + tx.sp);
     if (p.ram) chips.push('+' + p.ram + ' RAM');
     const profile = deps.weaponProfile(p);
-    const isWeaponProduct = p.kind === 'weapon' || p.kind === 'cyberweapon';
+    const isWeaponProduct = hasWeaponStatBlock(p);
+    const cardMode = acquisitionMode(p);
+    const packSize = purchaseQuantity(p);
+    if (packSize > 1) chips.push(packSize + 'x ' + tx.perPack);
     if (isWeaponProduct && profile.dmg) chips.push(tx.dmg + ' ' + profile.dmg);
     if (isWeaponProduct && profile.skill) chips.push(tx.skill + ' ' + profile.skill);
     if (isWeaponProduct && profile.rof) chips.push(tx.rof + ' ' + profile.rof);
@@ -291,7 +587,9 @@ export function desktopRenderVals(state = {}, deps = {}) {
     if (isWeaponProduct && profile.concealable) chips.push(tx.concealable);
     if (isWeaponProduct && deps.ignoresHalfSpBadge(profile)) chips.push(tx.halfSp);
     const fx = marketFx(pageStartIndex + i);
-    return { ...p, ...fx, num: String(pageStartIndex + i + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), soldout: p.stock === 'SOLD OUT', owned: p.kind === 'weapon' || p.kind === 'trauma-plan' ? false : S.owned.includes(p.code), bonusChips: chips, hasHumanityCost: p.kind !== 'weapon' && p.kind !== 'trauma-plan', hcostLabel: p.hcostNote || ('-' + (p.hcost || 0)), hasImage: !!p.imageUrl, noImage: !p.imageUrl, open: () => deps.setState({ selected: p }) };
+    const imageUrl = MARKET_ITEM_IMAGE_URLS[p.code] || p.imageUrl || '';
+    const marketProduct = { ...p, imageUrl };
+    return { ...marketProduct, ...fx, num: String(pageStartIndex + i + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), soldout: p.stock === 'SOLD OUT', owned: cardMode === 'install' && S.owned.includes(p.code), bonusChips: chips, hasHumanityCost: cardMode === 'install', hcostLabel: p.hcostNote || ('-' + (p.hcost || 0)), hasImage: !!imageUrl, noImage: !imageUrl, open: () => deps.setState({ selected: marketProduct }) };
   });
   const cats = ['ALL', ...Array.from(new Set(shelf.map(p => p.cat || p.category).filter(Boolean)))];
   const chips = cats.map(c => ({ label: c, count: c === 'ALL' ? shelf.length : shelf.filter(p => p.cat === c).length, onClick: () => deps.setState({ marketCat: c, marketPage: 1 }), style: deps.chipStyle(S.marketCat === c) }));
@@ -315,7 +613,12 @@ export function desktopRenderVals(state = {}, deps = {}) {
     const p = S.selected;
     const eqp = deps.normalizeEquipped(S.equipped).find(it => it.code === p.code);
     const profile = deps.weaponProfile(p);
-    const isWeaponProduct = p.kind === 'weapon' || p.kind === 'cyberweapon';
+    const isWeaponProduct = hasWeaponStatBlock(p);
+    // What kind of transaction this is decides the button, the comparison
+    // table, and whether the install engine is consulted at all. Merchandise
+    // has no slots to fill and no Humanity to spend.
+    const mode = acquisitionMode(p);
+    const packSize = purchaseQuantity(p);
     const idx = all.findIndex(x => x.code === p.code);
     const cmp = [];
     if (isWeaponProduct) {
@@ -333,6 +636,22 @@ export function desktopRenderVals(state = {}, deps = {}) {
       if (profile.modes.length) cmp.push({ label: 'MODES', from: 'REF', to: profile.modes.join(' / '), arrow: '—', diffTxt: '', color: '#d6aa4e' });
       if (profile.special) cmp.push({ label: 'SPECIAL', from: 'REF', to: profile.special, arrow: '—', diffTxt: '', color: '#d6aa4e' });
       if (p.kind === 'cyberweapon') cmp.push({ label: 'HUMANITY COST', from: eqp ? '-' + (eqp.hcost || 0) : '0', to: p.hcostNote || ('-' + (p.hcost || 0)), arrow: '—', diffTxt: '', color: p.hcostNote ? '#c0635b' : '#d6aa4e' });
+    } else if (mode === 'carry') {
+      // Merchandise is not replacing anything already bolted to the body, so
+      // there is no "before" column to diff against — the sheet just gains an
+      // item. Show what the thing is, not what it would change.
+      const row = (label, value) => cmp.push({ label, from: 'REF', to: value, arrow: '—', diffTxt: '', color: '#d6aa4e' });
+      const sp = armorSp(p);
+      if (sp) {
+        row(tx.sp, String(sp));
+        const pen = armorPenaltyOf(p);
+        row(tx.armorPenalty, pen ? ['REF', 'DEX', 'MOVE'].map(k => k + ' ' + pen[k]).join(' / ') : tx.noPenalty);
+      }
+      if (packSize > 1) row(tx.perPack, String(packSize));
+      Object.entries(deps.effectMap(p.statMod)).forEach(([k, v]) => v && row(k, '+' + v));
+      Object.entries(deps.effectMap(p.skillBonus)).forEach(([k, v]) => v && row(k, '+' + v));
+      if (p.ram) row('RAM', '+' + p.ram);
+      (Array.isArray(p.specialRules) ? p.specialRules : []).forEach(rule => row('SPECIAL', String(rule)));
     } else {
       CPRED_STAT_ORDER.forEach(k => {
         const from = (eqp && eqp.statMod && eqp.statMod[k]) || 0;
@@ -345,7 +664,7 @@ export function desktopRenderVals(state = {}, deps = {}) {
         const to = (p.skillBonus && p.skillBonus[k]) || 0;
         if (from || to) { const d = to - from; cmp.push({ label: k, from: '+' + from, to: '+' + to, diff: d, arrow: d > 0 ? '▲' : d < 0 ? '▼' : '—', diffTxt: d === 0 ? '' : (d > 0 ? '+' + d : '' + d), color: d > 0 ? '#3fe0d0' : d < 0 ? '#c0635b' : '#8b8a78' }); }
       });
-      const fa = (eqp && eqp.armor) || 0, ta = p.armor || 0;
+      const fa = armorSp(eqp), ta = armorSp(p);
       if (fa || ta) { const d = ta - fa; cmp.push({ label: 'ARMOR', from: '+' + fa, to: '+' + ta, arrow: d > 0 ? '▲' : d < 0 ? '▼' : '—', diffTxt: d === 0 ? '' : (d > 0 ? '+' + d : '' + d), color: d > 0 ? '#3fe0d0' : d < 0 ? '#c0635b' : '#8b8a78' }); }
       const fr = (eqp && eqp.ram) || 0, tr = p.ram || 0;
       if (fr || tr) { const d = tr - fr; cmp.push({ label: 'RAM', from: '+' + fr, to: '+' + tr, arrow: d > 0 ? '▲' : d < 0 ? '▼' : '—', diffTxt: d === 0 ? '' : (d > 0 ? '+' + d : '' + d), color: d > 0 ? '#3fe0d0' : d < 0 ? '#c0635b' : '#8b8a78' }); }
@@ -357,19 +676,23 @@ export function desktopRenderVals(state = {}, deps = {}) {
 
     const after = S.credits - p.price;
     const canAfford = after >= 0 && p.stock !== 'SOLD OUT';
-    const isTraumaPlanProduct = p.kind === 'trauma-plan';
+    const isTraumaPlanProduct = mode === 'plan';
     const isCurrentTraumaPlan = isTraumaPlanProduct && deps.traumaPlanKey(activeCharacter) === p.planKey;
-    const isEquipped = p.kind === 'weapon' ? false : isTraumaPlanProduct ? isCurrentTraumaPlan : eqp && eqp.code === p.code;
+    // Only chrome can be "already installed". A crate of rounds bought last
+    // week must not stop the next crate from being bought.
+    const isEquipped = isTraumaPlanProduct ? isCurrentTraumaPlan : mode === 'install' && !!eqp && eqp.code === p.code;
     // Prerequisites are checked BEFORE the click, not after: a shop that only
     // says "nao pode ser instalado" once the money is gone teaches nothing.
     // Only real cyberware goes through the install engine — carried gear and
     // Trauma Team plans have no slots or requirements to fail.
-    const goesThroughInstallEngine = !isTraumaPlanProduct && p.kind !== 'weapon';
+    const goesThroughInstallEngine = mode === 'install';
     const requirementBlock = (goesThroughInstallEngine && !isEquipped && canAfford && deps.previewInstall)
       ? deps.previewInstall(p)
       : null;
     const requirementBlocked = !!(requirementBlock && !requirementBlock.ok && requirementBlock.reason === 'requirements');
 
+    // "Saldo apos instalar" is wrong for a box of shells nobody installs.
+    const balanceLabel = mode === 'install' ? tx.balanceAfterInstall : tx.balanceAfterPurchase;
     let buyLabel, buyBg, balLabel, balColor;
     let blockLabel = '', blockMessage = '';
     if (isEquipped) {
@@ -382,17 +705,17 @@ export function desktopRenderVals(state = {}, deps = {}) {
       buyLabel = tx.insufficient + ' ₢'; buyBg = '#3a3f33'; balLabel = tx.shortBy + ' ' + deps.fmt(Math.abs(after)); balColor = '#c0635b';
       blockLabel = tx.insufficient; blockMessage = tx.shortBy + ' ' + deps.fmt(Math.abs(after)) + '.';
     } else if (requirementBlocked) {
-      buyLabel = tx.requirementPending; buyBg = '#3a3f33'; balLabel = tx.balanceAfterInstall + ' ' + deps.fmt(after); balColor = '#6f7a64';
+      buyLabel = tx.requirementPending; buyBg = '#3a3f33'; balLabel = balanceLabel + ' ' + deps.fmt(after); balColor = '#6f7a64';
       blockLabel = tx.blockedRequirement; blockMessage = requirementBlock.message;
     } else {
-      buyLabel = (isTraumaPlanProduct ? (S.lang === 'pt' ? 'ATIVAR PLANO' : 'ACTIVATE PLAN') : p.kind === 'weapon' ? tx.addToGear : tx.install) + ' →'; buyBg = '#d6aa4e'; balLabel = tx.balanceAfterInstall + ' ' + deps.fmt(after); balColor = '#6f7a64';
+      buyLabel = (isTraumaPlanProduct ? (S.lang === 'pt' ? 'ATIVAR PLANO' : 'ACTIVATE PLAN') : mode === 'carry' ? tx.addToGear : tx.install) + ' →'; buyBg = '#d6aa4e'; balLabel = balanceLabel + ' ' + deps.fmt(after); balColor = '#6f7a64';
     }
     const canInstall = !isEquipped && p.stock !== 'SOLD OUT' && canAfford && !requirementBlocked;
     const buyStyle = 'lm-market-buy-btn' + (canInstall ? ' lm-market-buy-btn--on' : ' lm-market-buy-btn--off');
 
     const selectedFx = marketFx(Math.max(0, idx));
     const traumaPlanStatusLabel = isCurrentTraumaPlan ? '— ACTIVE PLAN —' : '— NOT ACTIVE —';
-    selected = { ...p, ...selectedFx, num: String(idx + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), equippedName: p.kind === 'weapon' ? 'CARRIED GEAR' : isTraumaPlanProduct ? traumaPlanStatusLabel : eqp ? eqp.code + ' INSTALLED' : '— NOT INSTALLED —', cmp, buyLabel, buyStyle, balLabel, balColor, hasImage: !!p.imageUrl, noImage: !p.imageUrl, hasBlock: !!blockMessage, blockLabel, blockMessage, buy: () => deps.buy(p) };
+    selected = { ...p, ...selectedFx, num: String(idx + 1).padStart(2, '0'), priceLabel: deps.fmt(p.price), stockColor: stockColor(p.stock), equippedName: mode === 'carry' ? 'CARRIED GEAR' : isTraumaPlanProduct ? traumaPlanStatusLabel : eqp ? eqp.code + ' INSTALLED' : '— NOT INSTALLED —', cmp, buyLabel, buyStyle, balLabel, balColor, hasImage: !!p.imageUrl, noImage: !p.imageUrl, hasBlock: !!blockMessage, blockLabel, blockMessage, buy: () => deps.buy(p) };
   }
 
   // dice app (SYS.04)
@@ -489,6 +812,9 @@ export function desktopRenderVals(state = {}, deps = {}) {
     ram: { cur: ramUsed, max: ramMax, pct: deps.clampPct(ramMax ? ramUsed / ramMax * 100 : 0) },
     characterDetailVitals, characterDetailFlags, equippedGearSummary, hasEquippedGearSummary, noEquippedGearSummary,
     gear,
+    wornArmorRows,
+    wornArmorAny,
+    wornArmorNone: !wornArmorAny,
     inventoryFilters, inventoryTotal: allGear.length, inventoryEquippedTotal, inventoryWeaponTotal, noGear: gear.length === 0,
     inventoryBodyView,
     bodyMapView,
@@ -645,20 +971,124 @@ export function desktopHandlers(component) {
       code: p.code,
       name: p.name || p.code,
       type: p.weaponClass || p.cat || 'WEAPON',
-      qty: 1,
+      qty: purchaseQuantity(p),
       equipped: false,
       rarity: LIMIAR_TIER_COLORS[p.tier] || p.rarity,
       notes: [p.example, p.special].filter(Boolean).join(' // '),
+      shieldHp: p.shieldHp ?? p.maxHp ?? null,
+      maxHp: p.maxHp ?? p.shieldHp ?? null,
+      shieldLocation: (Number(p.shieldHp ?? p.maxHp) > 0) ? 'carried' : undefined,
+      cannotBeInstalledInPopupShield: !!p.cannotBeInstalledInPopupShield,
     }, 0);
   }
 
-  function toggleInventoryEquip(id) {
+  // Worn armor is not a boolean. Putting a vest on has to reach the sheet:
+  // SP into `character.armor`, the REF/DEX/MOVE tax with it, and the piece's
+  // own accumulated ablation into `character.spDamage` for that location.
+  // Everything that is not wearable armor keeps the plain toggle.
+  function toggleInventoryEquip(id, locations) {
     if (!component.ensureGm('Login do mestre necessario para alterar inventario')) return;
-    const gear = component.normalizeGearList(component.activeCharacter().gear || component.gearList).map(item => (
-      item.id === id ? { ...item, equipped: !item.equipped } : item
-    ));
-    const changed = gear.find(item => item.id === id);
-    updateInventoryGear(gear, changed ? changed.name + (changed.equipped ? ' equipado' : ' guardado') : 'Inventario atualizado');
+    const gear = component.normalizeGearList(component.activeCharacter().gear || component.gearList);
+    const row = gear.find(item => item.id === id);
+    if (row && Number(row.maxHp ?? row.shieldHp) > 0) {
+      if (row.equipped) return component.sheetHandlers().removeShield();
+      return component.sheetHandlers().equipShield(row.id);
+    }
+    if (row && row.armorProfile) return toggleWornArmor(row, locations);
+    const next = gear.map(item => (item.id === id ? { ...item, equipped: !item.equipped } : item));
+    const changed = next.find(item => item.id === id);
+    updateInventoryGear(next, changed ? changed.name + (changed.equipped ? ' equipado' : ' guardado') : 'Inventario atualizado');
+  }
+
+  function dropInventoryShield(id) {
+    if (!component.ensureGm('Login do mestre necessario para soltar escudo')) return;
+    const active = component.activeCharacter();
+    const current = component.normalizeGearList(active.gear || component.gearList);
+    const row = current.find(item => item.id === id && Number(item.maxHp ?? item.shieldHp) > 0);
+    if (!row) return;
+    const shield = component.normalizeShield(active.shield);
+    const isActive = !!shield && (shield.itemId === row.id || shield.itemId === row.code);
+    const gear = current.map(item => item.id === id
+      ? { ...item, equipped: false, shieldLocation: 'dropped', shieldHp: isActive ? shield.hp : item.shieldHp }
+      : item);
+    component.updateActiveCharacter({ gear, ...(isActive ? { shield: null } : {}) });
+    component.flash(row.name + ' SOLTO :: BRACO LIVRE');
+  }
+
+  function repairInventoryShield(id) {
+    if (!component.ensureGm('Login do mestre necessario para reparar escudo')) return;
+    const active = component.activeCharacter();
+    const current = component.normalizeGearList(active.gear || component.gearList);
+    const row = current.find(item => item.id === id && Number(item.maxHp ?? item.shieldHp) > 0);
+    if (!row) return;
+    const maxHp = component.asNumber(row.maxHp ?? row.shieldHp, 0, 0, 999);
+    const gear = current.map(item => item.id === id ? { ...item, shieldHp: maxHp } : item);
+    const shield = component.normalizeShield(active.shield);
+    const patch = shield && (shield.itemId === row.id || shield.itemId === row.code)
+      ? { gear, shield: { ...shield, hp: maxHp, maxHp } }
+      : { gear };
+    component.updateActiveCharacter(patch);
+    component.flash(row.name + ' REPARADO :: ' + maxHp + '/' + maxHp + ' HP');
+  }
+
+  function applyArmorPatch(result, message) {
+    if (!result.ok) return component.flash(result.message || 'Nao foi possivel equipar');
+    component.updateActiveCharacter({
+      gear: component.normalizeGearList(result.patch.gear),
+      armor: result.patch.armor,
+      spDamage: result.patch.spDamage,
+    });
+    if (message) component.flash(message);
+  }
+
+  function toggleWornArmor(row, locations) {
+    const active = component.activeCharacter();
+    const character = { ...active, gear: component.normalizeGearList(active.gear || component.gearList) };
+    const resolveItem = (entry) => component.gearCatalogSource(entry);
+    const worn = Array.isArray(row.wornAt) ? row.wornAt : [];
+    const target = locations && locations.length ? locations : null;
+
+    // Changing armor is free between fights and expensive inside one. The cost
+    // rides on the toast rather than blocking the change: it is the GM's call
+    // whether the table spends it, and a shop that silently refuses teaches
+    // nothing.
+    const inCombat = !!(component.state.combatState && component.state.combatState.active);
+    const costNote = (result) => (inCombat && result.timeCost ? ' [combate: ' + result.timeCost.label + ']' : '');
+
+    if (worn.length && (!target || target.every(loc => worn.includes(loc)))) {
+      const off = unequipWornArmor({ character, locations: target || worn, resolveItem });
+      return applyArmorPatch(off, off.ok ? row.name + ' guardado' + costNote(off) : undefined);
+    }
+    const on = equipWornArmor({ character, itemId: row.id, locations: target, resolveItem });
+    if (!on.ok) return applyArmorPatch(on);
+    const swapped = (on.replaced || []).map(r => r.name).filter(Boolean);
+    const where = (on.locations || []).map(loc => (loc === 'head' ? 'cabeca' : 'corpo')).join(' e ');
+    return applyArmorPatch(on, row.name + ' equipado (' + where + ')' + (swapped.length ? ' — ' + swapped.join(', ') + ' removido' : '') + costNote(on));
+  }
+
+  // CPR RAW p.99: a Tech patches Stopping Power back one point at a time.
+  // `amount` omitted restores the piece to full.
+  function repairInventoryArmor(location, amount) {
+    if (!component.ensureGm('Login do mestre necessario para alterar inventario')) return;
+    const active = component.activeCharacter();
+    const character = { ...active, gear: component.normalizeGearList(active.gear || component.gearList) };
+    const result = repairWornArmor({
+      character,
+      location,
+      amount,
+      resolveItem: (entry) => component.gearCatalogSource(entry),
+    });
+    const label = location === 'head' ? 'cabeca' : 'corpo';
+    if (!result.ok) {
+      // The panel counts two kinds of lost SP but a Tech can only patch one.
+      // Ablation coming from an active condition leaves when the condition
+      // does, so say that instead of "nothing to repair" next to a damaged bar.
+      const fromCondition = (active.statusEffects || []).some(s => s && s.modifiers && s.modifiers.spAblation && Number(s.modifiers.spAblation[location]) > 0);
+      return component.flash(fromCondition
+        ? 'SP de ' + label + ' esta reduzido por uma condicao ativa: remova a condicao'
+        : (result.message || 'Nada a reparar'));
+    }
+    applyArmorPatch(result, 'SP de ' + label + ' reparado');
   }
 
   function deleteInventoryGear(id) {
@@ -666,6 +1096,50 @@ export function desktopHandlers(component) {
     const current = component.normalizeGearList(component.activeCharacter().gear || component.gearList);
     const removed = current.find(item => item.id === id);
     updateInventoryGear(current.filter(item => item.id !== id), removed ? removed.name + ' excluido' : 'Item excluido');
+  }
+
+  function installWeaponAttachment(attachmentId, weaponId) {
+    if (!component.ensureGm('Login do mestre necessario para instalar acessorios')) return;
+    const gear = component.normalizeGearList(component.activeCharacter().gear || component.gearList);
+    const attachment = gear.find(item => item.id === attachmentId);
+    const weapon = gear.find(item => item.id === weaponId);
+    if (!attachment || !weapon || attachment.qty < 1) return component.flash('Acessorio ou arma hospedeira indisponivel');
+    const result = installAttachment(weapon, attachment);
+    if (!result.ok) return component.flash(result.reason || 'Instalacao incompativel');
+    const next = gear.map(item => {
+      if (item.id === weaponId) return result.weapon;
+      if (item.id === attachmentId) return { ...item, qty: Math.max(0, item.qty - 1) };
+      return item;
+    });
+    updateInventoryGear(next, attachment.name + ' instalado em ' + weapon.name);
+  }
+
+  function removeWeaponAttachment(weaponId, attachmentCode) {
+    if (!component.ensureGm('Login do mestre necessario para remover acessorios')) return;
+    const gear = component.normalizeGearList(component.activeCharacter().gear || component.gearList);
+    const weapon = gear.find(item => item.id === weaponId);
+    if (!weapon || !(weapon.installedAttachments || []).includes(attachmentCode)) return;
+    const loose = gear.find(item => item.code === attachmentCode && item.id !== weaponId);
+    const catalog = component.productByCode(attachmentCode) || { code: attachmentCode, name: attachmentCode, kind: 'weaponAttachment' };
+    let next = gear.map(item => item.id === weaponId ? removeAttachment(item, attachmentCode) : item);
+    if (loose) next = next.map(item => item.id === loose.id ? { ...item, qty: item.qty + 1 } : item);
+    else next.push(gearFromProduct(catalog));
+    updateInventoryGear(next, (catalog.name || attachmentCode) + ' removido de ' + weapon.name);
+  }
+
+  function transferWeaponAttachment(sourceWeaponId, targetWeaponId, attachmentCode) {
+    if (!component.ensureGm('Login do mestre necessario para transferir acessorios')) return;
+    const gear = component.normalizeGearList(component.activeCharacter().gear || component.gearList);
+    const source = gear.find(item => item.id === sourceWeaponId);
+    const target = gear.find(item => item.id === targetWeaponId);
+    const attachment = component.productByCode(attachmentCode) || { code: attachmentCode, name: attachmentCode, kind: 'weaponAttachment' };
+    if (!source || !target || !(source.installedAttachments || []).includes(attachmentCode)) return;
+    const installed = installAttachment(target, attachment);
+    if (!installed.ok) return component.flash(installed.reason || 'Transferencia incompativel');
+    const next = gear.map(item => item.id === sourceWeaponId
+      ? removeAttachment(item, attachmentCode)
+      : item.id === targetWeaponId ? installed.weapon : item);
+    updateInventoryGear(next, (attachment.name || attachmentCode) + ' transferido para ' + target.name);
   }
 
   function useInventoryGear(id) {
@@ -693,14 +1167,17 @@ export function desktopHandlers(component) {
   function buy(p) {
     // Trauma Team plans are self-service — the player is buying their own
     // coverage tier, unlike gear/cyberware purchases which the GM approves.
-    const isTraumaPlan = p.kind === 'trauma-plan';
+    const mode = acquisitionMode(p);
+    const isTraumaPlan = mode === 'plan';
     if (!isTraumaPlan && !component.ensureGm('Login do mestre necessario para alterar inventario')) return;
     if (component.state.credits < p.price || p.stock === 'SOLD OUT') return;
-    if (!isTraumaPlan && p.kind !== 'weapon' && component.normalizeEquipped(component.state.equipped).some(it => it.code === p.code)) return;
+    // Only chrome is one-per-body. Merchandise restocks: refusing the second
+    // box of rounds because the first one is on the sheet is not a rule.
+    if (mode === 'install' && component.normalizeEquipped(component.state.equipped).some(it => it.code === p.code)) return;
     clearTimeout(component._tt);
     component._charactersTouched = true;
 
-    if (!isTraumaPlan && p.kind !== 'weapon') {
+    if (mode === 'install') {
       const active = component.activeCharacter();
       const result = component.app().installCyberware.execute({
         character: active,
@@ -731,9 +1208,16 @@ export function desktopHandlers(component) {
         nextCharacter = { ...active, traumaPlan: p.planKey, credits };
         toast = 'TRAUMA TEAM :: ' + (p.name || p.planKey).toUpperCase() + ' ACTIVATED';
       } else {
-        const gear = [...component.normalizeGearList(active.gear || s.gearItems), gearFromProduct(p)];
+        // Buying a second pack of the same rounds should deepen the stack, not
+        // add a second line reading "1x Rifle Ammunition" beside the first.
+        const current = component.normalizeGearList(active.gear || s.gearItems);
+        const qty = purchaseQuantity(p);
+        const stackIndex = current.findIndex(it => it.code && it.code === p.code);
+        const gear = stackIndex >= 0
+          ? current.map((it, i) => (i === stackIndex ? { ...it, qty: (Number(it.qty) || 0) + qty } : it))
+          : [...current, gearFromProduct(p)];
         nextCharacter = { ...active, gear, credits };
-        toast = p.code + ' ADDED TO GEAR';
+        toast = p.code + ' ADDED TO GEAR' + (qty > 1 ? ' (x' + qty + ')' : '');
       }
       if (component.api()) component.api().characters.upsert(nextCharacter);
       return {
@@ -876,8 +1360,14 @@ export function desktopHandlers(component) {
     addInventoryGear,
     gearFromProduct,
     toggleInventoryEquip,
+    dropInventoryShield,
+    repairInventoryShield,
+    repairInventoryArmor,
     deleteInventoryGear,
     useInventoryGear,
+    installWeaponAttachment,
+    removeWeaponAttachment,
+    transferWeaponAttachment,
     buy,
     onGmCharacterImageUpload,
     onGmItemImageUpload,

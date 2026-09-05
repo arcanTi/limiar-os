@@ -7,6 +7,7 @@ import './styles/main.css';
 void import('../games/nexus/index.js');
 import { createLimiarAPI, LimiarStore } from './infrastructure/store.ts';
 import { downloadBytes } from './infrastructure/download.ts';
+import { readViewPrefs, writeViewPrefs } from './infrastructure/viewPrefs.ts';
 import { mountComponent } from './framework/index.js';
 import Component from './ui/Component.js';
 import { mountCampaignsOverlay } from './ui/views/campaigns.js';
@@ -27,6 +28,9 @@ mountComponent(Component, {
   app,
   store: LimiarStore,
   downloadFile: downloadBytes,
+  // Local layout preferences reach the UI through the composition root;
+  // the component itself never touches storage.
+  viewPrefs: { read: () => readViewPrefs(), write: (patch) => writeViewPrefs(patch) },
   activeCampaignId,
 });
 

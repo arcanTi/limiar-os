@@ -31,6 +31,13 @@ import {
   cpredStatMax as charCpredStatMax,
   applyHumanityRecovery as charApplyHumanityRecovery,
 } from '../domain/character/index.ts';
+import {
+  equipWornArmor,
+  repairWornArmor,
+  unequipWornArmor,
+  wornArmorProfile,
+  wornArmorSummary,
+} from '../domain/items/wornArmorEngine.ts';
 import { deriveStats as charDeriveStats } from '../domain/character/derivedStatsEngine.ts';
 import { buildCharacterSheetPdf, characterSheetFileName } from '../domain/character/characterSheetPdf.ts';
 import { normalizeBodyType as toxinNormalizeBodyType, toxinAmmunitionFor, toxinFromAmmunition } from '../domain/toxins/index.ts';
@@ -81,6 +88,7 @@ import {
   ignoresHalfSpBadge as itemsIgnoresHalfSpBadge,
   isMeleeWeapon as itemsIsMeleeWeapon,
 } from '../domain/items/weaponProfileEngine.ts';
+import { applyAttachmentEffects as itemsApplyAttachmentEffects } from '../domain/items/weaponAttachmentEngine.ts';
 import { LIMIAR_TRAUMA_PLANS, setTraumaPlans, traumaPlanKey as charTraumaPlanKey, traumaPlanByKey as charTraumaPlanByKey } from '../domain/character/traumaPlans.ts';
 import { isAdmin as authIsAdmin, isPlayerUser as authIsPlayerUser, canManageOwnSheet as authCanManageOwnSheet, canUploadImage as authCanUploadImage } from '../domain/auth/policies.ts';
 import {
@@ -93,6 +101,7 @@ import { setI18n, i18nTranslations } from './i18n.ts';
 import {
   damageProgramRez as netDamageProgramRez,
   deckProgramSummary as netDeckProgramSummary,
+  netrunningProgramById as netProgramById,
   normalizeInstalledPrograms as netNormalizeInstalledPrograms,
   repairProgramRez as netRepairProgramRez,
 } from '../domain/netrunning/index.ts';
@@ -112,6 +121,7 @@ import { mapHandlers, mapRenderVals } from './views/map.js';
 import { nexusHandlers, nexusRenderVals } from './views/nexus.js';
 import { tarotHandlers, tarotRenderVals } from './views/tarot.js';
 import { sheetHandlers, sheetRenderVals } from './views/sheet.js';
+import { normalizeCoreSections, toggleCoreSection } from './views/sheetSections.js';
 import { combatHandlers, combatRenderVals } from './views/combat.js';
 import { clearMapAttackIntent, loadMapAttackIntent, mapTokenVisibleNow } from '../domain/map/mapAttackIntent.ts';
 import { clearMapFocusIntent, loadMapFocusIntent } from '../domain/map/mapFocusIntent.ts';
@@ -238,6 +248,9 @@ class Component extends DCLogic {
     nexusChallenge: null,
     nexusResult: null,
     nexusTargetId: null,
+    // True while nexusChallenge came from this client's own NET test instead
+    // of the GM's published challenge (client-local, never persisted).
+    nexusLocalRun: false,
     mapSel: 0,
     mapImageUrl: '',
     toast: null,
@@ -254,6 +267,12 @@ class Component extends DCLogic {
     sheetCreating: false,
     sheetDraft: null,
     sheetTab: 'core',
+    // Which CORE blocks the GM has unfolded. Seeded from the browser so the
+    // choice survives a reload; players never read it (their sheet is always
+    // fully expanded).
+    sheetCoreSections: normalizeCoreSections(
+      (this.props.viewPrefs && this.props.viewPrefs.read().sheetCoreSections) || null,
+    ),
     hqIp: { ip: 0, log: [] },
     ipAward: { group: '', warrior: '', socializer: '', explorer: '', roleplayer: '' },
     ipOneRankPerSession: true,
@@ -271,6 +290,7 @@ class Component extends DCLogic {
     effectApply: { effectId: '', targetIds: [] },
     toxinDraft: null,
     toxinApply: { toxinId: '', targetIds: [], modifier: '' },
+    combatDosePending: null,
     userDraft: { username: '', role: 'player', email: '', inviteToCampaign: true },
     issuedAccessToken: null,
     gmStatus: 'Backend aguardando conexao',
@@ -527,8 +547,10 @@ class Component extends DCLogic {
         characters: normalizedCharacters,
         products: products || [],
         mapLocations: mapLocations || [],
-        nexusChallenge,
-        nexusResult,
+        // A player-launched NET test run lives only on this client, so a
+        // refresh must not replace it with the GM's (or a null) challenge.
+        nexusChallenge: this.state.nexusLocalRun ? this.state.nexusChallenge : nexusChallenge,
+        nexusResult: this.state.nexusLocalRun ? this.state.nexusResult : nexusResult,
         hqIp: this.normalizeHqIp(hqIp),
         tarotState,
         tarotDeck: tarotState.order,
@@ -618,8 +640,35 @@ class Component extends DCLogic {
   isMeleeWeapon(item) {
     return itemsIsMeleeWeapon(item);
   }
-  normalizeGearItem(item, idx = 0) {
+  /**
+   * An inventory row that only carries a catalog `code` has no damage profile
+   * of its own — the dice live in the item catalog. Merge the catalog entry
+   * underneath the saved row so the sheet, combat and the PDF export all read
+   * the same weapon, the way `installPayload` already does for cyberware.
+   *
+   * Saved rows carry placeholder zeros/blanks for every facet they never had
+   * (`count: 0`, `sides: 0`, `dmg: ''`), so those are dropped instead of being
+   * allowed to overwrite the catalog and erase the damage again.
+   */
+  gearCatalogSource(item) {
     const src = item || {};
+    const catalog = this.productByCode(src.code);
+    if (!catalog) return src;
+    const overrides = {};
+    for (const [key, value] of Object.entries(src)) {
+      if (value == null || value === '') continue;
+      if ((key === 'count' || key === 'sides') && !Number(value)) continue;
+      overrides[key] = value;
+    }
+    return { ...catalog, ...overrides };
+  }
+  normalizeGearItem(item, idx = 0) {
+    const raw = item || {};
+    const catalog = this.productByCode(raw.code);
+    const merged = this.gearCatalogSource(raw);
+    const src = Array.isArray(raw.installedAttachments)
+      ? itemsApplyAttachmentEffects(catalog || merged, merged)
+      : merged;
     const profile = this.weaponProfile(src);
     const name = String(src.name || src.code || 'Gear').trim() || 'Gear';
     const type = String(src.type || src.weaponClass || src.category || 'GEAR').trim().toUpperCase();
@@ -641,6 +690,20 @@ class Component extends DCLogic {
       // Poor-quality malfunction (CPR RAW): a natural 1 on the attack jams
       // the weapon; clearing it costs a full Action (combat.js unjamWeapon).
       jammed: !!src.jammed,
+      // Worn armor: which locations this piece covers right now and how much SP
+      // it has personally lost. Per-piece, because `character.spDamage` only
+      // knows head/body and cannot tell a battered vest from a spare one.
+      wornAt: Array.isArray(src.wornAt) ? src.wornAt.slice() : [],
+      spAblated: this.asNumber(src.spAblated, 0, 0, 99),
+      // Shield durability belongs to the purchased instance. Keep it through
+      // normalization so storing/dropping never silently restores or erases HP.
+      shieldHp: src.maxHp || src.shieldHp ? this.asNumber(src.shieldHp, src.maxHp, 0, 999) : null,
+      maxHp: src.maxHp || src.shieldHp ? this.asNumber(src.maxHp ?? src.shieldHp, 0, 0, 999) : null,
+      shieldLocation: src.shieldLocation || (src.equipped ? 'equipped' : 'carried'),
+      cannotBeInstalledInPopupShield: !!src.cannotBeInstalledInPopupShield,
+      armorProfile: wornArmorProfile(src),
+      installedAttachments: Array.isArray(src.installedAttachments) ? src.installedAttachments.slice() : [],
+      attachmentEffects: Array.isArray(src.attachmentEffects) ? src.attachmentEffects.map(effect => ({ ...effect })) : [],
     };
     normalized.dmg = src.dmg || this.gearDamageText(normalized);
     // Ammo tracking only applies to gear with a numeric magazine (catalog
@@ -653,7 +716,12 @@ class Component extends DCLogic {
     normalized.magazine = profile.mag ?? null;
     normalized.currentAmmo = normalized.magazine == null
       ? null
-      : (src.currentAmmo == null ? normalized.magazine : this.asNumber(src.currentAmmo, normalized.magazine, 0, normalized.magazine));
+      : (src.currentAmmo == null ? 0 : this.asNumber(src.currentAmmo, 0, 0, normalized.magazine));
+    // `toxinAmmoCode` was the old inventory-blind toggle. Reading it here
+    // migrates existing sheets into the one ammunition path; combat still
+    // requires a matching inventory stack before a bow can fire.
+    normalized.loadedAmmoCode = src.loadedAmmoCode || src.ammoCode || src.toxinAmmoCode || '';
+    normalized.loadedAmmoType = src.loadedAmmoType || src.ammoType || profile.ammoType || '';
     return normalized;
   }
   normalizeGearList(gear) {
@@ -915,10 +983,12 @@ class Component extends DCLogic {
           ? this.normalizeCharacter({ ...c, ...patches.get(c.id) })
           : c)),
       }));
-      patches.forEach((patch, id) => {
-        const next = (this.state.characters || []).find(c => c && c.id === id);
-        if (next && this.api()) this.api().characters.upsert({ ...next, ...patch });
-      });
+      if (opts.persist !== false) {
+        patches.forEach((patch, id) => {
+          const next = (this.state.characters || []).find(c => c && c.id === id);
+          if (next && this.api()) this.api().characters.upsert({ ...next, ...patch });
+        });
+      }
     }
     this.postChat({ kind: 'text', sender: 'SISTEMA', text: result.chatText });
     this.setState(s => ({ toxinApply: { ...(s.toxinApply || {}), targetIds: [] } }));
@@ -940,6 +1010,38 @@ class Component extends DCLogic {
       source: 'municao:' + ammo.code,
     });
   }
+  /**
+   * Sheet data the PDF cannot resolve on its own: chrome and cyberweapons are
+   * only whole once the item catalog is merged in, and installed programs are
+   * stored as bare ids. Resolving them here keeps the exporter a pure renderer.
+   */
+  characterSheetPdfExtras(character) {
+    const cyberware = this.installedCyberware(character);
+    return {
+      // Cyberweapons are gear the player fights with but never sees in the
+      // inventory list, so the exported EQUIPAMENTO table would lose them.
+      gear: [...(character.gear || []), ...this.installedCyberweaponGear(character)],
+      cyberware: cyberware.map(item => ({
+        name: item.name || item.code || '',
+        cat: item.cat || '',
+        marketCat: item.marketCat || '',
+        hcost: item.hcost,
+        location: item.location || '',
+        desc: item.desc || '',
+      })),
+      programs: netNormalizeInstalledPrograms(character.netPrograms).map(installed => {
+        const program = netProgramById(installed.id) || {};
+        return {
+          name: program.name || installed.id,
+          class: program.class || '',
+          rez: installed.rez,
+          maxRez: installed.maxRez,
+          state: installed.state,
+          effect: program.effect || '',
+        };
+      }),
+    };
+  }
   exportCharacterPdf(characterId) {
     const character = characterId ? this.characterById(characterId) : this.activeCharacter();
     if (!character || !character.id) {
@@ -948,7 +1050,7 @@ class Component extends DCLogic {
     }
     try {
       const bytes = buildCharacterSheetPdf({
-        character,
+        character: { ...character, ...this.characterSheetPdfExtras(character) },
         owner: (this.state.authUser && this.state.authUser.username) || character.ownerUsername || '',
         campaign: this.state.activeCampaignName || this.state.activeCampaignId || '',
         generatedAt: new Date().toLocaleString('pt-BR'),
@@ -1247,6 +1349,11 @@ class Component extends DCLogic {
 	  api() { return this.props.api || null; }
   app() { return this.props.app || null; }
   store() { return this.props.store || {}; }
+  toggleSheetCoreSection(key) {
+    const sheetCoreSections = toggleCoreSection(this.state.sheetCoreSections, key);
+    this.setState({ sheetCoreSections });
+    if (this.props.viewPrefs) this.props.viewPrefs.write({ sheetCoreSections });
+  }
   hqHandlers() {
     if (!this._hqHandlers) this._hqHandlers = hqHandlers(this);
     return this._hqHandlers;
@@ -1488,6 +1595,11 @@ class Component extends DCLogic {
     if (opts.dv != null) reusable.dv = opts.dv;
     if (opts.combatantId) reusable.combatantId = opts.combatantId;
     if (opts.initiative) reusable.initiative = true;
+    // A NET test carries the Interface Ability it was rolled for and the link
+    // it is rolled through; commitRoll turns the resolved check into a Nexus
+    // Breach run shaped by both (see launchNetTestRun).
+    if (opts.netrunning) reusable.netrunning = opts.netrunning;
+    if (opts.netConnection) reusable.netConnection = opts.netConnection;
     const actor = opts.actorId
       ? ((this.state.characters || []).find(c => c.id === opts.actorId) || this.activeCharacter())
       : this.activeCharacter();
@@ -1693,6 +1805,20 @@ class Component extends DCLogic {
       if (opts.evasionFor) { rollPayload.evasionFor = opts.evasionFor; rollPayload.evasionRequestId = opts.requestId; }
       this.postChat({ kind: 'roll', text: '', roll: rollPayload });
     }
+    // A netrunning test is the run's entry check: once it resolves, the
+    // operative is inside the Architecture, so the Breach minigame opens with
+    // this roll already folded into its difficulty.
+    if (opts.netrunning) {
+      this.nexusHandlers().launchNetTestRun({
+        abilityId: opts.netrunning,
+        label: opts.label,
+        dv: opts.dv,
+        connection: opts.netConnection,
+        total,
+        success,
+        actorId: opts.combatantId || opts.actorId,
+      });
+    }
 	    if (typeof opts.onResolved === 'function') {
 	      try { opts.onResolved({ label: opts.label, detail: String(detail), total, faces: faces.slice(), dice, contributions: this.normalizeRollContributions(opts), scope: opts.rollScope || (opts.check ? 'check' : 'roll'), crit, fumble, success, deathSavePassed, outcome, color }); }
 	      catch (err) { console.warn('Limiar roll onResolved failed:', err); }
@@ -1813,6 +1939,11 @@ class Component extends DCLogic {
       // Evasion-prompt roll requests carry evasionFor/requestId so the
       // attacker's client can match this specific reply (see commitRoll).
       ...(opts.evasionFor ? { evasionFor: opts.evasionFor, requestId: opts.requestId } : {}),
+      // NET test requests (roster.js requestNetTest) name the Interface
+      // Ability being tested and the link it runs over; both must survive
+      // into commitRoll.
+      ...(opts.netrunning ? { netrunning: opts.netrunning } : {}),
+      ...(opts.netConnection ? { netConnection: opts.netConnection } : {}),
     });
   }
 
@@ -1842,6 +1973,7 @@ class Component extends DCLogic {
       derived,
       eff,
       setState: (fn) => this.setState(fn),
+      toggleCoreSection: (key) => this.toggleSheetCoreSection(key),
       asNumber: (v, f, min, max) => this.asNumber(v, f, min, max),
       cpredStatMax: (key) => this.cpredStatMax(key),
       normalizeStats: (base) => this.normalizeStats(base),
@@ -1921,6 +2053,7 @@ class Component extends DCLogic {
       rollCombatAttack: (actorId, weapon) => this.combatHandlers().rollCombatAttack(actorId, weapon),
       rollCombatDamage: (actorId, weapon) => this.combatHandlers().rollCombatDamage(actorId, weapon),
       reloadWeapon: (actorId, itemId) => this.combatHandlers().reloadWeapon(actorId, itemId),
+      cycleWeaponAmmo: (actorId, itemId) => this.combatHandlers().cycleWeaponAmmo(actorId, itemId),
     });
     const chat = chatRenderVals(S, {
       tx,
@@ -2047,9 +2180,15 @@ class Component extends DCLogic {
       closeRoll: () => this.closeRoll(),
       rollAgain: () => this.rollAgain(),
       addInventoryGear: () => this.desktopHandlers().addInventoryGear(),
-      toggleInventoryEquip: (id) => this.desktopHandlers().toggleInventoryEquip(id),
+      toggleInventoryEquip: (id, locations) => this.desktopHandlers().toggleInventoryEquip(id, locations),
+      dropInventoryShield: (id) => this.desktopHandlers().dropInventoryShield(id),
+      repairInventoryShield: (id) => this.desktopHandlers().repairInventoryShield(id),
+      repairInventoryArmor: (location, amount) => this.desktopHandlers().repairInventoryArmor(location, amount),
       deleteInventoryGear: (id) => this.desktopHandlers().deleteInventoryGear(id),
       useInventoryGear: (id) => this.desktopHandlers().useInventoryGear(id),
+      installWeaponAttachment: (attachmentId, weaponId) => this.desktopHandlers().installWeaponAttachment(attachmentId, weaponId),
+      removeWeaponAttachment: (weaponId, attachmentCode) => this.desktopHandlers().removeWeaponAttachment(weaponId, attachmentCode),
+      transferWeaponAttachment: (sourceWeaponId, targetWeaponId, attachmentCode) => this.desktopHandlers().transferWeaponAttachment(sourceWeaponId, targetWeaponId, attachmentCode),
       buy: (p) => this.desktopHandlers().buy(p),
       previewInstall: (product) => this.app().installCyberware.preview({
         character: this.activeCharacter(),

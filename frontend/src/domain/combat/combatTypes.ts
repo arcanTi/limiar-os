@@ -56,6 +56,9 @@ export interface WeaponCombatProfile {
   rof?: number | null;
   magazine?: number | null;
   ammoType?: string | null;
+  loadedAmmoCode?: string | null;
+  loadedAmmoType?: string | null;
+  currentAmmo?: number | null;
   handsRequired?: number | 'varies' | null;
   hands?: number | null;
   concealable?: boolean | null;

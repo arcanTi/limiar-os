@@ -445,13 +445,17 @@ describe('CPR RAW netrunning foundation', () => {
   it('Given rezzed utility Programs, When building a breach config, Then their Nexus modifiers are included before the run', () => {
     const installed = normalizeInstalledPrograms(['worm', 'speedy-gonzalvez', 'eraser', 'see-ya', 'armor', 'flak', 'shield']);
     const mods = programRunModifiers(installed);
-    expect(mods.labels).toEqual(['Worm: Backdoor automatico', 'Speedy Gonzalvez: +12s', 'Eraser: trace x0.90', 'See Ya: trace x0.95']);
+    expect(mods.labels).toEqual(['Worm: Backdoor automatico', 'Boosters: +2 SPD', 'Eraser: trace x0.90', 'See Ya: trace x0.95']);
+    // Speedy Gonzalvez is a Speed Booster in RAW, so it feeds the run's speed
+    // contest instead of handing out a flat clock bonus.
+    expect(mods.speedBonus).toBe(2);
     expect(mods.mitigation).toEqual(['Armor: -4 brain damage', 'Flak: Non-Black ICE ATK -> 0', 'Shield: cancela primeiro dano cerebral']);
 
     const cfg = buildBreachConfig('standard', 6, [], installed);
     expect(cfg.scriptCount).toBe(2);
-    expect(cfg.timeLimit).toBe(136);
-    expect(cfg.traceRate).toBe(0.7);
+    // Interface 6 + Speedy Gonzalvez's +2 SPD against a Standard system's 4.
+    expect(cfg.timeLimit).toBe(116);
+    expect(cfg.traceRate).toBe(0.75);
     expect(cfg.prepResults).toContainEqual({ abilityId: 'backdoor', success: true, margin: 2, source: 'Worm' });
     expect(cfg.programModifierLabels).toEqual(mods.labels);
     expect(cfg.traceMitigation).toEqual(mods.mitigation);
@@ -528,20 +532,27 @@ describe('CPR RAW netrunning foundation', () => {
     expect(BREACH_TIERS.advanced).toMatchObject({ dv: 12, matrixSize: 7, scriptCount: 5, scriptLengths: [3, 4, 4], timeLimit: 80, traceRate: 1.5, tokenSet: 'ghost', sequenceContinuity: 'linked' });
   });
 
-  it('Given Interface rank, When building a breach config, Then buffer time and trace are rank-modified', () => {
+  it('Given Interface rank, When building a breach config, Then the clock and trace follow the speed contest and the buffer follows the rank', () => {
+    // Standard architectures run at Speed 4: an Interface 4 operative is dead
+    // even with the system, so the tier's own clock and trace stand.
     const rank4 = buildBreachConfig('standard', 4, []);
     expect(rank4).toMatchObject({
       architectureTier: 'standard',
       architectureDv: 8,
       bufferSize: 7,
-      timeLimit: 116,
-      traceRate: 0.88,
+      runnerSpeed: 4,
+      systemSpeed: 4,
+      speedDelta: 0,
+      timeLimit: 100,
+      traceRate: 1,
     });
 
+    // Advanced runs at Speed 8, so Interface 10 is only two steps ahead.
     const rank10 = buildBreachConfig('advanced', 10, []);
     expect(rank10.bufferSize).toBe(10);
-    expect(rank10.timeLimit).toBe(120);
-    expect(rank10.traceRate).toBe(1.05);
+    expect(rank10.speedDelta).toBe(2);
+    expect(rank10.timeLimit).toBe(88);
+    expect(rank10.traceRate).toBe(1.41);
   });
 
   it('Given successful prep, When building a breach config, Then each Interface Ability modifier is applied and clamped', () => {
@@ -553,7 +564,9 @@ describe('CPR RAW netrunning foundation', () => {
     ]);
 
     expect(cfg.scriptCount).toBe(1);
-    expect(cfg.traceRate).toBe(0.48);
+    // Interface 10 against a Basic system (Speed 2) caps the contest at +6:
+    // trace 0.8 x 0.82 = 0.656, then Cloak's x0.75.
+    expect(cfg.traceRate).toBe(0.49);
     expect(cfg.secondaryObjectives).toBe(true);
     expect(cfg.extraNodes).toBe(1);
     expect(cfg.scannerRevealed).toBe(true);
@@ -566,7 +579,8 @@ describe('CPR RAW netrunning foundation', () => {
       { abilityId: 'scanner', success: false, margin: -1 },
     ]);
 
-    expect(cfg.traceRate).toBe(0.77);
+    // Same +6 contest on a Standard system, then the failed Cloak's x1.1.
+    expect(cfg.traceRate).toBe(0.9);
     expect(cfg.scannerRevealed).toBe(false);
     expect(cfg.scriptCount).toBe(3);
     expect(cfg.extraNodes).toBe(2);

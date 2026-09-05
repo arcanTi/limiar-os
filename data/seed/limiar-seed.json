@@ -379,7 +379,7 @@
       "code": "NEURAL-LINK",
       "name": "Neural Link",
       "cat": "NEURAL",
-      "desc": "sistema neural artificial necessario para plugs neurais e subdermal grip; possui 5 option slots.",
+      "desc": "Sistema nervoso artificial cabeado conectado à base do cérebro. É o pré-requisito obrigatório para qualquer neuralware, plugs de interface e garras subdérmicas. Oferece 5 Option Slots.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -393,7 +393,9 @@
       "humanityLossDice": "2d6",
       "foundational": true,
       "optionSlotsProvided": 5,
-      "unique": true
+      "unique": true,
+      "kind": "cyberware",
+      "requiresGmApproval": false
     },
     {
       "id": "chip-socket",
@@ -520,7 +522,7 @@
       "code": "KERENZIKOV",
       "name": "Kerenzikov",
       "cat": "NEURAL",
-      "desc": "speedware que adiciona +2 a iniciativa; apenas um speedware pode estar instalado.",
+      "desc": "Implantador speedware sempre ativo. Adiciona +2 em todos os testes de Iniciativa. Apenas um speedware pode ser instalado por personagem.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -549,7 +551,9 @@
           },
           "stackingRule": "doNotStack"
         }
-      ]
+      ],
+      "kind": "cyberware",
+      "requiresGmApproval": false
     },
     {
       "id": "sandevistan",
@@ -576,7 +580,7 @@
       "code": "SANDEVISTAN",
       "name": "Sandevistan",
       "cat": "NEURAL",
-      "desc": "speedware ativado com uma acao; adiciona +3 a iniciativa por 1 minuto e possui cooldown de 1 hora.",
+      "desc": "Speedware ativado por demanda através de um comando de voz ou mental rápida (gasta 1 Ação). Concede +3 em Iniciativa por 1 minuto inteiro, seguido por um cooldown de 1 hora. Requer Neural Link.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -608,7 +612,9 @@
           },
           "stackingRule": "doNotStack"
         }
-      ]
+      ],
+      "kind": "cyberware",
+      "requiresGmApproval": false
     },
     {
       "id": "pain-editor",
@@ -635,7 +641,7 @@
       "code": "PAIN-EDITOR",
       "name": "Pain Editor",
       "cat": "NEURAL",
-      "desc": "ignora penalidades por estar Seriously Wounded.",
+      "desc": "Chipware que intercepta e desativa os receptores de dor e fadiga corporal do usuário. Permite que o personagem ignore completamente os efeitos e penalidades do estado Seriously Wounded. Requer Chipware Socket.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -662,7 +668,9 @@
           "type": "contextualEffect",
           "value": "ignore penalties from being Seriously Wounded"
         }
-      ]
+      ],
+      "kind": "cyberware",
+      "requiresGmApproval": false
     },
     {
       "id": "cybereye",
@@ -672,7 +680,7 @@
       "stock": "IN STOCK",
       "hcost": 7,
       "hlDice": "2d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -689,7 +697,7 @@
       "code": "CYBEREYE",
       "name": "Cybereye",
       "cat": "OPTICS",
-      "desc": "olho artificial; cada Cybereye possui 3 option slots.",
+      "desc": "Olho artificial de última geração que substitui um olho orgânico perdido ou saudável. Serve como base essencial para todas as opções oculares (Cyberoptics). Cada Cybereye instalado possui 3 slots disponíveis para módulos adicionais.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -705,7 +713,8 @@
       "optionSlotsProvided": 3,
       "countMode": "multiple",
       "permitsMultiple": true,
-      "paired": true
+      "paired": true,
+      "kind": "cyberware"
     },
     {
       "id": "image-enh",
@@ -715,7 +724,7 @@
       "stock": "IN STOCK",
       "hcost": 3,
       "hlDice": "1d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -732,7 +741,7 @@
       "code": "IMAGE-ENH",
       "name": "Image Enhance",
       "cat": "OPTICS",
-      "desc": "melhora imagem e analise visual; adiciona +2 a Perception, Lip Reading e Conceal/Reveal Object.",
+      "desc": "Coprocessador neural de imagem que otimiza contraste, nitidez de bordas e renderização cromática em tempo real. Garante bônus de +2 em testes de Perception, Lip Reading (leitura labial) e Conceal/Reveal Object (encontrar ou esconder itens). Requer dois Cybereyes pareados.",
       "skillBonus": {
         "Perception": 2
       },
@@ -783,7 +792,8 @@
             "Conceal/Reveal Object"
           ]
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "lowlight-uv",
@@ -793,7 +803,7 @@
       "stock": "IN STOCK",
       "hcost": 3,
       "hlDice": "1d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -810,7 +820,7 @@
       "code": "LOWLIGHT-UV",
       "name": "Low Light / Infrared / UV",
       "cat": "OPTICS",
-      "desc": "ignora penalidades por escuridao, fumaca, neblina e condicoes similares.",
+      "desc": "Módulo de visão avançada de três espectros. Permite ao usuário alternar instantaneamente para visão térmica (infravermelho), ampliação de luz residual (low-light) ou radiação ultravioleta. Ignora completamente penalidades visuais causadas por escuridão total, neblina ou cortinas de fumaça pesada. Requer dois Cybereyes pareados e consome 2 slots em cada.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -845,7 +855,8 @@
           "type": "senseMode",
           "value": "ignore penalties due to darkness, smoke, fog, and similar conditions"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "target-scope",
@@ -855,7 +866,7 @@
       "stock": "IN STOCK",
       "hcost": 3,
       "hlDice": "1d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -872,7 +883,7 @@
       "code": "TARGET-SCOPE",
       "name": "Targeting Scope",
       "cat": "OPTICS",
-      "desc": "adiciona +1 ao Check ao fazer Aimed Shot.",
+      "desc": "Retículo holográfico tático inteligente que se conecta à fiação neural do cérebro. Fornece cálculo de distância balística ativa, adicionando um bônus de +1 em testes de ataque de Tiro Mirado (Aimed Shot). Múltiplos módulos instalados não se acumulam. Requer Cybereye.",
       "bonus": [
         {
           "type": "rangedBonus",
@@ -908,7 +919,8 @@
           },
           "condition": "aimedShot"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "cyberaudio",
@@ -918,7 +930,7 @@
       "stock": "IN STOCK",
       "hcost": 7,
       "hlDice": "2d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -935,7 +947,7 @@
       "code": "CYBERAUDIO",
       "name": "Cyberaudio Suite",
       "cat": "AUDIO",
-      "desc": "suite cyberaudio com 3 option slots; nao pode instalar mais de uma.",
+      "desc": "Substituição completa do aparelho auditivo interno invisível dentro do crânio. Serve como base obrigatória para a instalação de todas as opções de áudio e inteligência auditiva. Possui 3 slots internos de opções. Apenas 1 suite pode ser instalada por personagem.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -950,7 +962,8 @@
       "foundational": true,
       "optionSlotsProvided": 3,
       "unique": true,
-      "maxInstalled": 1
+      "maxInstalled": 1,
+      "kind": "cyberware"
     },
     {
       "id": "amp-hearing",
@@ -960,7 +973,7 @@
       "stock": "IN STOCK",
       "hcost": 3,
       "hlDice": "1d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -977,7 +990,7 @@
       "code": "AMP-HEARING",
       "name": "Amplified Hearing",
       "cat": "AUDIO",
-      "desc": "+2 em Perception para Checks envolvendo audicao.",
+      "desc": "Filtros digitais e moduladores de frequência que estendem o espectro audível do personagem. Concede bônus de +2 em testes de Perception que dependam primariamente de ouvir ruídos fracos ou distantes. Requer Cyberaudio Suite.",
       "skillBonus": {
         "Perception": 1
       },
@@ -1009,7 +1022,8 @@
           ],
           "condition": "hearingRelevant"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "radio-comm",
@@ -1019,7 +1033,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -1036,7 +1050,7 @@
       "code": "RADIO-COMM",
       "name": "Radio Communicator",
       "cat": "AUDIO",
-      "desc": "comunicacao por radio com alcance de 1 milha.",
+      "desc": "Transmissor e receptor de ondas de rádio UHF/VHF de longo alcance instalado na suite interna. Garante comunicação sem fio criptografada com choombas a distâncias de até 1,6 km (1 milha). Requer Cyberaudio Suite.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -1062,7 +1076,8 @@
           "type": "contextualEffect",
           "value": "radio communication within 1 mile"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "voice-stress",
@@ -1072,7 +1087,7 @@
       "stock": "IN STOCK",
       "hcost": 3,
       "hlDice": "1d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -1089,7 +1104,7 @@
       "code": "VOICE-STRESS",
       "name": "Voice Stress Analyzer",
       "cat": "AUDIO",
-      "desc": "+2 em Human Perception e Interrogation para analise de voz/estresse.",
+      "desc": "Modulo analisador de modulação e estresse vocal integrado ao processamento de áudio. Concede bônus de +2 em testes de Human Perception e Interrogation focados na voz de outras pessoas, funcionando como um detector de mentiras fisiológico portátil. Requer Cyberaudio Suite.",
       "skillBonus": {
         "Human Perception": 1,
         "Interrogation": 1
@@ -1130,7 +1145,8 @@
           ],
           "condition": "voiceRelevant=true"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "audiovox",
@@ -1521,7 +1537,7 @@
       "code": "CYBERARM",
       "name": "Cyberarm",
       "cat": "LIMBS",
-      "desc": "braco substituto com 4 option slots; vem com Standard Hand sem HL e sem slot.",
+      "desc": "Braço mecânico substituto reforçado. Oferece 4 slots livres para opções e vem equipado de fábrica com uma Standard Hand (que custa 0eb e 0 de Humanidade).",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -1545,7 +1561,9 @@
           "slotCost": 0,
           "whenIncludedBy": "Cyberarm"
         }
-      ]
+      ],
+      "kind": "cyberware",
+      "requiresGmApproval": false
     },
     {
       "id": "big-knucks",
@@ -2007,7 +2025,7 @@
       "stock": "LIMITED",
       "hcost": 14,
       "hlDice": "4d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 367",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -2024,7 +2042,7 @@
       "code": "LINEAR-SIGMA",
       "name": "Implanted Linear Frame Sigma",
       "cat": "BORG",
-      "desc": "frame implantado que aumenta BODY efetivo para 12; requer BODY 6 e Grafted Muscle and Bone Lace.",
+      "desc": "Reforço esquelético de titânio e feixes de músculos artificiais de polímeros acionados eletricamente. Eleva o atributo BODY efetivo do usuário para 12 (recalculando instantaneamente HP máximo, Wound Threshold e o valor base do Death Save). Requer BODY 6 mínimo orgânico e enxerto de Grafted Muscle and Bone Lace.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -2064,7 +2082,8 @@
             "BODY"
           ]
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "linear-beta",
@@ -2074,7 +2093,7 @@
       "stock": "LIMITED",
       "hcost": 14,
       "hlDice": "4d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 367",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -2091,7 +2110,7 @@
       "code": "LINEAR-BETA",
       "name": "Implanted Linear Frame Beta",
       "cat": "BORG",
-      "desc": "frame implantado que aumenta BODY efetivo para 14; requer BODY 8 e duas Grafted Muscle and Bone Lace.",
+      "desc": "Versão pesada de grau tático-militar de chassis cibernéticos internos. Eleva o atributo BODY efetivo do personagem para o patamar titânico de 14 (atualizando imediatamente HP, Wound Threshold e Death Saves). Requer BODY 8 mínimo orgânico e duas instalações separadas do implante Grafted Muscle and Bone Lace.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -2132,7 +2151,8 @@
             "BODY"
           ]
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "multioptic",
@@ -2142,7 +2162,7 @@
       "stock": "IN STOCK",
       "hcost": 14,
       "hlDice": "4d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 367",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -2159,7 +2179,7 @@
       "code": "MULTIOPTIC",
       "name": "MultiOptic Mount",
       "cat": "BORG",
-      "desc": "permite montar ate 5 Cybereyes adicionais.",
+      "desc": "Modificação facial reconstrutiva pesada que altera a fisionomia do usuário. Concede um suporte orbital mecânico capaz de acomodar e sustentar até 5 Cybereyes adicionais na face. Os olhos extras são adquiridos e instalados de forma independente.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -2176,7 +2196,8 @@
           "type": "containerSlots",
           "value": "allows mounting up to 5 additional Cybereyes"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "sensor-array",
@@ -2186,7 +2207,7 @@
       "stock": "IN STOCK",
       "hcost": 14,
       "hlDice": "4d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 367",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -2203,7 +2224,7 @@
       "code": "SENSOR-ARRAY",
       "name": "Sensor Array",
       "cat": "BORG",
-      "desc": "permite instalar ate 5 opcoes de cyberaudio adicionais; requer Cyberaudio Suite e nao ocupa slot dela.",
+      "desc": "Suporte de antenas achatadas internas parecendo fones de nuca (rabbit ears) integrados à suite auditiva. Permite instalar até 5 opções de áudio e comunicações de Cyberaudio adicionais, sem consumir os 3 slots limitados da suite de áudio convencional. Requer Cyberaudio Suite.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -2228,7 +2249,8 @@
           "type": "containerSlots",
           "value": "allows up to 5 additional Cyberaudio Options without taking Cyberaudio option slots"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "backup-drive",
@@ -2443,7 +2465,7 @@
       "code": "MANTIS-BLADE",
       "name": "Mantis Blade",
       "cat": "LIMBS",
-      "desc": "lamina retratil escondida no braco; funciona como cyberweapon melee pesada exotica, 3d6 ROF 2, usando Melee Weapon.",
+      "desc": "Lâminas retráteis escondidas sob a estrutura dos braços cibernéticos. Funciona como uma arma melee pesada exótica (3d6 de dano com ROF 2), que pode ser sacada ou guardada sem consumir ações de turno.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -2547,7 +2569,7 @@
       "code": "MONOWIRE",
       "name": "Monowire",
       "cat": "LIMBS",
-      "desc": "fio monomolecular retratil usado como chicote curto; cyberweapon melee muito pesada exotica, 4d6 ROF 1, usando Melee Weapon.",
+      "desc": "Fio monomolecular flexível de alta tensão montado sob o dedo ou pulso cibernético. Atua como um chicote de alta letalidade, tratado como arma melee muito pesada exótica (4d6 de dano com ROF 1 e alcance de até 4 metros).",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3251,7 +3273,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3267,7 +3289,7 @@
       "code": "ANTI-DAZ",
       "name": "Anti-Dazzle",
       "cat": "OPTICS",
-      "desc": "imunidade a efeitos causados por flashes de luz.",
+      "desc": "Filtro protetor automatizado que reage instantaneamente a picos súbitos de luminosidade. Concede imunidade total a efeitos de ofuscamento por flashes de luz, explosões de fósforo e granadas de flashbang. Requer dois Cybereyes instalados de forma pareada.",
       "bonus": [
         {
           "type": "flashImmunity",
@@ -3307,7 +3329,8 @@
           "type": "contextualEffect",
           "value": "immune to flash effects"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "chyron",
@@ -3317,7 +3340,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3333,7 +3356,7 @@
       "code": "CHYRON",
       "name": "Chyron",
       "cat": "OPTICS",
-      "desc": "projeta uma subtela no campo de visao.",
+      "desc": "Projeta uma subtela translúcida de HUD diretamente no canto do campo de visão do usuário. Permite ler mensagens de texto, assistir a feeds de vídeo em tempo real ou exibir dados de diagnóstico vindos de outros eletrônicos pareados (como um Agent ou cyberdeck). Requer Cybereye.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3359,7 +3382,8 @@
           "type": "contextualEffect",
           "value": "projects subscreen into field of vision"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "color-sh",
@@ -3369,7 +3393,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3385,7 +3409,7 @@
       "code": "COLOR-SH",
       "name": "Color Shift",
       "cat": "OPTICS",
-      "desc": "permite mudancas ilimitadas de cor e padrao do olho.",
+      "desc": "Módulo cosmético que permite alterar instantaneamente a cor, o brilho, a textura ou o padrão estético da íris e esclera do olho artificial. Pode ser ajustado para reagir ao humor do usuário ou exibir marcas de gangues e logotipos de corporações. Requer Cybereye.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3411,7 +3435,8 @@
           "type": "contextualEffect",
           "value": "eye color/pattern changes"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "dartgun-eye",
@@ -3421,7 +3446,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3437,7 +3462,7 @@
       "code": "DARTGUN-EYE",
       "name": "Dartgun",
       "cat": "OPTICS",
-      "desc": "dartgun exotica de tiro unico escondida no olho.",
+      "desc": "Arma exótica miniaturizada e oculta sob o globo ocular cibernético. Permite disparar um único dardo carregado com veneno ou biotoxina de forma totalmente discreta e sem necessidade de gestos físicos (resolvido com a perícia Handgun). Requer Cybereye e consome todos os 3 slots do membro.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3489,7 +3514,8 @@
       "ammoType": "Dart",
       "hands": 0,
       "concealable": true,
-      "weaponClass": "Exotic Dartgun"
+      "weaponClass": "Exotic Dartgun",
+      "kind": "cyberware"
     },
     {
       "id": "micro-opt",
@@ -3499,7 +3525,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3515,7 +3541,7 @@
       "code": "MICRO-OPT",
       "name": "MicroOptics",
       "cat": "OPTICS",
-      "desc": "fornece magnificacao de 400x.",
+      "desc": "Lentes de foco ultrafino que agem como um microscópio portátil de campo. Permite obter uma ampliação de imagem visual de até 400 vezes na retina cibernética, facilitando o trabalho de detetives, peritos forenses ou técnicos reparando microcircuitos na rua. Requer Cybereye.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3541,7 +3567,8 @@
           "type": "senseMode",
           "value": "400x magnification"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "micro-vid",
@@ -3551,7 +3578,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3567,7 +3594,7 @@
       "code": "MICRO-VID",
       "name": "MicroVideo",
       "cat": "OPTICS",
-      "desc": "camera ocular que grava audio e video em Memory Chip ou Agent vinculado.",
+      "desc": "Câmera de captação digital microscópica instalada diretamente no Cybereye. Permite gravar tudo o que o usuário vê e ouve continuamente, salvando o arquivo em um Memory Chip inserido no próprio crânio ou transmitindo diretamente para um Agent sincronizado. Consome 2 slots.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3593,7 +3620,8 @@
           "type": "contextualEffect",
           "value": "records audio and video to Memory Chip or linked Agent"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "rad-det-opt",
@@ -3603,7 +3631,7 @@
       "stock": "IN STOCK",
       "hcost": 3,
       "hlDice": "1d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3619,7 +3647,7 @@
       "code": "RAD-DET-OPT",
       "name": "Radiation Detector",
       "cat": "OPTICS",
-      "desc": "detecta radiacao dentro de 100m/yd.",
+      "desc": "Sensor de partículas de alta precisão que exibe constantemente o nível de radiação ionizante ao redor do personagem em um HUD gráfico sobreposto. Emite avisos visuais de perigo caso o usuário se aproxime de zonas de contaminação industrial ou Badlands poluídas. Requer Cybereye.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3645,7 +3673,8 @@
           "type": "senseMode",
           "value": "radiation readings within 100m/yd displayed visually"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "tele-opt",
@@ -3655,7 +3684,7 @@
       "stock": "IN STOCK",
       "hcost": 3,
       "hlDice": "1d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3671,7 +3700,7 @@
       "code": "TELE-OPT",
       "name": "TeleOptics",
       "cat": "OPTICS",
-      "desc": "visao detalhada ate 800m/yd; +1 em Aimed Shot contra alvos a 51m/yd ou mais.",
+      "desc": "Sistema de lentes multifocais com zoom dinâmico digital. Permite focar e ler placas ou detalhes com precisão cirúrgica a até 800 metros de distância. Concede bônus de +1 em ataques de tiros de fuzis ou armas de longo alcance ao disparar contra alvos situados a 51 metros ou mais. Requer Cybereye.",
       "bonus": [
         {
           "type": "rangedBonus",
@@ -3711,7 +3740,8 @@
           },
           "condition": "Aimed Shot against target at 51m/yd or farther"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "virtuality",
@@ -3721,7 +3751,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 360",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3737,7 +3767,7 @@
       "code": "VIRTUALITY",
       "name": "Virtuality",
       "cat": "OPTICS",
-      "desc": "projeta imagens do cyberspace sobre a visao do usuario.",
+      "desc": "Permite sobrepor imagens gráficas completas tridimensionais geradas por computadores ou pela rede de cyberspace diretamente sobre a visão real do mundo físico. Imprescindível para Netrunners visualizarem a rede local enquanto lutam no mundo real. Requer dois Cybereyes pareados.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3769,7 +3799,8 @@
           "type": "contextualEffect",
           "value": "projects cyberspace imagery over user view"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "aud-rec",
@@ -3779,7 +3810,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3795,7 +3826,7 @@
       "code": "AUD-REC",
       "name": "Audio Recorder",
       "cat": "AUDIO",
-      "desc": "grava audio em Memory Chip ou Agent vinculado.",
+      "desc": "Modulo discreto acoplado ao ouvido interno que grava áudio ambiente com qualidade cristalina de estúdio. Salva arquivos de áudio em um Memory Chip craniano ou transmite em pacotes criptografados de dados para um Agent associado. Requer Cyberaudio Suite.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3821,7 +3852,8 @@
           "type": "contextualEffect",
           "value": "records audio to Memory Chip or linked Agent"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "bug-det",
@@ -3831,7 +3863,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3847,7 +3879,7 @@
       "code": "BUG-DET",
       "name": "Bug Detector",
       "cat": "AUDIO",
-      "desc": "emite alerta quando esta a ate 2m/yd de um dispositivo de escuta.",
+      "desc": "Modulo inteligente de escuta passiva eletrônica. Emite um som leve, mas nítido (apito de aviso) no canal auditivo do usuário sempre que detectar um grampo telefônico ativo, microfone espião ou escuta sem fio a até 2 metros de distância. Requer Cyberaudio Suite.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3873,7 +3905,8 @@
           "type": "senseMode",
           "value": "beeps within 2m/yd of listening device"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "hom-trac",
@@ -3883,7 +3916,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3899,7 +3932,7 @@
       "code": "HOM-TRAC",
       "name": "Homing Tracer",
       "cat": "AUDIO",
-      "desc": "permite seguir um rastreador vinculado ate 1 milha.",
+      "desc": "Bússola de radiofrequência interna que calcula a direção e proximidade de emissores de sinal vinculados. Permite seguir um sinal ativo a até 1,6 km (1 milha) de distância. Vem acompanhado de 1 transmissor físico básico (reposição custa 50eb). Requer Cyberaudio Suite.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3925,7 +3958,8 @@
           "type": "senseMode",
           "value": "follow linked tracer up to 1 mile away"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "int-agent",
@@ -3935,7 +3969,7 @@
       "stock": "IN STOCK",
       "hcost": 3,
       "hlDice": "1d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -3951,7 +3985,7 @@
       "code": "INT-AGENT",
       "name": "Internal Agent",
       "cat": "AUDIO",
-      "desc": "Agent interno funcional; audio apenas salvo se vinculado a Cybereye com Chyron.",
+      "desc": "Um telefone celular inteligente (Agent) implantado de forma totalmente invisível e integrado à suite de áudio. Controlado por comando de sub-vozes mentais. A saída visual de dados exige um implante Chyron ocular para exibição. Requer Cyberaudio Suite.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -3976,7 +4010,8 @@
           "type": "contextualEffect",
           "value": "internal Agent, audio-only unless linked to Cybereye with Chyron"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "level-damp",
@@ -3986,7 +4021,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -4002,7 +4037,7 @@
       "code": "LEVEL-DAMP",
       "name": "Level Damper",
       "cat": "AUDIO",
-      "desc": "imunidade a efeitos causados por ruidos altos.",
+      "desc": "Limitador automático de pressão sonora em microssegundos. Garante ao usuário imunidade completa a surdez temporária ou traumas auditivos causados por rajadas sonoras severas, explosões ou flashbangs em combate fechado. Requer Cyberaudio Suite.",
       "bonus": [
         {
           "type": "deafenImmunity",
@@ -4033,7 +4068,8 @@
           "type": "contextualEffect",
           "value": "immune to effects caused by loud noises"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "radar-det",
@@ -4043,7 +4079,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -4059,7 +4095,7 @@
       "code": "RADAR-DET",
       "name": "Radar Detector",
       "cat": "AUDIO",
-      "desc": "alerta quando um feixe de radar ativo esta dentro de 100m/yd.",
+      "desc": "Célula receptora de microondas passivas que alerta passivamente o personagem (com um bipe específico no canal auditivo) sempre que houver qualquer feixe de radar ativo ou varredura de vigilância a até 100 metros de distância. Requer Cyberaudio Suite.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -4085,7 +4121,8 @@
           "type": "senseMode",
           "value": "detects active radar beam within 100m/yd"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "scram-desc",
@@ -4095,7 +4132,7 @@
       "stock": "IN STOCK",
       "hcost": 2,
       "hlDice": "1d6/2 round up",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -4111,7 +4148,7 @@
       "code": "SCRAM-DESC",
       "name": "Scrambler/Descrambler",
       "cat": "AUDIO",
-      "desc": "embaralha comunicacoes enviadas e desembaralha comunicacoes recebidas.",
+      "desc": "Mapeador criptográfico instalado no circuito de comunicações sem fio. Embaralha instantaneamente todas as transmissões de saída de rádio e desembaralha sinais criptografados de entrada vindos de aliados com a mesma chave. Requer Cyberaudio Suite.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -4137,7 +4174,8 @@
           "type": "contextualEffect",
           "value": "scrambles outgoing and descrambles incoming communications"
         }
-      ]
+      ],
+      "kind": "cyberware"
     },
     {
       "id": "enh-anti",
@@ -5475,7 +5513,7 @@
       "stock": "LIMITED",
       "hcost": 14,
       "hlDice": "4d6",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 367",
       "armor": 0,
       "ram": 0,
       "specs": {
@@ -5491,7 +5529,7 @@
       "code": "ART-SHOULDER",
       "name": "Artificial Shoulder Mount",
       "cat": "BORG",
-      "desc": "permite montar 2 cyberarms extras sob o primeiro par de bracos.",
+      "desc": "Uma pesada e invasiva modificação osteomuscular cirúrgica que remodela a cintura escapular. Permite a instalação cirúrgica de um segundo par de Cyberarms totalmente funcionais localizados logo abaixo do primeiro par nativo. Apenas uma instalação por personagem.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -5508,7 +5546,10 @@
           "type": "contextualEffect",
           "value": "user can mount 2 cyberarms under first set of arms"
         }
-      ]
+      ],
+      "kind": "cyberware",
+      "optionSlotsRequired": 0,
+      "unique": true
     },
     {
       "id": "face-qc",
@@ -5932,7 +5973,7 @@
       "code": "GORILLA-ARMS",
       "name": "Gorilla Arms",
       "cat": "LIMBS",
-      "desc": "par de cyberarms reforcados; concede +2 em Athletics apenas para forca bruta e usa BODY +2 somente para dano dos proprios Gorilla Arms, sem alterar BODY real, HP ou Death Save.",
+      "desc": "Par de braços cibernéticos reforçados com ligas pesadas de tungstênio e atuadores pneumáticos industriais. Concede +2 em testes de Athletics de força bruta e adiciona +2 de BODY temporário apenas para calcular o dano de seus próprios ataques físicos de Brawling desarmados, mantendo as características biológicas para HP e Morte.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -6103,7 +6144,7 @@
       "code": "ENH-HYD-RAM",
       "name": "Hydraulic Ram",
       "cat": "LIMBS",
-      "desc": "pistoes hidraulicos para Gorilla Arms; adiciona +3d6 apenas contra cover ou objetos, nunca contra personagens.",
+      "desc": "Pistões hidráulicos táticos montados sobre as Gorilla Arms. Adiciona monstruosos +3d6 de dano adicional aplicados estritamente contra coberturas rígidas (portas, concreto, veículos) ou objetos; nunca adiciona dano a alvos vivos.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -6178,7 +6219,7 @@
       "code": "ENH-PNEU-ACT",
       "name": "Pneumatic Actuation",
       "cat": "LIMBS",
-      "desc": "atuadores pneumaticos para Gorilla Arms; quando o ataque causa Critical Injury, adiciona +5 HP direto sem ablar armor.",
+      "desc": "Atuadores rápidos para Gorilla Arms. Quando um ataque desarmado causa uma Lesão Crítica, inflige +5 de HP de dano direto que ignora a armadura do defensor (não acumulável com headshots e sem causar ablação).",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -6252,7 +6293,7 @@
       "code": "ENH-TUNG-REIN",
       "name": "Tungsten Reinforcement",
       "cat": "LIMBS",
-      "desc": "reforco de tungstenio para Gorilla Arms; permite escolher modo 3d6 ROF 2 ou 4d6 ROF 1.",
+      "desc": "Reforço pesado de liga densa sobre a junta das Gorilla Arms. Confere flexibilidade de combate, permitindo alternar livremente o estilo de ataque das mãos entre Pesado (3d6 com ROF 2) ou Muito Pesado (4d6 com ROF 1).",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -6334,7 +6375,7 @@
       "code": "ENH-DBL-EDGE",
       "name": "Double-Edged Actuator",
       "cat": "LIMBS",
-      "desc": "atuador duplo para Mantis Blade; ao causar Critical Injury, role duas vezes na tabela e escolha um resultado.",
+      "desc": "Garante corte agressivo nas Mantis Blades. Quando o ataque causar uma Lesão Crítica, o jogador rola duas vezes na tabela de ferimentos e escolhe o resultado de maior interesse mecânico.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -6405,7 +6446,7 @@
       "code": "ENH-MONO-EDG",
       "name": "Monomolecular Edge",
       "cat": "LIMBS",
-      "desc": "fio monomolecular para Mantis Blade; quando o dano atravessa armor, causa +1 ablation adicional.",
+      "desc": "Aperfeiçoa a lâmina das Mantis Blades com fio molecular hiper-afiado. Quando o dano do ataque penetrar o SP da armadura inimiga, inflige +1 ponto de ablação (damage armor) adicional no alvo.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -6547,7 +6588,7 @@
       "code": "ENH-ELECTRO",
       "name": "Electro-Line",
       "cat": "LIMBS",
-      "desc": "modulo eletrocondutivo para Monowire; permite modo nao letal 3d6 ROF 1, sem Critical Injury por padrao.",
+      "desc": "Módulo eletrocondutivo instalado no Monowire. Permite operar o chicote em um modo de choque tático não letal, causando 3d6 com ROF 1 sem abrir Lesões Críticas biológicas por padrão.",
       "bonus": [],
       "skillBonus": {},
       "statMod": {},
@@ -6792,7 +6833,7 @@
         "STANDARD"
       ],
       "sourceType": "official-core",
-      "source": "Cyberpunk RED Core Rulebook, Cyberware tables",
+      "source": "Cyberpunk RED Core Rulebook, page 361",
       "name": "Radio Scanner / Music Player",
       "cyberwareType": "cyberaudio",
       "install": "clinic",
@@ -6814,10 +6855,11 @@
           "value": "plays music or tunes radio broadcasts"
         }
       ],
-      "desc": "toca musica ou sintoniza transmissoes de radio.",
+      "desc": "Modulo sintonizador comercial que escaneia ativamente canais públicos de rádio aberta no Data Pool local ou sintoniza faixas de rádio piratas e notícias de Screamsheets locais diretamente no ouvido do usuário. Requer Cyberaudio Suite.",
       "price": 50,
       "hcost": 2,
-      "hlDice": "1d6/2 round up"
+      "hlDice": "1d6/2 round up",
+      "kind": "cyberware"
     },
     {
       "id": "contraceptive",
@@ -7748,7 +7790,7 @@
       "cost": 0,
       "costCategory": "N/A",
       "purchasable": false,
-      "desc": "perfil de sistema para Brawling com BODY 4 ou menor.",
+      "desc": "Perfil de dano mecânico desarmado para personagens com BODY de nível 4 ou inferior. Causa 1d6 de dano físico.",
       "category": "WEAPONS",
       "cat": "WEAPONS",
       "price": 0,
@@ -7787,7 +7829,7 @@
       "cost": 0,
       "costCategory": "N/A",
       "purchasable": false,
-      "desc": "perfil de sistema para Brawling com BODY 5-6.",
+      "desc": "Perfil de dano mecânico desarmado para personagens com BODY de nível 5 ou 6. Causa 2d6 de dano físico.",
       "category": "WEAPONS",
       "cat": "WEAPONS",
       "price": 0,
@@ -7826,7 +7868,7 @@
       "cost": 0,
       "costCategory": "N/A",
       "purchasable": false,
-      "desc": "perfil de sistema para Brawling com BODY 7-10.",
+      "desc": "Perfil de dano mecânico desarmado para personagens com BODY de nível entre 7 e 10. Causa 3d6 de dano físico.",
       "category": "WEAPONS",
       "cat": "WEAPONS",
       "price": 0,
@@ -7865,7 +7907,7 @@
       "cost": 0,
       "costCategory": "N/A",
       "purchasable": false,
-      "desc": "perfil de sistema para Brawling com BODY 11+.",
+      "desc": "Perfil de dano mecânico desarmado para personagens com BODY de escala sobre-humana (11 ou mais). Causa 4d6 de dano físico.",
       "category": "WEAPONS",
       "cat": "WEAPONS",
       "price": 0,
@@ -7883,6 +7925,7 @@
       "sourceType": "official-core",
       "source": "Cyberpunk RED Core Rulebook, Weapons table",
       "kind": "weaponAttachment",
+      "slotsRequired": 1,
       "name": "Sniping Scope",
       "cost": 100,
       "costCategory": "Premium",
@@ -7902,6 +7945,7 @@
       "sourceType": "official-core",
       "source": "Cyberpunk RED Core Rulebook, Weapons table",
       "kind": "weaponAttachment",
+      "slotsRequired": 2,
       "name": "Smartgun Link",
       "cost": 500,
       "costCategory": "Expensive",
@@ -7921,6 +7965,7 @@
       "sourceType": "official-core",
       "source": "Cyberpunk RED Core Rulebook, Weapons table",
       "kind": "weaponAttachment",
+      "slotsRequired": 1,
       "name": "Extended Magazine",
       "cost": 100,
       "costCategory": "Premium",
@@ -7940,6 +7985,7 @@
       "sourceType": "official-core",
       "source": "Cyberpunk RED Core Rulebook, Weapons table",
       "kind": "weaponAttachment",
+      "slotsRequired": 1,
       "name": "Drum Magazine",
       "cost": 500,
       "costCategory": "Expensive",
@@ -7959,6 +8005,7 @@
       "sourceType": "official-core",
       "source": "Cyberpunk RED Core Rulebook, Weapons table",
       "kind": "weaponAttachment",
+      "slotsRequired": 2,
       "name": "Underbarrel Shotgun",
       "cost": 500,
       "costCategory": "Expensive",
@@ -7984,6 +8031,7 @@
       "sourceType": "official-core",
       "source": "Cyberpunk RED Core Rulebook, Weapons table",
       "kind": "weaponAttachment",
+      "slotsRequired": 2,
       "name": "Underbarrel Grenade Launcher",
       "cost": 500,
       "costCategory": "Expensive",
@@ -8015,7 +8063,7 @@
       "name": "Medium Pistol Ammunition",
       "ammoType": "M Pistol",
       "packSize": 10,
-      "desc": "municao para Medium Pistol.",
+      "desc": "Munição de pistola média comum. Compatível com pistolas médias (2d6) e submetralhadoras leves (SMGs). Vendido em pacotes de 10.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 10
@@ -8032,7 +8080,7 @@
       "name": "Heavy Pistol Ammunition",
       "ammoType": "H Pistol",
       "packSize": 10,
-      "desc": "municao para Heavy Pistol.",
+      "desc": "Munição de pistola pesada padrão. Compatível com pistolas pesadas (3d6) e submetralhadoras pesadas (Heavy SMGs). Vendido em pacotes de 10.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 10
@@ -8049,7 +8097,7 @@
       "name": "Very Heavy Pistol Ammunition",
       "ammoType": "VH Pistol",
       "packSize": 10,
-      "desc": "municao para Very Heavy Pistol.",
+      "desc": "Munição pesada de calibre grosso. Compatível com pistolas muito pesadas (4d6). Essencial para derrubar alvos blindados de perto. Pacote de 10.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 10
@@ -8066,7 +8114,7 @@
       "name": "Rifle Ammunition",
       "ammoType": "Rifle",
       "packSize": 10,
-      "desc": "municao de rifle.",
+      "desc": "Munição padrão de fuzil. Compatível com fuzis de assalto e fuzis de precisão. Essencial para combates táticos de longo alcance. Pacote com 10.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 10
@@ -8083,7 +8131,7 @@
       "name": "Shotgun Slug",
       "ammoType": "Slug",
       "packSize": 10,
-      "desc": "slug para shotgun.",
+      "desc": "Projétil sólido (slug) para espingardas. Concentra o dano em um único alvo, disparando 5d6 de dano com precisão baseada na tabela de espingardas.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 10
@@ -8102,7 +8150,7 @@
       "name": "Shotgun Shell",
       "ammoType": "Shell",
       "packSize": 10,
-      "desc": "shell para shotgun; comportamento de cone/area fica para fase de combate.",
+      "desc": "Cartuchos de bagos de chumbo para espingardas. Dispara em cone de 6m/yd de largura e comprimento, atingindo múltiplos alvos. Causa 5d6 de dano.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 10
@@ -8119,7 +8167,7 @@
       "name": "Arrow",
       "ammoType": "Arrow",
       "packSize": 10,
-      "desc": "flecha para arco ou besta.",
+      "desc": "Flechas ou virotes padrão para arcos e bestas de alta tensão. Perfeitas para caça ou infiltrações silenciosas que exigem discrição total nas Badlands ou zonas de combate.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 10
@@ -8136,7 +8184,7 @@
       "name": "Grenade",
       "ammoType": "Grenade",
       "packSize": 1,
-      "desc": "municao de granada.",
+      "desc": "Granada de fragmentação padrão de 40mm para Lança-Granadas. Causa devastadores 6d6 de dano de explosão numa área de efeito de 10m x 10m.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 50
@@ -8153,7 +8201,7 @@
       "name": "Rocket",
       "ammoType": "Rocket",
       "packSize": 1,
-      "desc": "municao de foguete.",
+      "desc": "Foguete explosivo guiado para Lança-Foguetes. Causa catastróficos 8d6 de dano de explosão numa área de efeito de 10m x 10m.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 100
@@ -8486,7 +8534,7 @@
           }
         }
       ],
-      "desc": "versao leve de Metalgear; SP 16 e penalidade de -3 para REF, DEX e MOVE.",
+      "desc": "Uma versão otimizada e ligeiramente mais leve do icônico traje Metalgear corporativo. Garante proteção colossal de SP16 e reduz a penalidade física para apenas -3 em REF, DEX e MOVE.",
       "price": 1000,
       "category": "ARMOR",
       "cat": "ARMOR"
@@ -8505,15 +8553,31 @@
         "headSP": 4,
         "bodySP": 4,
         "ablates": true,
-        "armorPenalty": { "REF": 0, "DEX": 0, "MOVE": 0 }
+        "armorPenalty": {
+          "REF": 0,
+          "DEX": 0,
+          "MOVE": 0
+        }
       },
       "effects": [
         {
           "type": "armorLayer",
-          "value": { "sp": 4, "locations": ["head", "body"], "armorPenalty": { "REF": 0, "DEX": 0, "MOVE": 0 }, "ablates": true }
+          "value": {
+            "sp": 4,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": 0,
+              "DEX": 0,
+              "MOVE": 0
+            },
+            "ablates": true
+          }
         }
       ],
-      "desc": "armadura de couro; SP 4, sem penalidade de REF, DEX ou MOVE.",
+      "desc": "Jaquetas e calças de couro resistente com almofadas de impacto nos ombros e quadris. Fornece SP4 com zero penalidades físicas.",
       "price": 20,
       "category": "ARMOR",
       "cat": "ARMOR"
@@ -8532,15 +8596,31 @@
         "headSP": 7,
         "bodySP": 7,
         "ablates": true,
-        "armorPenalty": { "REF": 0, "DEX": 0, "MOVE": 0 }
+        "armorPenalty": {
+          "REF": 0,
+          "DEX": 0,
+          "MOVE": 0
+        }
       },
       "effects": [
         {
           "type": "armorLayer",
-          "value": { "sp": 7, "locations": ["head", "body"], "armorPenalty": { "REF": 0, "DEX": 0, "MOVE": 0 }, "ablates": true }
+          "value": {
+            "sp": 7,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": 0,
+              "DEX": 0,
+              "MOVE": 0
+            },
+            "ablates": true
+          }
         }
       ],
-      "desc": "colete de kevlar; SP 7, sem penalidade de REF, DEX ou MOVE.",
+      "desc": "Colete protetor clássico de Kevlar leve de alta resistência. Pode ser embutido sob roupas normais. Fornece SP7 com zero penalidade de movimentação.",
       "price": 50,
       "category": "ARMOR",
       "cat": "ARMOR"
@@ -8559,15 +8639,31 @@
         "headSP": 11,
         "bodySP": 11,
         "ablates": true,
-        "armorPenalty": { "REF": 0, "DEX": 0, "MOVE": 0 }
+        "armorPenalty": {
+          "REF": 0,
+          "DEX": 0,
+          "MOVE": 0
+        }
       },
       "effects": [
         {
           "type": "armorLayer",
-          "value": { "sp": 11, "locations": ["head", "body"], "armorPenalty": { "REF": 0, "DEX": 0, "MOVE": 0 }, "ablates": true }
+          "value": {
+            "sp": 11,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": 0,
+              "DEX": 0,
+              "MOVE": 0
+            },
+            "ablates": true
+          }
         }
       ],
-      "desc": "armorjack leve; SP 11, sem penalidade de REF, DEX ou MOVE.",
+      "desc": "A escolha favorita dos edgerunners urbanos. Combina Kevlar tecido com malhas de placas de plástico flexível. Garante proteção substancial de SP11 com zero penalidades.",
       "price": 100,
       "category": "ARMOR",
       "cat": "ARMOR"
@@ -8586,12 +8682,28 @@
         "headSP": 11,
         "bodySP": 11,
         "ablates": true,
-        "armorPenalty": { "REF": 0, "DEX": 0, "MOVE": 0 }
+        "armorPenalty": {
+          "REF": 0,
+          "DEX": 0,
+          "MOVE": 0
+        }
       },
       "effects": [
         {
           "type": "armorLayer",
-          "value": { "sp": 11, "locations": ["head", "body"], "armorPenalty": { "REF": 0, "DEX": 0, "MOVE": 0 }, "ablates": true }
+          "value": {
+            "sp": 11,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": 0,
+              "DEX": 0,
+              "MOVE": 0
+            },
+            "ablates": true
+          }
         },
         {
           "type": "contextualEffect",
@@ -8602,10 +8714,12 @@
         "supportsInterfacePlugs": true,
         "supportsDeckMounts": true
       },
-      "desc": "traje isolante de combate; SP 11, sem penalidade; compativel com Interface Plugs e encaixes de deck de invasao.",
+      "desc": "Traje selado de combate com gel de absorção tática. SP11 para cabeça e corpo com zero penalidades. Adiciona 1 Option Slot para hardware de Cyberdeck e suporta Interface Plugs.",
       "price": 1000,
       "category": "ARMOR",
-      "cat": "ARMOR"
+      "cat": "ARMOR",
+      "optionSlotsProvided": 1,
+      "cyberdeckSlotsProvided": 1
     },
     {
       "id": "medium-armorjack",
@@ -8621,15 +8735,31 @@
         "headSP": 12,
         "bodySP": 12,
         "ablates": true,
-        "armorPenalty": { "REF": -2, "DEX": -2, "MOVE": -2 }
+        "armorPenalty": {
+          "REF": -2,
+          "DEX": -2,
+          "MOVE": -2
+        }
       },
       "effects": [
         {
           "type": "armorLayer",
-          "value": { "sp": 12, "locations": ["head", "body"], "armorPenalty": { "REF": -2, "DEX": -2, "MOVE": -2 }, "ablates": true }
+          "value": {
+            "sp": 12,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": -2,
+              "DEX": -2,
+              "MOVE": -2
+            },
+            "ablates": true
+          }
         }
       ],
-      "desc": "armorjack medio; SP 12 e penalidade de -2 para REF, DEX e MOVE.",
+      "desc": "Armorjack reforçado com placas rígidas de policarbonato adicionais. Oferece SP12 para cabeça e corpo, aplicando penalidade constante de -2 em REF, DEX e MOVE.",
       "price": 100,
       "category": "ARMOR",
       "cat": "ARMOR"
@@ -8648,15 +8778,31 @@
         "headSP": 13,
         "bodySP": 13,
         "ablates": true,
-        "armorPenalty": { "REF": -2, "DEX": -2, "MOVE": -2 }
+        "armorPenalty": {
+          "REF": -2,
+          "DEX": -2,
+          "MOVE": -2
+        }
       },
       "effects": [
         {
           "type": "armorLayer",
-          "value": { "sp": 13, "locations": ["head", "body"], "armorPenalty": { "REF": -2, "DEX": -2, "MOVE": -2 }, "ablates": true }
+          "value": {
+            "sp": 13,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": -2,
+              "DEX": -2,
+              "MOVE": -2
+            },
+            "ablates": true
+          }
         }
       ],
-      "desc": "armorjack pesado; SP 13 e penalidade de -2 para REF, DEX e MOVE.",
+      "desc": "A armadura corporal mais espessa disponível antes de armaduras militares. Oferece proteção de SP13 com penalidade de -2 em REF, DEX e MOVE.",
       "price": 500,
       "category": "ARMOR",
       "cat": "ARMOR"
@@ -8675,15 +8821,31 @@
         "headSP": 15,
         "bodySP": 15,
         "ablates": true,
-        "armorPenalty": { "REF": -4, "DEX": -4, "MOVE": -4 }
+        "armorPenalty": {
+          "REF": -4,
+          "DEX": -4,
+          "MOVE": -4
+        }
       },
       "effects": [
         {
           "type": "armorLayer",
-          "value": { "sp": 15, "locations": ["head", "body"], "armorPenalty": { "REF": -4, "DEX": -4, "MOVE": -4 }, "ablates": true }
+          "value": {
+            "sp": 15,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": -4,
+              "DEX": -4,
+              "MOVE": -4
+            },
+            "ablates": true
+          }
         }
       ],
-      "desc": "armadura flak; SP 15 e penalidade de -4 para REF, DEX e MOVE.",
+      "desc": "Armadura pesada de campo de batalha com placas metálicas rígidas que amortecem fragmentos e tiros de rifles. Proteção formidável de SP15, aplicando penalidade pesada de -4 em REF, DEX e MOVE.",
       "price": 500,
       "category": "ARMOR",
       "cat": "ARMOR"
@@ -8702,15 +8864,31 @@
         "headSP": 18,
         "bodySP": 18,
         "ablates": true,
-        "armorPenalty": { "REF": -4, "DEX": -4, "MOVE": -4 }
+        "armorPenalty": {
+          "REF": -4,
+          "DEX": -4,
+          "MOVE": -4
+        }
       },
       "effects": [
         {
           "type": "armorLayer",
-          "value": { "sp": 18, "locations": ["head", "body"], "armorPenalty": { "REF": -4, "DEX": -4, "MOVE": -4 }, "ablates": true }
+          "value": {
+            "sp": 18,
+            "locations": [
+              "head",
+              "body"
+            ],
+            "armorPenalty": {
+              "REF": -4,
+              "DEX": -4,
+              "MOVE": -4
+            },
+            "ablates": true
+          }
         }
       ],
-      "desc": "Metalgear completo; SP 18 e penalidade de -4 para REF, DEX e MOVE.",
+      "desc": "A blindagem pessoal definitiva das ruas de Night City. Placas rígidas de cerâmica montadas sobre um traje especial. Proteção extrema de SP18 contra qualquer disparo, com penalidade pesada de -4 em REF, DEX e MOVE.",
       "price": 5000,
       "category": "ARMOR",
       "cat": "ARMOR"
@@ -8730,13 +8908,13 @@
       "effects": [
         {
           "type": "contextualEffect",
-          "value": "shield with 10 HP (not SP); occupies one arm; no REF/DEX/MOVE penalty; can be installed in Popup Shield"
+          "value": "shield with 10 HP (not SP); occupies one arm; no REF/DEX/MOVE penalty; can be installed in Popup Shield; blocks Ranged Evasion"
         }
       ],
-      "desc": "escudo balistico dobravel com 10 HP proprios (nao SP); ocupa um braco; sem penalidade de REF, DEX ou MOVE.",
+      "desc": "Escudo balístico dobrável de policarbonato com 10 HP de cobertura. Quando empunhado, absorve o dano diretamente em seus pontos de vida e impede que o usuário se esquive (Evasion) de ataques à distância.",
       "price": 100,
-      "category": "GEAR",
-      "cat": "GEAR"
+      "category": "ARMOR",
+      "cat": "ARMOR"
     },
     {
       "id": "smart-ears",
@@ -8840,13 +9018,14 @@
       "specialRules": [
         "toxin ammunition: resolved by the toxin engine, not weapon damage"
       ],
-      "name": "Municao de Biotoxina",
+      "name": "Munição de Biotoxina",
       "ammoType": "Toxin",
-      "desc": "Flechas e granadas. Nao causa o dano da arma: alvo de carne atingido testa Resist Torture/Drugs DV15 ou sofre 3d6 direto no HP (sem ablacao).",
+      "desc": "Munição exótica carregada com biotoxina letal. Disponível para Flechas e Granadas. Alvos orgânicos atingidos não sofrem o dano comum da arma, mas devem passar em um teste de Resist Torture/Drugs contra DV15 ou sofrerão 3d6 de dano direto no HP, ignorando a armadura.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 500,
-      "toxinAmmo": true
+      "toxinAmmo": true,
+      "packSize": 1
     },
     {
       "id": "ammo-poison",
@@ -8859,13 +9038,14 @@
       "specialRules": [
         "toxin ammunition: resolved by the toxin engine, not weapon damage"
       ],
-      "name": "Municao de Veneno",
+      "name": "Munição de Veneno",
       "ammoType": "Toxin",
-      "desc": "Flechas e granadas. Nao causa o dano da arma: alvo de carne atingido testa Resist Torture/Drugs DV13 ou sofre 2d6 direto no HP (sem ablacao).",
+      "desc": "Munição exótica contendo veneno sintetizado. Compatível com arcos/bestas e granadas de fumaça. Alvos de carne atingidos devem passar em um teste de Resist Torture/Drugs DV13 ou sofrem 2d6 de dano direto no HP (sem ablação de armadura).",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 100,
-      "toxinAmmo": true
+      "toxinAmmo": true,
+      "packSize": 10
     },
     {
       "id": "ammo-teargas",
@@ -8878,13 +9058,14 @@
       "specialRules": [
         "toxin ammunition: resolved by the toxin engine, not weapon damage"
       ],
-      "name": "Municao de Gas Lacrimogeneo",
+      "name": "Munição de Gás Lacrimogêneo",
       "ammoType": "Toxin",
-      "desc": "Somente granadas. Nao causa o dano da arma: olhos de carne atingidos testam Resist Torture/Drugs DV13 ou recebem Olho Danificado por 1 minuto (sem dano bonus).",
+      "desc": "Gás não letal de controle de distúrbios, compatível apenas com Granadas. Alvos biológicos sem filtros nasais sofrem efeito de Olho Danificado por 1 minuto se falharem no teste de Resist Torture/Drugs DV13.",
       "category": "AMMUNITION",
       "cat": "AMMUNITION",
       "price": 50,
-      "toxinAmmo": true
+      "toxinAmmo": true,
+      "packSize": 1
     },
     {
       "id": "tox-belladonna",

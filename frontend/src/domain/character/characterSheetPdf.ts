@@ -4,7 +4,7 @@
  * Why hand-rolled: the app is served under `script-src 'self'`, so no CDN can
  * be reached, and the project carries no runtime npm dependencies at all. A
  * PDF with base-14 fonts and text widgets is a small enough format to emit
- * directly (~400 lines) that pulling in a ~300 KB library to do it would cost
+ * directly (~600 lines) that pulling in a ~300 KB library to do it would cost
  * more than it saves.
  *
  * "Editable" means every number a player touches between sessions — stats, HP,
@@ -13,18 +13,69 @@
  * the field's /V, and as an /AP appearance stream, because several viewers
  * (Chrome's built-in one included) ignore /NeedAppearances and would otherwise
  * show a sheet full of blanks until each field is clicked.
+ *
+ * This module is a renderer, not a resolver: everything it prints has to be
+ * handed to it already resolved. Gear damage in particular lives in the item
+ * catalog, so the caller merges the catalog into the inventory row before
+ * exporting (`Component.gearCatalogSource`) — otherwise a weapon saved as a
+ * bare catalog code exports with an empty DANO column.
  */
+
+export interface SheetPdfGear {
+  name?: string;
+  type?: string;
+  qty?: number;
+  dmg?: string;
+  rof?: number | string | null;
+  magazine?: number | null;
+  currentAmmo?: number | null;
+  equipped?: boolean;
+  notes?: string;
+}
+
+export interface SheetPdfArmorSlot {
+  name?: string;
+  sp?: number;
+  penalty?: number;
+}
+
+export interface SheetPdfCyberware {
+  name?: string;
+  cat?: string;
+  marketCat?: string;
+  hcost?: number;
+  location?: string | null;
+  desc?: string;
+}
+
+export interface SheetPdfProgram {
+  name?: string;
+  class?: string;
+  rez?: number;
+  maxRez?: number;
+  state?: string;
+  effect?: string;
+}
 
 export interface SheetPdfCharacter {
   id?: string;
   name?: string;
   role?: string;
   level?: number;
+  roleAbilityRank?: number;
   base?: Record<string, unknown>;
   health?: { cur?: number; max?: number };
   derived?: Record<string, unknown>;
   skills?: { name?: string; stat?: string; level?: number; total?: number }[];
-  gear?: { name?: string; type?: string; qty?: number; dmg?: string; notes?: string }[];
+  gear?: SheetPdfGear[];
+  armor?: { head?: SheetPdfArmorSlot; body?: SheetPdfArmorSlot };
+  shield?: { itemId?: string; name?: string; kind?: string; hp?: number; maxHp?: number } | null;
+  /** Installed chrome, already merged with the item catalog by the caller. */
+  cyberware?: SheetPdfCyberware[];
+  /** Cyberdeck programs, already resolved from their ids by the caller. */
+  programs?: SheetPdfProgram[];
+  criticalInjuries?: { name_pt?: string; location?: string; treated?: boolean; source?: string }[];
+  statusEffects?: { label_pt?: string; source?: string; remaining?: unknown; duration?: unknown }[];
   credits?: number;
   ip?: number;
   reputation?: number;
@@ -47,9 +98,12 @@ const PAGE_W = 595;
 const PAGE_H = 842;
 const MARGIN = 34;
 const CONTENT_W = PAGE_W - MARGIN * 2;
+const BOTTOM = PAGE_H - MARGIN;
 const STAT_ORDER = ['INT', 'REF', 'DEX', 'TECH', 'COOL', 'WILL', 'LUCK', 'MOVE', 'BODY', 'EMP'];
 const SKILL_ROWS_PER_PAGE = 34;
-const GEAR_ROWS = 14;
+/** Blank inventory lines kept past the character's gear, to fill in by hand. */
+const GEAR_MIN_ROWS = 18;
+const TABLE_ROW_H = 20;
 
 interface FieldSpec {
   name: string;
@@ -65,6 +119,19 @@ interface FieldSpec {
 interface PageDraft {
   ops: string[];
   fields: FieldSpec[];
+}
+
+/** A running cursor over one or more pages, so a section can spill over. */
+interface Flow {
+  pages: PageDraft[];
+  y: number;
+}
+
+interface TableColumn {
+  key: string;
+  label: string;
+  w: number;
+  size?: number;
 }
 
 // ---------------------------------------------------------------- primitives
@@ -92,16 +159,49 @@ function esc(value: unknown): string {
   return toWinAnsi(value).replace(/([\\()])/g, '\\$1').replace(/\r?\n/g, '\\n');
 }
 
-/** Rough base-14 width so long names can be trimmed instead of overflowing. */
+/** Rough base-14 character budget for a column of the given pixel width. */
+function charBudget(size: number, width: number): number {
+  return Math.max(1, Math.floor(width / (size * 0.5)));
+}
+
+/** Trim long values instead of letting them overflow their column. */
 function fits(value: string, size: number, width: number): string {
   const text = toWinAnsi(value);
-  const max = Math.max(1, Math.floor(width / (size * 0.5)));
+  const max = charBudget(size, width);
   return text.length <= max ? text : text.slice(0, Math.max(1, max - 1)) + '.';
+}
+
+/**
+ * Greedy word wrap. Without it a note paragraph renders as one long line that
+ * runs off the right edge of its box and is simply lost when printed.
+ */
+function wrapText(value: string, size: number, width: number, maxLines: number): string[] {
+  const max = charBudget(size, width);
+  const out: string[] = [];
+  for (const paragraph of toWinAnsi(value).split(/\r?\n/)) {
+    if (!paragraph.trim()) { out.push(''); continue; }
+    let current = '';
+    for (const word of paragraph.split(/\s+/)) {
+      const piece = word.length > max ? word.slice(0, max) : word;
+      if (!current) { current = piece; continue; }
+      if (current.length + 1 + piece.length <= max) { current += ' ' + piece; continue; }
+      out.push(current);
+      current = piece;
+      if (out.length >= maxLines) break;
+    }
+    if (current && out.length < maxLines) out.push(current);
+    if (out.length >= maxLines) break;
+  }
+  return out.slice(0, Math.max(0, maxLines));
 }
 
 function num(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function text(value: unknown): string {
+  return String(value == null ? '' : value).trim();
 }
 
 function txt(x: number, yTop: number, value: string, size = 9, bold = false): string {
@@ -119,6 +219,21 @@ function line(x1: number, yTop: number, x2: number): string {
 }
 
 // ------------------------------------------------------------------- layout
+
+function newPage(): PageDraft {
+  return { ops: [], fields: [] };
+}
+
+function flowPage(flow: Flow): PageDraft {
+  return flow.pages[flow.pages.length - 1];
+}
+
+/** Break to a new page when `height` no longer fits under the current cursor. */
+function flowEnsure(flow: Flow, height: number): void {
+  if (flow.y + height <= BOTTOM) return;
+  flow.pages.push(newPage());
+  flow.y = MARGIN + 8;
+}
 
 function sectionTitle(page: PageDraft, yTop: number, label: string): number {
   page.ops.push(rect(MARGIN, yTop - 10, CONTENT_W, 14, 0.88));
@@ -149,8 +264,83 @@ function labelledField(
   });
 }
 
+/**
+ * A ruled table of form fields that flows across pages. Every cell is editable
+ * so a printed sheet stays usable when the party picks something up mid-run.
+ */
+function tableSection(
+  flow: Flow,
+  title: string,
+  columns: TableColumn[],
+  rows: Record<string, string>[],
+  opts: { prefix: string; minRows?: number; gap?: number } = { prefix: 'row' },
+): void {
+  const gap = opts.gap == null ? 4 : opts.gap;
+  const total = Math.max(rows.length, opts.minRows || 0);
+  if (!total) return;
+
+  // The heading plus at least one row has to fit, or the title would strand
+  // itself at the bottom of a page with its table on the next one.
+  flowEnsure(flow, 16 + 10 + TABLE_ROW_H);
+  let page = flowPage(flow);
+  flow.y = sectionTitle(page, flow.y, title);
+
+  const drawHeader = (): void => {
+    let x = MARGIN;
+    page.ops.push('0.35 g\n');
+    for (const column of columns) {
+      page.ops.push(txt(x, flow.y - 3, column.label, 6.5));
+      x += column.w + gap;
+    }
+    page.ops.push('0 g\n');
+    flow.y += 4;
+  };
+  drawHeader();
+
+  for (let index = 0; index < total; index += 1) {
+    if (flow.y + TABLE_ROW_H > BOTTOM) {
+      flow.pages.push(newPage());
+      flow.y = MARGIN + 8;
+      page = flowPage(flow);
+      flow.y = sectionTitle(page, flow.y, `${title} (CONT.)`);
+      drawHeader();
+    }
+    const row = rows[index] || {};
+    let x = MARGIN;
+    for (const column of columns) {
+      const size = column.size || 8;
+      page.fields.push({
+        name: `${opts.prefix}.${index}.${column.key}`,
+        value: text(row[column.key]),
+        x,
+        y: flow.y,
+        w: column.w,
+        h: TABLE_ROW_H - 2,
+        size,
+      });
+      page.ops.push(line(x, flow.y + TABLE_ROW_H - 1, x + column.w));
+      x += column.w + gap;
+    }
+    flow.y += TABLE_ROW_H;
+  }
+  // Clear of the last row's rule, so the next section's title bar does not
+  // sit on top of it.
+  flow.y += 20;
+}
+
+/** Split a fixed width into columns by weight, absorbing the rounding drift. */
+function columnWidths(weights: number[], gap: number): number[] {
+  const usable = CONTENT_W - gap * (weights.length - 1);
+  const sum = weights.reduce((acc, weight) => acc + weight, 0);
+  const widths = weights.map((weight) => Math.floor((usable * weight) / sum));
+  widths[widths.length - 1] += usable - widths.reduce((acc, width) => acc + width, 0);
+  return widths;
+}
+
+// --------------------------------------------------------------------- pages
+
 function buildIdentityPage(input: SheetPdfInput): PageDraft {
-  const page: PageDraft = { ops: [], fields: [] };
+  const page = newPage();
   const c = input.character;
   const derived = (c.derived || {}) as Record<string, unknown>;
   const base = (c.base || {}) as Record<string, unknown>;
@@ -165,11 +355,27 @@ function buildIdentityPage(input: SheetPdfInput): PageDraft {
 
   let y = 68;
   y = sectionTitle(page, y, 'IDENTIDADE');
-  labelledField(page, { label: 'NOME', name: 'identity.name', value: String(c.name || ''), x: MARGIN, yTop: y, w: 240 });
-  labelledField(page, { label: 'PAPEL', name: 'identity.role', value: String(c.role || ''), x: MARGIN + 250, yTop: y, w: 160 });
-  labelledField(page, { label: 'NIVEL', name: 'identity.level', value: String(c.level ?? ''), x: MARGIN + 420, yTop: y, w: 107 });
+  const [nameW, roleW, rankW, levelW] = columnWidths([200, 130, 90, 87], 10);
+  labelledField(page, { label: 'NOME', name: 'identity.name', value: text(c.name), x: MARGIN, yTop: y, w: nameW });
+  labelledField(page, { label: 'PAPEL', name: 'identity.role', value: text(c.role), x: MARGIN + nameW + 10, yTop: y, w: roleW });
+  labelledField(page, {
+    label: 'RANK DE PAPEL',
+    name: 'identity.roleRank',
+    value: c.roleAbilityRank == null ? '' : String(num(c.roleAbilityRank, 0)),
+    x: MARGIN + nameW + roleW + 20,
+    yTop: y,
+    w: rankW,
+  });
+  labelledField(page, {
+    label: 'NIVEL',
+    name: 'identity.level',
+    value: c.level == null ? '' : String(c.level),
+    x: MARGIN + nameW + roleW + rankW + 30,
+    yTop: y,
+    w: levelW,
+  });
   y += 34;
-  labelledField(page, { label: 'JOGADOR', name: 'identity.player', value: input.owner || String(c.ownerUsername || ''), x: MARGIN, yTop: y, w: 240 });
+  labelledField(page, { label: 'JOGADOR', name: 'identity.player', value: input.owner || text(c.ownerUsername), x: MARGIN, yTop: y, w: 240 });
   labelledField(page, { label: 'CAMPANHA', name: 'identity.campaign', value: input.campaign || '', x: MARGIN + 250, yTop: y, w: 277 });
   y += 40;
 
@@ -194,6 +400,7 @@ function buildIdentityPage(input: SheetPdfInput): PageDraft {
 
   y = sectionTitle(page, y, 'ESTADO');
   const health = c.health || {};
+  const armor = c.armor || {};
   const cells: { label: string; name: string; value: string }[] = [
     { label: 'HP ATUAL', name: 'state.hp', value: String(num(health.cur, 0)) },
     { label: 'HP MAX', name: 'state.hpMax', value: String(num(health.max, num(derived.hpMax, 0))) },
@@ -201,8 +408,8 @@ function buildIdentityPage(input: SheetPdfInput): PageDraft {
     { label: 'DEATH SAVE', name: 'state.deathSave', value: String(num(derived.deathSave, 0)) },
     { label: 'HUMANIDADE', name: 'state.humanity', value: String(num(derived.humanityCurrent, 0)) },
     { label: 'HUM. MAX', name: 'state.humanityMax', value: String(num(derived.humanityMax, 0)) },
-    { label: 'SP CABECA', name: 'state.headSp', value: String(num(derived.currentHeadSp, num(derived.headSp, 0))) },
-    { label: 'SP CORPO', name: 'state.bodySp', value: String(num(derived.currentBodySp, num(derived.bodySp, 0))) },
+    { label: 'SP CABECA', name: 'state.headSp', value: String(num(derived.currentHeadSp, num(derived.headSp, num(armor.head && armor.head.sp, 0)))) },
+    { label: 'SP CORPO', name: 'state.bodySp', value: String(num(derived.currentBodySp, num(derived.bodySp, num(armor.body && armor.body.sp, 0)))) },
     { label: 'SORTE', name: 'state.luck', value: String(num(c.luckCurrent, 0)) },
     { label: 'EDDIES', name: 'state.credits', value: String(num(c.credits, 0)) },
     { label: 'IP', name: 'state.ip', value: String(num(c.ip, 0)) },
@@ -224,13 +431,17 @@ function buildIdentityPage(input: SheetPdfInput): PageDraft {
   y += 36 * Math.ceil(cells.length / 6) + 12;
 
   y = sectionTitle(page, y, 'HISTORIA E ANOTACOES');
+  // Both fields exist on a real sheet and neither is a fallback for the other,
+  // so exporting only one silently drops whatever the player wrote in the
+  // other tab.
+  const story = [text(c.story), text(c.notes)].filter(Boolean).join('\n\n');
   page.fields.push({
     name: 'notes.story',
-    value: String(c.story || c.notes || ''),
+    value: story,
     x: MARGIN,
     y: y + 2,
     w: CONTENT_W,
-    h: PAGE_H - MARGIN - (y + 2),
+    h: BOTTOM - (y + 2),
     multiline: true,
   });
   return page;
@@ -241,7 +452,7 @@ function buildSkillPage(
   pageIndex: number,
   pageCount: number,
 ): PageDraft {
-  const page: PageDraft = { ops: [], fields: [] };
+  const page = newPage();
   const rows = skills || [];
   let y = sectionTitle(page, MARGIN + 8, pageCount > 1 ? `HABILIDADES (${pageIndex + 1}/${pageCount})` : 'HABILIDADES');
   const colW = Math.floor((CONTENT_W - 16) / 2);
@@ -263,8 +474,8 @@ function buildSkillPage(
     const row = index % SKILL_ROWS_PER_PAGE;
     const x = MARGIN + col * (colW + 16);
     const rowTop = y + row * rowH;
-    page.ops.push(txt(x, rowTop + 11, fits(String(skill.name || ''), 8, colW - 104), 8));
-    page.ops.push(txt(x + colW - 96, rowTop + 11, String(skill.stat || ''), 7));
+    page.ops.push(txt(x, rowTop + 11, fits(text(skill.name), 8, colW - 104), 8));
+    page.ops.push(txt(x + colW - 96, rowTop + 11, text(skill.stat), 7));
     page.ops.push(line(x, rowTop + 14, x + colW));
     const slug = String(skill.name || index).toLowerCase().replace(/[^a-z0-9]+/g, '-');
     page.fields.push({
@@ -289,74 +500,206 @@ function buildSkillPage(
   return page;
 }
 
-function buildGearPage(character: SheetPdfCharacter): PageDraft {
-  const page: PageDraft = { ops: [], fields: [] };
-  let y = sectionTitle(page, MARGIN + 8, 'EQUIPAMENTO');
-  const gear = (character.gear || []).slice(0, GEAR_ROWS);
-  const nameW = 210;
-  const typeW = 96;
-  const qtyW = 40;
-  const dmgW = 70;
-  const notesW = CONTENT_W - nameW - typeW - qtyW - dmgW - 16;
+function ammoLabel(item: SheetPdfGear): string {
+  const magazine = item.magazine;
+  if (magazine == null || !Number.isFinite(Number(magazine))) return '';
+  const current = item.currentAmmo == null ? magazine : item.currentAmmo;
+  return `${num(current, 0)}/${num(magazine, 0)}`;
+}
 
-  page.ops.push('0.35 g\n');
-  page.ops.push(txt(MARGIN, y - 3, 'ITEM', 6.5));
-  page.ops.push(txt(MARGIN + nameW + 4, y - 3, 'TIPO', 6.5));
-  page.ops.push(txt(MARGIN + nameW + typeW + 8, y - 3, 'QTD', 6.5));
-  page.ops.push(txt(MARGIN + nameW + typeW + qtyW + 12, y - 3, 'DANO', 6.5));
-  page.ops.push(txt(MARGIN + nameW + typeW + qtyW + dmgW + 16, y - 3, 'NOTAS', 6.5));
-  page.ops.push('0 g\n');
-  y += 4;
+function gearRows(character: SheetPdfCharacter): Record<string, string>[] {
+  return (character.gear || []).map((item) => {
+    const rof = item.rof == null || item.rof === '' ? '' : `ROF ${item.rof}`;
+    const notes = [item.equipped ? 'EQUIPADO' : '', rof, text(item.notes)].filter(Boolean).join(' · ');
+    return {
+      name: text(item.name),
+      type: text(item.type),
+      qty: item.qty == null ? '' : String(num(item.qty, 0)),
+      dmg: text(item.dmg),
+      ammo: ammoLabel(item),
+      notes,
+    };
+  });
+}
 
-  // Blank rows past the character's current gear: the sheet is meant to be
-  // filled in by hand once it leaves the app.
-  for (let index = 0; index < GEAR_ROWS; index += 1) {
-    const item = gear[index] || {};
-    const rowTop = y + index * 22;
-    const columns: [string, string, number, number][] = [
-      [`gear.${index}.name`, String(item.name || ''), MARGIN, nameW],
-      [`gear.${index}.type`, String(item.type || ''), MARGIN + nameW + 4, typeW],
-      [`gear.${index}.qty`, item.qty == null ? '' : String(item.qty), MARGIN + nameW + typeW + 8, qtyW],
-      [`gear.${index}.dmg`, String(item.dmg || ''), MARGIN + nameW + typeW + qtyW + 12, dmgW],
-      [`gear.${index}.notes`, String(item.notes || ''), MARGIN + nameW + typeW + qtyW + dmgW + 16, notesW],
-    ];
-    for (const [name, value, x, w] of columns) {
-      page.fields.push({ name, value, x, y: rowTop, w, h: 18, size: 8 });
-      page.ops.push(line(x, rowTop + 19, x + w));
-    }
+function buildGearFlow(flow: Flow, character: SheetPdfCharacter): void {
+  const [nameW, typeW, qtyW, dmgW, ammoW, notesW] = columnWidths([160, 92, 26, 54, 42, 153], 4);
+  tableSection(
+    flow,
+    'EQUIPAMENTO',
+    [
+      { key: 'name', label: 'ITEM', w: nameW },
+      { key: 'type', label: 'TIPO', w: typeW, size: 7 },
+      { key: 'qty', label: 'QTD', w: qtyW },
+      { key: 'dmg', label: 'DANO', w: dmgW },
+      { key: 'ammo', label: 'MUN.', w: ammoW, size: 7 },
+      { key: 'notes', label: 'NOTAS', w: notesW, size: 7 },
+    ],
+    gearRows(character),
+    { prefix: 'gear', minRows: GEAR_MIN_ROWS },
+  );
+}
+
+function buildChromeFlow(flow: Flow, character: SheetPdfCharacter): void {
+  const armor = character.armor || {};
+  const shield = character.shield || null;
+
+  // Armour is the one block a player re-reads every single fight; the derived
+  // SP boxes on page 1 do not say which armour those numbers came from.
+  flowEnsure(flow, 16 + 40);
+  const page = flowPage(flow);
+  flow.y = sectionTitle(page, flow.y, 'ARMADURA E ESCUDO');
+  const armorW = columnWidths([180, 44, 44, 180, 44, 44], 8);
+  const armorCells: { label: string; name: string; value: string }[] = [
+    { label: 'CABECA', name: 'armor.head.name', value: text(armor.head && armor.head.name) },
+    { label: 'SP', name: 'armor.head.sp', value: String(num(armor.head && armor.head.sp, 0)) },
+    { label: 'PENAL.', name: 'armor.head.penalty', value: String(num(armor.head && armor.head.penalty, 0)) },
+    { label: 'CORPO', name: 'armor.body.name', value: text(armor.body && armor.body.name) },
+    { label: 'SP', name: 'armor.body.sp', value: String(num(armor.body && armor.body.sp, 0)) },
+    { label: 'PENAL.', name: 'armor.body.penalty', value: String(num(armor.body && armor.body.penalty, 0)) },
+  ];
+  let x = MARGIN;
+  armorCells.forEach((cell, index) => {
+    labelledField(page, { label: cell.label, name: cell.name, value: cell.value, x, yTop: flow.y, w: armorW[index] });
+    x += armorW[index] + 8;
+  });
+  flow.y += 34;
+  const [shieldNameW, shieldKindW, shieldHpW] = columnWidths([300, 120, 107], 8);
+  labelledField(page, { label: 'ESCUDO', name: 'shield.name', value: text(shield && (shield.name || shield.itemId)), x: MARGIN, yTop: flow.y, w: shieldNameW });
+  labelledField(page, { label: 'TIPO', name: 'shield.kind', value: text(shield && shield.kind), x: MARGIN + shieldNameW + 8, yTop: flow.y, w: shieldKindW });
+  labelledField(page, {
+    label: 'HP',
+    name: 'shield.hp',
+    value: shield ? `${num(shield.hp, 0)}/${num(shield.maxHp, 0)}` : '',
+    x: MARGIN + shieldNameW + shieldKindW + 16,
+    yTop: flow.y,
+    w: shieldHpW,
+  });
+  flow.y += 44;
+
+  const cyberware = character.cyberware || [];
+  if (cyberware.length) {
+    const [nameW, catW, humW, descW] = columnWidths([150, 96, 34, 247], 4);
+    tableSection(
+      flow,
+      'CYBERWARE INSTALADO',
+      [
+        { key: 'name', label: 'CHROME', w: nameW },
+        { key: 'cat', label: 'CATEGORIA', w: catW, size: 7 },
+        { key: 'hum', label: 'HUM.', w: humW },
+        { key: 'desc', label: 'EFEITO / LOCAL', w: descW, size: 7 },
+      ],
+      cyberware.map((item) => ({
+        name: text(item.name),
+        cat: text(item.marketCat || item.cat),
+        hum: item.hcost == null ? '' : String(num(item.hcost, 0)),
+        desc: [text(item.location), text(item.desc)].filter(Boolean).join(' · '),
+      })),
+      { prefix: 'cyber' },
+    );
   }
-  y += GEAR_ROWS * 22 + 10;
 
-  y = sectionTitle(page, y, 'CYBERWARE, CONTATOS E LIVRE');
-  const freeHeight = PAGE_H - MARGIN - (y + 2);
+  const programs = character.programs || [];
+  if (programs.length) {
+    const [nameW, classW, rezW, effectW] = columnWidths([130, 80, 50, 267], 4);
+    tableSection(
+      flow,
+      'PROGRAMAS DO CYBERDECK',
+      [
+        { key: 'name', label: 'PROGRAMA', w: nameW },
+        { key: 'class', label: 'CLASSE', w: classW, size: 7 },
+        { key: 'rez', label: 'REZ', w: rezW },
+        { key: 'effect', label: 'EFEITO', w: effectW, size: 7 },
+      ],
+      programs.map((program) => ({
+        name: text(program.name),
+        class: text(program.class),
+        rez: program.maxRez ? `${num(program.rez, 0)}/${num(program.maxRez, 0)}` : text(program.state),
+        effect: text(program.effect),
+      })),
+      { prefix: 'program' },
+    );
+  }
+
+  const injuries = character.criticalInjuries || [];
+  if (injuries.length) {
+    const [nameW, locW, treatedW, sourceW] = columnWidths([220, 80, 90, 137], 4);
+    tableSection(
+      flow,
+      'FERIMENTOS CRITICOS',
+      [
+        { key: 'name', label: 'FERIMENTO', w: nameW },
+        { key: 'location', label: 'LOCAL', w: locW, size: 7 },
+        { key: 'treated', label: 'TRATADO', w: treatedW, size: 7 },
+        { key: 'source', label: 'ORIGEM', w: sourceW, size: 7 },
+      ],
+      injuries.map((injury) => ({
+        name: text(injury.name_pt),
+        location: injury.location === 'head' ? 'CABECA' : 'CORPO',
+        treated: injury.treated ? 'SIM' : 'NAO',
+        source: text(injury.source),
+      })),
+      { prefix: 'injury' },
+    );
+  }
+
+  const statuses = character.statusEffects || [];
+  if (statuses.length) {
+    const [nameW, sourceW, remainingW] = columnWidths([260, 130, 137], 4);
+    tableSection(
+      flow,
+      'ESTADOS ATIVOS',
+      [
+        { key: 'name', label: 'ESTADO', w: nameW },
+        { key: 'source', label: 'ORIGEM', w: sourceW, size: 7 },
+        { key: 'remaining', label: 'DURACAO', w: remainingW, size: 7 },
+      ],
+      statuses.map((status) => {
+        const remaining = (status.remaining || status.duration) as { value?: unknown; unit?: unknown } | null;
+        return {
+          name: text(status.label_pt),
+          source: text(status.source),
+          remaining: remaining ? `${text(remaining.value)} ${text(remaining.unit)}`.trim() : '',
+        };
+      }),
+      { prefix: 'status' },
+    );
+  }
+
+  // Whatever vertical space is left becomes ruled, writable scratch space —
+  // contacts, loot, rep, whatever the table needs mid-session.
+  flowEnsure(flow, 16 + 60);
+  const last = flowPage(flow);
+  flow.y = sectionTitle(last, flow.y, 'CONTATOS E ANOTACOES LIVRES');
+  const freeHeight = BOTTOM - (flow.y + 2);
   for (let rule = 1; rule * 16 < freeHeight; rule += 1) {
-    page.ops.push(line(MARGIN, y + 2 + rule * 16, MARGIN + CONTENT_W));
+    last.ops.push(line(MARGIN, flow.y + 2 + rule * 16, MARGIN + CONTENT_W));
   }
-  page.fields.push({
+  last.fields.push({
     name: 'notes.free',
     value: '',
     x: MARGIN,
-    y: y + 2,
+    y: flow.y + 2,
     w: CONTENT_W,
     h: freeHeight,
     multiline: true,
   });
-  return page;
 }
 
 // -------------------------------------------------------------- PDF assembly
 
 function appearanceStream(field: FieldSpec): string {
   const size = field.size || 9;
+  const lineHeight = size + 3;
   const lines = field.multiline
-    ? toWinAnsi(field.value).split(/\r?\n/).slice(0, Math.floor(field.h / (size + 3)))
-    : [toWinAnsi(field.value)];
+    ? wrapText(field.value, size, field.w - 6, Math.max(1, Math.floor(field.h / lineHeight)))
+    : [fits(field.value, size, field.w - 6)];
   let body = '/Tx BMC q BT 0 g /Helv ' + size + ' Tf\n';
-  lines.forEach((text, index) => {
+  lines.forEach((value, index) => {
     const y = field.multiline
-      ? field.h - size - 3 - index * (size + 3)
+      ? field.h - size - 3 - index * lineHeight
       : (field.h - size) / 2 + 1;
-    body += `1 0 0 1 3 ${y.toFixed(2)} Tm (${esc(text)}) Tj\n`;
+    body += `1 0 0 1 3 ${y.toFixed(2)} Tm (${esc(value)}) Tj\n`;
   });
   body += 'ET Q EMC\n';
   return body;
@@ -379,7 +722,14 @@ export function buildCharacterSheetPdf(input: SheetPdfInput): Uint8Array {
     );
     pages.push(buildSkillPage(slice, index, skillPageCount));
   }
-  pages.push(buildGearPage(character));
+
+  const gearFlow: Flow = { pages: [newPage()], y: MARGIN + 8 };
+  buildGearFlow(gearFlow, character);
+  pages.push(...gearFlow.pages);
+
+  const chromeFlow: Flow = { pages: [newPage()], y: MARGIN + 8 };
+  buildChromeFlow(chromeFlow, character);
+  pages.push(...chromeFlow.pages);
 
   // Object numbers are assigned up front because pages reference their widgets
   // and every widget references its page back.

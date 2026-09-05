@@ -19,10 +19,16 @@ const character = {
     { name: 'Brawling', stat: 'DEX', level: 4, total: 9 },
     { name: 'Concentration', stat: 'WILL', level: 2, total: 7 },
   ],
-  gear: [{ name: 'Heavy Pistol', type: 'WEAPON', qty: 1, dmg: '3d6', notes: 'Excelente' }],
+  gear: [{ name: 'Heavy Pistol', type: 'WEAPON', qty: 1, dmg: '3d6', magazine: 8, currentAmmo: 5, notes: 'Excelente' }],
+  armor: { head: { name: 'Light Armorjack', sp: 11, penalty: 0 }, body: { name: 'Light Armorjack', sp: 11, penalty: 0 } },
+  cyberware: [{ name: 'Kerenzikov', marketCat: 'NEURAL', hcost: 14, desc: '+2 em Initiative Rolls' }],
+  programs: [{ name: 'Sword', class: 'attacker', rez: 0, maxRez: 0, state: 'rezzed', effect: '3d6 REZ' }],
+  criticalInjuries: [{ name_pt: 'Costelas quebradas', location: 'body', treated: false, source: 'combate' }],
+  statusEffects: [{ label_pt: 'Atordoado', source: 'combate', remaining: { value: 2, unit: 'round' } }],
   credits: 12000,
   ip: 45,
   story: 'ORIGEM:\nNight City',
+  notes: 'Deve favores ao fixer.',
 };
 
 function parse(pdf: string) {
@@ -86,8 +92,51 @@ describe('buildCharacterSheetPdf', () => {
       name: `Skill ${index}`, stat: 'INT', level: 1, total: 5,
     }));
     const pdf = decode(buildCharacterSheetPdf({ character: { ...character, skills: many } }));
-    expect(/\/Type \/Pages \/Count 4/.test(pdf)).toBe(true);
+    expect(/\/Type \/Pages \/Count 5/.test(pdf)).toBe(true);
     expect(pdf).toContain('HABILIDADES \\(2/2\\)');
+  });
+
+  it('exports the damage and ammunition of every inventory row', () => {
+    const pdf = decode(buildCharacterSheetPdf({ character }));
+    expect(pdf).toContain('/T (gear.0.name) /V (Heavy Pistol)');
+    expect(pdf).toContain('/T (gear.0.dmg) /V (3d6)');
+    expect(pdf).toContain('/T (gear.0.ammo) /V (5/8)');
+  });
+
+  it('exports armour, chrome, programs and conditions the sheet carries', () => {
+    const pdf = decode(buildCharacterSheetPdf({ character }));
+    expect(pdf).toContain('/T (armor.head.name) /V (Light Armorjack)');
+    expect(pdf).toContain('/T (armor.body.sp) /V (11)');
+    expect(pdf).toContain('/T (cyber.0.name) /V (Kerenzikov)');
+    expect(pdf).toContain('/T (cyber.0.hum) /V (14)');
+    expect(pdf).toContain('/T (program.0.name) /V (Sword)');
+    expect(pdf).toContain('/T (injury.0.name) /V (Costelas quebradas)');
+    expect(pdf).toContain('/T (status.0.name) /V (Atordoado)');
+  });
+
+  it('keeps both the story and the notes tab instead of exporting only one', () => {
+    const pdf = decode(buildCharacterSheetPdf({ character }));
+    expect(pdf).toContain('/T (notes.story) /V (ORIGEM:\\nNight City\\n\\nDeve favores ao fixer.)');
+  });
+
+  it('wraps a long note over several appearance lines instead of clipping it', () => {
+    const long = 'palavra '.repeat(60).trim();
+    const pdf = decode(buildCharacterSheetPdf({ character: { ...character, story: long, notes: '' } }));
+    // The appearance stream is what non-interactive viewers print; a single
+    // Tm line there means the paragraph ran off the right edge of the box.
+    const streams = [...pdf.matchAll(/\/Tx BMC q BT 0 g \/Helv [\d.]+ Tf\n((?:1 0 0 1 3 [^\n]*\n)+)ET Q EMC/g)];
+    const noteLines = streams
+      .map((match) => match[1].trimEnd().split('\n'))
+      .filter((lines) => lines.some((entry) => entry.includes('palavra')));
+    expect(noteLines.length).toBe(1);
+    expect(noteLines[0].length).toBeGreaterThan(3);
+  });
+
+  it('grows the inventory table past one page instead of dropping rows', () => {
+    const many = Array.from({ length: 70 }, (_, index) => ({ name: `Item ${index}`, type: 'GEAR', qty: 1 }));
+    const pdf = decode(buildCharacterSheetPdf({ character: { ...character, gear: many } }));
+    expect(pdf).toContain('/T (gear.69.name) /V (Item 69)');
+    expect(pdf).toContain('EQUIPAMENTO \\(CONT.\\)');
   });
 
   it('names the download after the character', () => {

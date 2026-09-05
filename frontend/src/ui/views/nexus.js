@@ -3,10 +3,14 @@
 // "breach" minigame rendered alongside it. Mount/teardown of the vendored
 // NexusBreach DOM widget lives here too (FX/lifecycle belongs to the view).
 import {
+  BREACH_TIERS,
   blackIceById,
   blackIceOptionsForTier,
+  breachConnectionOptions,
+  breachTierForDv,
   breachTierOptions,
   buildBreachConfig,
+  normalizeBreachConnection,
   netrunningProgramById,
   normalizeInstalledPrograms,
   normalizeBlackIceState,
@@ -90,7 +94,14 @@ export function nexusRenderVals(state = {}, deps = {}) {
   }));
   const hasScannerReveal = scannerRevealRows.length > 0;
   const nexusDraftWatchers = normalizeWatchers(S.nexusWatchers);
-  const nexusPreviewConfig = buildBreachConfig(nexusTier, nexusTargetRank, [], nexusTarget.netPrograms, nexusBlackIceSelection, nexusDraftWatchers);
+  const nexusConnection = normalizeBreachConnection(S.nexusConnection);
+  const nexusPreviewConfig = buildBreachConfig(nexusTier, nexusTargetRank, [], nexusTarget.netPrograms, nexusBlackIceSelection, nexusDraftWatchers, { connection: nexusConnection });
+  const nexusConnectionOptions = breachConnectionOptions().map(link => ({
+    id: link.id,
+    label: link.label.toUpperCase() + ' // ' + link.hint,
+    selected: link.id === nexusConnection,
+    notSelected: link.id !== nexusConnection,
+  }));
   const watcherDraft = S.nexusWatcherDraft || {};
   const draftPreset = watcherPresetById(watcherDraft.presetId) || WATCHER_PRESETS[0];
   const nexusWatcherPresetOptions = WATCHER_PRESETS.map(preset => ({
@@ -129,7 +140,11 @@ export function nexusRenderVals(state = {}, deps = {}) {
     const watchers = normalizeWatchers(nx.watchers);
     const watcherNote = watchers.length ? ' · ' + watchers.length + ' watcher' + (watchers.length > 1 ? 's' : '') : '';
     const stealthNote = nx.stealthActive ? ' · stealth' : '';
-    return arch + (nx.scriptCount || '?') + ' scripts · matriz ' + nx.matrixSize + '×' + nx.matrixSize + ' · ' + time + ' · trace ' + nx.traceRate + 'x · ' + continuity + (nx.secondaryObjectives ? ' · bônus' : '') + (programs.length ? ' · ' + programs.join(' · ') : '') + (showIce ? ' · ICE ' + ice.name : '') + watcherNote + stealthNote;
+    // The link and the speed contest are difficulty the player is entitled to
+    // see: they explain the clock and the trace rate right next to them.
+    const linkNote = nx.connectionLabel ? nx.connectionLabel.toLowerCase() + (nx.connectionCheckMod ? ' (' + (nx.connectionCheckMod > 0 ? '+' : '') + nx.connectionCheckMod + ' nos checks)' : '') + ' · ' : '';
+    const speedNote = nx.speedDelta == null ? '' : ' · spd ' + nx.runnerSpeed + 'v' + nx.systemSpeed;
+    return arch + linkNote + (nx.scriptCount || '?') + ' scripts · matriz ' + nx.matrixSize + '×' + nx.matrixSize + ' · ' + time + ' · trace ' + nx.traceRate + 'x' + speedNote + ' · ' + continuity + (nx.secondaryObjectives ? ' · bônus' : '') + (programs.length ? ' · ' + programs.join(' · ') : '') + (showIce ? ' · ICE ' + ice.name : '') + watcherNote + stealthNote;
   })() : '';
 
   const nexusTargetName = (() => {
@@ -268,6 +283,10 @@ export function nexusRenderVals(state = {}, deps = {}) {
       notSelected: tier.id !== nexusTier,
     })),
     onNexusTier: (e) => deps.setNexusTier(e.target.value),
+    nexusConnection,
+    nexusConnectionOptions,
+    onNexusConnection: (e) => deps.setNexusConnection(e.target.value),
+    nexusDifficultyDigest: nexusPreviewConfig.difficultyDigest || [],
     nexusBlackIceOptions,
     onNexusBlackIce: (e) => deps.setNexusBlackIce(e.target.value),
     nexusPreviewBlackIceLabel,
@@ -417,6 +436,9 @@ export function nexusHandlers(component) {
     const iceId = currentChallengeBlackIceId();
     component.setState({
       nexusResult: saved,
+      // The run is over: release the client-local lock so the next refresh can
+      // pull whatever the GM has published since.
+      nexusLocalRun: false,
       ...(traced && iceId ? { nexusBlackIce: normalizeBlackIceState({ revealed: true }, iceId) } : {}),
     });
     component.postChat({
@@ -443,6 +465,9 @@ export function nexusHandlers(component) {
         window.NexusBreach.mount(rootEl, { showSetup: false, config: cfg, onResult: reportNexusResult });
       }
     };
+    // A run the player opened from their own NET test is client-local: the
+    // server has no such challenge, so asking for it would wipe the run.
+    if (component.state.nexusLocalRun) { apply(component.state.nexusChallenge); return; }
     if (component.api() && component.api().nexus) {
       component.api().nexus.get().then(cfg => { component.setState({ nexusChallenge: cfg }); apply(cfg); });
     } else {
@@ -450,9 +475,70 @@ export function nexusHandlers(component) {
     }
   };
 
+
+  // A NET test rolled at the table (GM console request or the sheet's own
+  // Interface Ability button) IS the run's entry check: the DV the GM asked
+  // for picks the Architecture tier, and the roll itself seeds the matching
+  // prep result, so a clean Backdoor opens the run one script lighter. The
+  // config never leaves this client — the GM's published challenge, when
+  // there is one, always wins.
+  const launchNetTestRun = (context = {}) => {
+    if (component.state.gm) return false;
+    const activeId = component.state.activeCharacterId;
+    if (context.actorId && activeId && context.actorId !== activeId) return false;
+    if (window.NexusBreach && window.NexusBreach.isMounted()) {
+      flash('Run em andamento :: teste NET rolado sem abrir novo Nexus');
+      return false;
+    }
+    const pending = component.state.nexusChallenge;
+    if (!component.state.nexusLocalRun && pending && pending.architectureTier && challengeForActivePlayer(pending) && !component.state.nexusResult) {
+      flash('Desafio do mestre pendente :: abra o Nexus para joga-lo');
+      return false;
+    }
+    const character = component.activeCharacter();
+    const rank = interfaceRankFor(character);
+    const tierId = breachTierForDv(context.dv);
+    const requestedDv = Number(context.dv);
+    const dv = Number.isFinite(requestedDv) ? requestedDv : BREACH_TIERS[tierId].dv;
+    const abilityId = String(context.abilityId || '').toLowerCase();
+    const connection = normalizeBreachConnection(context.connection);
+    const total = Number(context.total) || 0;
+    // commitRoll already applied the RAW "beat the DV, a tie fails" rule when
+    // the request carried one; without a DV the tier's own DV decides.
+    const success = typeof context.success === 'boolean' ? context.success : total > dv;
+    // Non-prep abilities (zap, control, eye-dee, custom) are dropped by
+    // buildBreachConfig's own filter — no need to branch on the id here.
+    const prepResults = [{ abilityId, success, margin: total - dv, source: 'teste NET' }];
+    const config = {
+      ...buildBreachConfig(tierId, rank, prepResults, character && character.netPrograms, 'auto', [], { dv, connection }),
+      targetId: activeId || null,
+      interfaceRank: rank,
+      prepRequired: false,
+      prepComplete: true,
+      netTest: { abilityId: abilityId || 'custom', label: context.label || 'TESTE NET', dv, total, success, connection },
+    };
+    component.setState({
+      nexusChallenge: config,
+      nexusLocalRun: true,
+      nexusResult: null,
+      nexusPrepResults: [],
+      nexusPrepFinalized: true,
+      nexusStealth: null,
+      nexusBlackIce: null,
+      view: 'games',
+      gameTab: 'nexus',
+      sheetOpen: false,
+      selected: null,
+    });
+    teardownNexus();
+    mountNexus();
+    return true;
+  };
+
   return {
     teardownNexus,
     mountNexus,
+    launchNetTestRun,
     challengeForActivePlayer,
     reportNexusResult,
     interfaceRankFor,
@@ -470,7 +556,7 @@ export function nexusHandlers(component) {
       const rank = interfaceRankFor(target);
       const watchers = normalizeWatchers(component.state.nexusWatchers);
       const config = architectureMode()
-        ? { ...buildBreachConfig(component.state.nexusTier || 'standard', rank, [], target && target.netPrograms, component.state.nexusBlackIceId || 'auto', watchers), targetId, interfaceRank: rank, prepRequired: true }
+        ? { ...buildBreachConfig(component.state.nexusTier || 'standard', rank, [], target && target.netPrograms, component.state.nexusBlackIceId || 'auto', watchers, { connection: component.state.nexusConnection }), targetId, interfaceRank: rank, prepRequired: true }
         : { ...window.NexusBreach.readConfig(), targetId, configMode: 'custom' };
       const saved = (component.api() && component.api().nexus) ? await component.api().nexus.set(config) : config;
       component.setState({ nexusChallenge: saved, nexusResult: null, nexusPrepResults: [], nexusPrepFinalized: false, nexusStealth: null, nexusBlackIce: null, gmStatus: 'Desafio enviado para ' + ((target && target.name) || 'operativo') });
@@ -486,6 +572,7 @@ export function nexusHandlers(component) {
       if (mode === 'custom') mountNexus();
     },
     setNexusTier: (value) => component.setState({ nexusTier: value }),
+    setNexusConnection: (value) => component.setState({ nexusConnection: normalizeBreachConnection(value) }),
 
     // GM: Watcher roster for the next published challenge (Going Quiet).
     setNexusWatcherPreset(value) {
@@ -656,7 +743,11 @@ export function nexusHandlers(component) {
     runNexusPrep(abilityId) {
       const challenge = component.state.nexusChallenge || {};
       const rank = Number(challenge.interfaceRank) || interfaceRankFor(component.activeCharacter());
+      // The DV is the one the run was opened with (the GM's, when they named
+      // one), and the link the operative is jacked in through modifies every
+      // Interface check made from inside it.
       const dv = Number(challenge.architectureDv) || 8;
+      const linkMod = Number(challenge.connectionCheckMod) || 0;
       const current = nexusPrepResults();
       const limit = netActionsPerTurn(rank);
       if (!challengeForActivePlayer(challenge)) return component.flash && component.flash('Nenhuma architecture publicada para este operativo');
@@ -666,10 +757,10 @@ export function nexusHandlers(component) {
       const abilityName = String(abilityId || '').toUpperCase();
       component.roll({
         actorId: component.state.activeCharacterId,
-        label: 'NEXUS PREP :: ' + abilityName,
+        label: 'NEXUS PREP :: ' + abilityName + (linkMod ? ' (' + (linkMod > 0 ? '+' : '') + linkMod + ' ' + String(challenge.connectionLabel || challenge.connection || 'LINK').toUpperCase() + ')' : ''),
         sides: 10,
         count: 1,
-        mod: rank,
+        mod: rank + linkMod,
         check: true,
         dv,
         onResolved: (result) => {
@@ -688,7 +779,7 @@ export function nexusHandlers(component) {
       const challenge = component.state.nexusChallenge || {};
       if (!challengeForActivePlayer(challenge)) return;
       const finalConfig = {
-        ...buildBreachConfig(challenge.architectureTier || 'standard', challenge.interfaceRank || interfaceRankFor(component.activeCharacter()), nexusPrepResults(), component.activeCharacter().netPrograms, challenge.blackIceId || 'none', challenge.watchers),
+        ...buildBreachConfig(challenge.architectureTier || 'standard', challenge.interfaceRank || interfaceRankFor(component.activeCharacter()), nexusPrepResults(), component.activeCharacter().netPrograms, challenge.blackIceId || 'none', challenge.watchers, { dv: challenge.architectureDv, connection: challenge.connection }),
         targetId: challenge.targetId || null,
         interfaceRank: challenge.interfaceRank || interfaceRankFor(component.activeCharacter()),
         prepRequired: true,
