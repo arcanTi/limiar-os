@@ -36,7 +36,16 @@ The latest evidence-based repository score lives in
 - Keeps Night City Tarot as a persistent deck and session, with effects
   translated into damage, ablation, criticals and auditable status.
 - Embeds Nexus Breach as a Netrunner minigame inside the same surface.
+- Tracks progression: IP, character level, Role rank and table achievements
+  awarded to the party or to one character, with an undo that reverses the
+  whole award.
 - Includes chat, shared GM state, HQ/IP and the combat cockpit.
+- Puts the table's sheets on one GM console, with a quick-edit bench for HP,
+  IP, eddies, conditions, items and directed NET checks.
+- Rolls complete NPC stat blocks from an archetype crossed with a tier, from a
+  seed that reproduces the whole squad.
+- Exports any sheet as a fillable PDF, generated in-process with no
+  dependency and no server round trip.
 - Includes the **Mesa**, a per-campaign tactical map tied to combat and
   sheets.
 
@@ -75,6 +84,15 @@ only when you continue without a campaign.
 Staff delete a sheet from **SYSTEM → GM DATA OPS → PERSONAGENS DESTA
 CAMPANHA**, which is also how a table clears the demo sheets on a fresh
 install. Deletion is limited to the campaign you run; `admin` can delete any.
+
+### Playing an absent player's character
+
+A player who misses a session can have their sheet handed to someone else at
+the table. From the campaign roster the GM grants control of one character to
+another **member of that same campaign**; the substitute then plays it
+alongside their own. The grant is not membership: the absent player keeps their
+seat and their ownership, so nothing about the sheet changes hands. It has no
+expiry — the GM revokes it when the player is back (migration `0008`).
 
 ## Effects panel
 
@@ -177,6 +195,33 @@ straight to the resist check. Load one from the weapon row in the combat
 cockpit; the button cycles through the rounds that weapon accepts and back to
 none.
 
+## GM table console
+
+**MESA // PERSONAGENS** is the GM-only band above the sheet tabs in the main
+app — the table read as characters, not the tactical map. Every sheet at the
+table is a card with its portrait, Role, level, IP, owner, an HP bar and a
+count of untreated injuries and active effects; a search over name, Role and
+owner plus a PJ/NPC filter narrows the grid.
+
+Choosing a card makes that character **active**, which is what every other GM
+tool — inventory, market, conditions, IP — is already pointing at. Under the
+grid sits a quick console for the edits that were not worth a round trip
+through another page, and each card's buttons jump straight to the right tab
+with that character selected:
+
+| Tab | What it does |
+| --- | --- |
+| VITAIS | damage, heal, heal to full, IP in or out, eddies |
+| CONDICOES | apply one critical injury or one status effect, campaign effects included |
+| ITENS | hand over a catalog product, or a free-form item (GEAR, WEAPON, ARMOR, CONSUMABLE, DATA, KEYCARD, CYBERWARE) |
+| NET | send a NET check to one player or to the whole table |
+
+The NET tab picks a RAW Netrunning ability (or a free label), a DV from the
+architecture floors 6/8/10/12 plus the hard 15/17, and sends the roll to the
+player instead of rolling for them. Only Netrunners have an Interface rank; for
+anyone else the console says so before the request goes out — they roll a flat
+1d10.
+
 ## Tactical Mesa
 
 The Mesa lives in `campaign-map.html` and the `/api/campaign-maps/*`
@@ -221,9 +266,10 @@ records IP history:
 - Role ability: `next rank * 30`.
 
 Every new player sheet is built by the guided wizard
-(`frontend/src/ui/views/onboarding.js`), whose steps are validated in
-`frontend/src/domain/character/characterWizard.ts`. Its fifth step spends the
-Complete Package's starting money (CPR p.42/104/105/110), and
+(`frontend/src/ui/views/onboarding.js`), whose eight steps — sistema,
+identidade, atributos, skills, chrome, arsenal, vida, revisao — are validated in
+`frontend/src/domain/character/characterWizard.ts`. The **Chrome** step spends
+the Complete Package's starting money (CPR p.42/104/105/110), and
 `frontend/src/domain/character/creationChrome.ts` holds those rules:
 
 - The operative starts with **2.550eb**. Cyberware and DLC enhancements are
@@ -269,8 +315,25 @@ a Corporate Conapt so only the 600eb Good Prepak is paid, and a Nomad lives
 with the family pack and its Motorpool. The preset follows the Role until the
 player picks one themselves. The sheet stores housing, food, `monthlyCost` and
 `graceMonths` — never a due date: the campaign calendar belongs to the table.
-- `validate_character_creation` mirrors the budget server-side, so a
-  hand-crafted payload cannot open a sheet with more than 2.550eb.
+
+`validate_character_creation` mirrors the whole budget server-side, so a
+hand-crafted payload cannot open a sheet with more than 2.550eb.
+
+After creation the sheet grows through the **CONQUISTAS** tab
+(`frontend/src/domain/progression/`). An award carries a title, a note, IP and
+character levels, and is either *individual* or *party*: the party form writes
+the same award id onto every seated sheet, so the history groups it back into
+one row and a mistaken award is undone in a single gesture instead of character
+by character. Each award also lands in the sheet's IP ledger, next to purchases,
+so where the IP came from and where it went are the same list.
+
+Any sheet can be downloaded as a **fillable PDF**
+(`frontend/src/domain/character/characterSheetPdf.ts`). It is generated in the
+browser with no dependency and no round trip: every number a player touches
+between sessions — stats, HP, humanity, ammo, eddies, skill levels, notes — is
+a real AcroForm field, so the sheet keeps working offline in any PDF reader.
+Values are written both as `/V` and as an appearance stream, because several
+viewers ignore `/NeedAppearances` and would otherwise show blanks.
 
 ### Dice and rolls
 
@@ -287,6 +350,25 @@ Shared state uses `/api/combat-state`.
 Players can end their own turn through the narrow
 `/api/combat-state/end-turn` route; broad combat changes stay under GM
 control.
+
+**NPC generator.** The cockpit's reinforcements drawer rolls a complete
+combat-ready block from an **archetype** — who this is: civil, guarda, ganger,
+policial, corpsec, solo, drone — crossed with a **tier** — how dangerous: base,
+veterano, elite, chefe, plus a group-only `misto` that puts one leader over a
+base/veterano mix. Baselines follow the CPR core NPC blocks and tiers stack
+fixed deltas on them, so one archetype scales from mook to boss without a
+second table. All ten STATs, HP by the RAW formula, catalog armor and weapons,
+a focused skill set and descriptive tags come out at once, and every random
+decision goes through an injected rng — the same seed reproduces the whole
+squad (`frontend/src/domain/combat/npcGenerator.ts`).
+
+### Movement and distance
+
+`frontend/src/domain/movement/` holds the tactical movement math: one grid cell
+is two meters, a Movement Action covers MOVE cells, Run doubles that, and
+difficult terrain costs two cells for every cell crossed. Cell size and the
+terrain multiplier are parameters rather than constants, so the map can measure
+for a different system without forking the module.
 
 ### Injuries and conditions
 
@@ -357,19 +439,24 @@ frontend/
     domain/map/                 # geometry, vision, templates and intents
     infrastructure/api/         # backend route clients
     infrastructure/session.ts   # client-side session
+    infrastructure/store.ts     # client state container
+    infrastructure/download.ts  # handing generated bytes to the browser
     pages/                      # login and Mesa controllers
     styles/                     # main, login and Mesa styles
-    ui/                         # component and per-surface views
+    ui/                         # component, shared view helpers and per-surface views
 
 backend/
   asgi.py                       # FastAPI composition, static files and WebSocket
   routers/                      # native auth, campaigns and Mesa HTTP contracts
+  dependencies.py               # request-scoped session and service wiring
   application/                  # transport-independent use cases and ports
   repositories/                 # PostgreSQL/filesystem adapters
-  services/                     # external identity verification adapter
-  domain/                       # backend validation
-  db.py                         # PostgreSQL-only pool and transactions
-  sql/postgres.sql              # clean-install PostgreSQL schema
+  domain/                       # backend access rules and payload validation
+  schemas.py                    # Pydantic request models
+  security.py                   # access-token alphabet, normalization and rate limiting
+  db.py                         # PostgreSQL-only pool, transactions and seeding
+  migrations/                   # Alembic revisions (0001-0008)
+  sql/postgres.sql              # baseline schema applied by revision 0001
 
 data/seed/                      # declarative catalog and references
 vendor/sarah-dice/              # vendored 3D dice
@@ -389,6 +476,14 @@ were deleted. HTTP and WebSocket resolve sessions through the same application
 service, and neither transport imports persistence adapters. PostgreSQL is the
 sole database in production and tests.
 
+The schema is owned by **Alembic**, not by a hand-applied SQL file: startup
+runs `upgrade head` before seeding, and `backend/sql/postgres.sql` is the
+baseline that revision `0001` applies. Later revisions carry the structural
+decisions the product depends on — JSONB documents (`0002`), the campaign event
+log (`0003`), campaign-scoped shared state (`0004`), optimistic revisions
+(`0005`), access tokens (`0006`), one campaign per character (`0007`) and
+character delegation (`0008`).
+
 Campaign events are persisted in the PostgreSQL event log. Each app process
 observes that shared log and fans changes out to its local sockets, so sessions
 and event versions remain coherent across replicas. PostgreSQL `LISTEN/NOTIFY`
@@ -396,9 +491,9 @@ is still a useful future latency optimization; correctness does not depend on it
 
 ## Notas de melhoria do sistema
 
-Atualizadas em **2026-08-06**. O repositorio esta avaliado em **8,9/10**, com
-**9,5/10 em arquitetura**. Essas notas representam o estado verificado, nao uma
-meta permanente. Evidencias, metricas e justificativas ficam em
+Remedidas em **2026-09-05**: o repositorio esta em **9,0/10**, com **9,5/10 em
+arquitetura**. Essas notas representam o estado verificado, nao uma meta
+permanente. Evidencias, metricas e a divida que segura a nota ficam em
 [`docs/REPOSITORY-HEALTH.md`](./docs/REPOSITORY-HEALTH.md); a ordem detalhada de
 execucao fica em [`docs/ROADMAP.md`](./docs/ROADMAP.md).
 
@@ -415,19 +510,26 @@ execucao fica em [`docs/ROADMAP.md`](./docs/ROADMAP.md).
   agregados de persistencia.
 - A ficha compartilhada possui uma base reutilizavel; novas extracoes devem
   preservar comportamento, acessibilidade e densidade de informacao.
+- **Estado compartilhado isolado por campanha** (migracao `0004`): chat,
+  combate, tarot, HQ e Nexus escrevem sob `campaign_id`, e duas campanhas nao
+  compartilham estado.
+- **Concorrencia otimista** (migracao `0005`): ficha, estado de combate e cenas
+  da Mesa exigem `expectedRevision` e devolvem conflito explicito em vez de
+  perder escrita silenciosamente.
+- **Personagem pertence a uma campanha** (migracao `0007`) e o controle
+  temporario de uma ficha ausente e um grant revogavel (migracao `0008`).
 
 ### Proximas melhorias, por prioridade
 
 | Prioridade | Melhoria | Criterio de aceite |
 | --- | --- | --- |
-| P0 | Isolar chat, combate, tarot, HQ e Nexus por campanha | Toda leitura, escrita e notificacao possui `campaign_id`; duas campanhas nao compartilham estado |
-| P0 | Adicionar concorrencia otimista a ficha e ao combate | Escritas usam revisao esperada e conflitos retornam resposta explicita, sem perda silenciosa de dados |
 | P1 | Substituir dicionarios livres por DTOs Pydantic graduais | Contratos de entrada e saida criticos sao tipados, validados e cobertos por testes de erro |
 | P1 | Criar ports explicitos para cada agregado da Mesa | A aplicacao deixa de depender de `Any` e `__getattr__`; cada caso de uso declara somente as operacoes utilizadas |
 | P1 | Continuar a decomposicao da ficha e das grandes views | Componentes menores mantem exatamente persistencia, atalhos, foco, estados visuais e regras atuais |
-| P1 | Elevar cobertura de UI, framework e Nexus | Pisos de linhas, branches e funcoes sobem gradualmente no CI sem testes artificiais |
+| P0 | Atualizar os pisos de cobertura do CI | Os pisos de `vite.config.js` (57/47/46/44, de 2026-07-28) sobem para a medicao atual (65,02/56,28/51,96/52,38) arredondada para baixo, para que uma regressao volte a falhar |
+| P1 | Elevar cobertura de UI, framework e Nexus | `framework/` (11,0% de linhas), `pages/` (38,1%) e `ui/` (52,4%) sobem sem testes artificiais |
 | P2 | Migrar estilos inline restantes | Estados e variacoes passam para classes coesas, sem alterar a hierarquia visual da ficha e da Mesa |
-| P2 | Reduzir a baseline Ruff | Nenhum achado novo e reducao incremental dos 240 achados existentes |
+| P2 | Reduzir a baseline Ruff | Nenhum achado novo e reducao incremental dos 239 achados existentes (`scripts/ruff-baseline.json`) |
 | P2 | Dividir o bundle e os scripts 3D legados | Carregamento sob demanda reduz o bundle inicial sem quebrar rolagens, Nexus ou renderizacao 3D |
 | P2 | Melhorar observabilidade operacional | Logs estruturados incluem requisicao, campanha, usuario e conflito sem registrar tokens ou segredos |
 
@@ -449,7 +551,7 @@ mesa ou dar consequencia duradoura as decisoes dos personagens.
 | Cenas sociais e reputacao | Facedown, COOL, REP, chat e notas existem | Contatos, favores, dividas, reputacao por faccao, atitude de NPC e consequencias de dialogo | Conversa, estilo e influencia passam a ter memoria mecanica comparavel ao combate |
 | Downtime e economia | Eurodollars, inventario, IP, terapia, Trauma Team e progressao | Hustles, Night Markets, reparos, fabricacao/upgrades, hospital, terapia, lifestyle e rent em um calendario de downtime | O intervalo entre missoes vira jogo e alimenta a proxima historia |
 | Saude e humanidade | Ferimentos criticos, estabilizacao, tratamento, Humanity e cyberware estruturado | Linha do tempo de recuperacao, cirurgia, disponibilidade do Medtech e alertas de consequencias de Humanity | Dano e chrome continuam relevantes depois que a iniciativa termina |
-| Campanha e continuidade | Campanhas, roster, convites, chat, estados compartilhados e event log | Isolar todo estado por campanha; criar journal pesquisavel, recap, objetivos, rumores e pendencias | Cada campanha preserva sua propria memoria e pode ser retomada depois de semanas |
+| Campanha e continuidade | Campanhas, roster, convites, chat, event log e todo estado compartilhado ja isolado por `campaign_id` | Journal pesquisavel, recap, objetivos, rumores e pendencias | Cada campanha preserva sua propria memoria e pode ser retomada depois de semanas |
 | Ferramentas do GM | Cenas, NPC templates, tokens, segredos, permissao e controles da Mesa | Preparador de encontros, cenas reutilizaveis, clocks, frentes/faccoes e revelacao gradual de informacao | O GM prepara menos dados repetidos e improvisa sem perder rastreabilidade |
 | Encerramento da sessao | IP e logs existem de forma separada | Resumo automatico revisavel, distribuicao de IP/recompensas, mudancas de reputacao e ganchos abertos | A sessao termina com consequencias claras e a proxima ja nasce preparada |
 | Seguranca e conforto da mesa | Perfis, visibilidade por audiencia e controles de permissao | Linhas e veus, pausa de seguranca, conteudo oculto por jogador e ferramentas de acessibilidade | O sistema protege o ritmo e os limites do grupo sem expor escolhas privadas |
@@ -457,8 +559,9 @@ mesa ou dar consequencia duradoura as decisoes dos personagens.
 
 ### Ordem recomendada pelo ciclo de jogo
 
-1. **Confiabilidade da campanha:** isolamento por `campaign_id`, concorrencia da
-   ficha/combate e journal por campanha.
+1. **Confiabilidade da campanha:** com o isolamento por `campaign_id` e a
+   concorrencia otimista da ficha/combate ja entregues, resta o journal por
+   campanha.
 2. **Nucleo da sessao:** ficha contextual, pipeline unico de combate, economia de
    turno, movimento advisory e reconexao sem perda de estado.
 3. **Identidade de Cyberpunk RED:** acoes especificas dos papeis, Netrunning
@@ -488,9 +591,10 @@ deixa um registro compreensivel para o GM.
 
 ## Requirements
 
-- Docker Engine with Docker Compose for the supported deployment;
-- Python 3.13 or newer for native backend development;
-- Node.js/npm to develop, test or rebuild the frontend;
+- Python 3.13 or newer plus Node.js/npm for the native run, which is the
+  current working environment;
+- Docker Engine with Docker Compose for PostgreSQL, and for the parked
+  container deployment;
 - a modern browser with ES modules support.
 
 ## Running locally
@@ -505,10 +609,10 @@ cp .env.example .env   # first time only; fill in the values
 ```
 
 `run-local.sh` loads `.env`, rebuilds the frontend into `dist/`, refuses to
-start if something else already holds the port, and serves:
+start if something else already holds the port, and serves the app at:
 
 ```text
-http://127.0.0.1:8765/Limiar%20OS.dc-2.html
+http://127.0.0.1:8765/
 ```
 
 Pass `--no-build` to skip the Vite build when only backend code changed.
@@ -717,16 +821,21 @@ npm run typecheck
 npm run test:coverage
 ```
 
-Build and hygiene:
+Build and hygiene — the same gates CI runs:
 
 ```bash
 cd frontend && npm run build
+python3 scripts/check-repository-hygiene.py   # generated artifacts stay out of Git
+python3 scripts/check-architecture.py         # layer boundaries: transport -> application -> adapters
+python3 scripts/ruff-baseline.py              # no new Ruff findings over the frozen baseline
+sh scripts/verify-domain-catalogs.sh          # canonical catalog and rules-engine verification
 git diff --check
 ```
 
-The current checkout collects 127 backend tests and runs 763 frontend tests.
-CI requires every backend test to execute against PostgreSQL with zero skips;
-the commands above remain the source of truth for each checkout.
+The current checkout collects **194 backend tests** and **1223 frontend tests**
+in 88 files, with line coverage at 65,02%. CI requires every backend test to
+execute against PostgreSQL with zero skips; the commands above remain the source
+of truth for each checkout.
 
 ## Development hooks
 
