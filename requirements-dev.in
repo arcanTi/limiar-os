@@ -7,4 +7,4 @@ pytest-cov>=7,<8
 # Usado por scripts/ruff-baseline.py, que roda no CI. A versao fica fixada
 # porque uma release nova do ruff introduz regras e faria a baseline estourar
 # por motivo alheio ao commit em revisao.
-ruff==0.15.20
+ruff==0.16.5
