@@ -17,8 +17,8 @@ docker run --rm \
   sh -ceu '
     python -m venv /tmp/lock-env
     /tmp/lock-env/bin/python -m pip install --quiet pip-tools==7.6.0
-    /tmp/lock-env/bin/pip-compile --quiet --resolver=backtracking --strip-extras \
+    /tmp/lock-env/bin/pip-compile --quiet --resolver=backtracking --strip-extras --no-header \
       --generate-hashes --output-file=requirements.txt requirements.in
-    /tmp/lock-env/bin/pip-compile --quiet --resolver=backtracking --strip-extras \
+    /tmp/lock-env/bin/pip-compile --quiet --resolver=backtracking --strip-extras --no-header \
       --generate-hashes --output-file=requirements-dev.txt requirements-dev.in
   '
