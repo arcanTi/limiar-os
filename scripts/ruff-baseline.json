@@ -1,5 +1,5 @@
 {
-  "max_findings": 240,
+  "max_findings": 239,
   "targets": [
     "backend",
     "scripts"

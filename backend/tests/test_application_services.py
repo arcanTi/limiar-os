@@ -14,6 +14,8 @@ from backend.application.game_state import GameStateService
 from backend.application.sessions import SessionService
 from backend.domain.validation import ValidationError
 
+ALL_STATS = ("INT", "REF", "DEX", "TECH", "COOL", "WILL", "LUCK", "MOVE", "BODY", "EMP")
+
 
 class MemoryRecords:
     def __init__(self, rows=None):
@@ -101,7 +103,11 @@ class MemoryCampaigns:
     def join_campaign(self, campaign_id, character_id, session):
         if self.members is not None:
             self.members.setdefault(campaign_id, set()).add(session["username"])
-        return {"campaign_id": campaign_id, "username": session["username"], "character_id": character_id}
+        return {
+            "campaign_id": campaign_id,
+            "username": session["username"],
+            "character_id": character_id,
+        }
 
 
 class MemoryIdentity:
@@ -167,14 +173,15 @@ def test_player_creation_rejects_an_illegal_stat_spread():
     service = CharacterService(MemoryRecords(), MemoryCampaigns())
     with pytest.raises(ValidationError):
         service.save_as_player(
-            {"id": "cheater", "name": "Cheater", "base": {k: 10 for k in ("INT", "REF", "DEX", "TECH", "COOL", "WILL", "LUCK", "MOVE", "BODY", "EMP")}},
+            {"id": "cheater", "name": "Cheater", "base": dict.fromkeys(ALL_STATS, 10)},
             {"username": "ana", "role": "player"},
         )
 
 
 def test_player_update_of_an_existing_sheet_is_not_held_to_creation_limits():
-    grown = {k: 10 for k in ("INT", "REF", "DEX", "TECH", "COOL", "WILL", "LUCK", "MOVE", "BODY", "EMP")}
-    records = MemoryRecords({"characters": {"vet": {"id": "vet", "name": "Vet", "ownerUsername": "ana", "revision": 0}}})
+    grown = dict.fromkeys(ALL_STATS, 10)
+    sheet = {"id": "vet", "name": "Vet", "ownerUsername": "ana", "revision": 0}
+    records = MemoryRecords({"characters": {"vet": sheet}})
     service = CharacterService(records, MemoryCampaigns())
     saved = service.save_as_player(
         {"id": "vet", "name": "Vet", "base": grown, "expectedRevision": 0},

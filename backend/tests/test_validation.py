@@ -87,7 +87,10 @@ def test_sanitize_text_and_payload_strip_control_characters_and_limit_length():
 
 
 def _legal_base(**overrides):
-    base = {"INT": 6, "REF": 8, "DEX": 6, "TECH": 6, "COOL": 6, "WILL": 7, "LUCK": 5, "MOVE": 6, "BODY": 8, "EMP": 4}
+    base = {
+        "INT": 6, "REF": 8, "DEX": 6, "TECH": 6, "COOL": 6,
+        "WILL": 7, "LUCK": 5, "MOVE": 6, "BODY": 8, "EMP": 4,
+    }
     base.update(overrides)
     return base
 
@@ -121,21 +124,39 @@ def test_character_creation_skips_fields_that_are_absent():
         ({"skills": [{"name": "Handgun", "level": 7}]}, "must be between 0 and 6"),
         ({"skills": [{"name": "Handgun", "level": 1}]}, "must be 0 or at least 2"),
         ({"skills": [{"name": "Athletics", "level": 1}]}, "must be at least 2"),
-        ({"skills": [{"name": f"S{i}", "level": 6} for i in range(11)]}, "spend 66 points; the limit is 60"),
-        ({"skills": [{"name": "Language (Japanese)", "level": 4, "origin": True}]}, "claims the origin language"),
         (
-            {"creation": {"originLanguage": "Japanese"}, "skills": [{"name": "Language (Spanish)", "level": 4, "origin": True}]},
+            {"skills": [{"name": f"S{i}", "level": 6} for i in range(11)]},
+            "spend 66 points; the limit is 60",
+        ),
+        (
+            {"skills": [{"name": "Language (Japanese)", "level": 4, "origin": True}]},
             "claims the origin language",
         ),
         (
-            {"creation": {"originLanguage": "Japanese"}, "skills": [{"name": "Language (Japanese)", "level": 3, "origin": True}]},
+            {
+                "creation": {"originLanguage": "Japanese"},
+                "skills": [{"name": "Language (Spanish)", "level": 4, "origin": True}],
+            },
+            "claims the origin language",
+        ),
+        (
+            {
+                "creation": {"originLanguage": "Japanese"},
+                "skills": [{"name": "Language (Japanese)", "level": 3, "origin": True}],
+            },
             "must be at least 4",
         ),
         ({"creation": {"method": "wish"}}, "'creation.method' must be one of"),
         ({"creation": {"method": "roll"}}, "'creation.statRolls' must be at least 10"),
-        ({"creation": {"method": "roll", "statRolls": 3}}, "'creation.statRolls' must be at least 10"),
+        (
+            {"creation": {"method": "roll", "statRolls": 3}},
+            "'creation.statRolls' must be at least 10",
+        ),
         ({"creation": {"method": "roll", "statRolls": -1}}, "non-negative"),
-        ({"creation": {"method": "roll", "statRolls": 10, "statRerolls": "2"}}, "'creation.statRerolls'"),
+        (
+            {"creation": {"method": "roll", "statRolls": 10, "statRerolls": "2"}},
+            "'creation.statRerolls'",
+        ),
     ],
 )
 def test_character_creation_rejects_illegal_spreads(payload, message):
@@ -145,7 +166,10 @@ def test_character_creation_rejects_illegal_spreads(payload, message):
 
 
 def test_character_creation_lets_rolled_stats_exceed_the_point_budget():
-    rolled = {"creation": {"method": "roll", "statRolls": 12, "statRerolls": 2}, "base": _legal_base(INT=10, BODY=10, EMP=9)}
+    rolled = {
+        "creation": {"method": "roll", "statRolls": 12, "statRerolls": 2},
+        "base": _legal_base(INT=10, BODY=10, EMP=9),
+    }
     validate_character_creation({"name": "V", **rolled})
     with pytest.raises(ValidationError):
         validate_character_creation({"name": "V", **rolled, "base": _legal_base(INT=11)})
@@ -168,18 +192,24 @@ def test_character_creation_free_skill_levels_do_not_count():
     # Thirteen default skills at 2 cost nothing; only levels above 2 spend.
     defaults = [
         {"name": name, "level": 2}
-        for name in ("Athletics", "Brawling", "Concentration", "Conversation", "Education", "Evasion", "First Aid",
-                     "Human Perception", "Language (Streetslang)", "Local Expert (Your Home)", "Perception",
-                     "Persuasion", "Stealth")
+        for name in (
+            "Athletics", "Brawling", "Concentration", "Conversation", "Education",
+            "Evasion", "First Aid", "Human Perception", "Language (Streetslang)",
+            "Local Expert (Your Home)", "Perception", "Persuasion", "Stealth",
+        )
     ]
-    validate_character_creation({"name": "V", "skills": defaults + [{"name": f"S{i}", "level": 6} for i in range(10)]})
+    bought = [{"name": f"S{i}", "level": 6} for i in range(10)]
+    validate_character_creation({"name": "V", "skills": defaults + bought})
 
 
 def test_character_creation_accepts_the_starting_budget():
     validate_character_creation({
         "name": "V",
         "credits": 1050,
-        "equipped": [{"code": "GORILLA-ARMS", "price": 1000}, {"code": "ENH-HYD-RAM", "price": 500}],
+        "equipped": [
+            {"code": "GORILLA-ARMS", "price": 1000},
+            {"code": "ENH-HYD-RAM", "price": 500},
+        ],
     })
 
 
@@ -195,7 +225,9 @@ def test_character_creation_rejects_cash_above_the_creation_budget():
 
 def test_character_creation_counts_installed_chrome_against_the_budget():
     with pytest.raises(ValidationError) as excinfo:
-        validate_character_creation({"name": "V", "credits": 2550, "equipped": [{"code": "X", "price": 1000}]})
+        validate_character_creation(
+            {"name": "V", "credits": 2550, "equipped": [{"code": "X", "price": 1000}]},
+        )
     assert "3550eb" in str(excinfo.value)
 
 
@@ -241,20 +273,31 @@ def test_character_creation_accepts_chrome_and_gear_sharing_the_pool():
         "name": "V",
         "credits": 850,
         "equipped": [{"code": "GORILLA-ARMS", "price": 1000}],
-        "gear": [{"code": "ASSAULT-RIFLE", "price": 500, "qty": 1}, {"code": "AGENT", "price": 100, "qty": 2}],
+        "gear": [
+            {"code": "ASSAULT-RIFLE", "price": 500, "qty": 1},
+            {"code": "AGENT", "price": 100, "qty": 2},
+        ],
     })
 
 
 def test_character_creation_accepts_a_lifestyle_record():
     validate_character_creation({
         "name": "V",
-        "lifestyle": {"id": "default", "housing": "Cargo Container", "food": "Kibble", "monthlyCost": 1100, "graceMonths": 1},
+        "lifestyle": {
+            "id": "default",
+            "housing": "Cargo Container",
+            "food": "Kibble",
+            "monthlyCost": 1100,
+            "graceMonths": 1,
+        },
     })
 
 
 def test_character_creation_rejects_a_negative_monthly_cost():
     with pytest.raises(ValidationError) as excinfo:
-        validate_character_creation({"name": "V", "lifestyle": {"housing": "Cargo Container", "monthlyCost": -100}})
+        validate_character_creation(
+            {"name": "V", "lifestyle": {"housing": "Cargo Container", "monthlyCost": -100}},
+        )
     assert "'lifestyle.monthlyCost' must be a non-negative integer" in str(excinfo.value)
 
 
