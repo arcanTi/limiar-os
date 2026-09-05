@@ -152,9 +152,9 @@ export function resolveAttackCheck(context: AttackContext = {}, rng: () => numbe
   }
 
   const margin = attackParts.total - defenseDV;
-  // CPR RAW: the attacker must beat the DV; a tie always goes to the
-  // defender, whether the DV is a fixed range value or an opposed roll.
-  const hit = attackParts.total > defenseDV;
+  // CPR RAW: a fixed DV is met or beaten, so a tie hits; an opposed roll
+  // gives the tie to the defender.
+  const hit = opposed ? attackParts.total > defenseDV : attackParts.total >= defenseDV;
   if (weapon.quality === 'poor' && attackParts.d10 === 1) {
     issues.push(combatIssue('info', 'poor_quality_malfunction_placeholder', 'Poor quality malfunction is not resolved in this phase.', { d10: attackParts.d10 }));
   }

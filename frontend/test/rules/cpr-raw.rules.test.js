@@ -686,33 +686,34 @@ describe('CPR RAW combat rules', () => {
     expect(result.opposed).toBe(true);
   });
 
-  it('Given fixed ranged DV tie, When resolving an attack check, Then the tie fails (attacker must beat the DV)', () => {
-    // CPR RAW p.130/p.170: "If you beat the DV (Defender wins in a tie)".
+  it('Given fixed ranged DV tie, When resolving an attack check, Then meeting the DV hits', () => {
+    // CPR RAW: a fixed DV is met or beaten; only an opposed roll gives the tie
+    // to the defender.
     const tie = resolveAttackCheck({
       attacker: { stats: { REF: 8 }, skills: { Handgun: 6 } },
       weapon: { weaponSkill: 'Handgun' },
       attackRoll: { total: 15 },
       targetDV: 15,
     });
-    expect(tie.hit).toBe(false);
+    expect(tie.hit).toBe(true);
     expect(tie.margin).toBe(0);
     expect(tie.opposed).toBe(false);
-    const beat = resolveAttackCheck({
+    const under = resolveAttackCheck({
       attacker: { stats: { REF: 8 }, skills: { Handgun: 6 } },
       weapon: { weaponSkill: 'Handgun' },
-      attackRoll: { total: 16 },
+      attackRoll: { total: 14 },
       targetDV: 15,
     });
-    expect(beat.hit).toBe(true);
-    expect(beat.margin).toBe(1);
+    expect(under.hit).toBe(false);
+    expect(under.margin).toBe(-1);
   });
 
-  it('Given an Autofire tie against the DV, When the attack resolves end to end, Then it misses and never multiplies by zero', () => {
+  it('Given an Autofire miss, When the attack resolves end to end, Then it deals no damage and never multiplies by zero', () => {
     const result = resolveCombatAttack({
       attacker: { stats: { REF: 8 }, skills: { Autofire: 6 } },
       weapon: { code: 'SMG', damage: '2d6', weaponSkill: 'Autofire', autofire: { enabled: true, multiplier: 3 } },
       attackMode: 'autofire',
-      attackRoll: { total: 15 },
+      attackRoll: { total: 14 },
       targetDV: 15,
       damageRoll: { rolls: [6, 6] },
       target: { armor: { body: { sp: 0, ablates: true } } },
